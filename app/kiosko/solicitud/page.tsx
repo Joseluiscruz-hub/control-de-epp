@@ -1,0 +1,318 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { getActiveAssignment } from "@/lib/kiosk-api";
+import { PPECatalogItem, ReplacementReason } from "@/lib/kiosk-types";
+import { evaluateReplacement, getStockStatus } from "@/lib/replacement-logic";
+import {
+  ArrowLeft, AlertTriangle, CheckCircle2, Camera,
+  PenLine, DollarSign, RotateCcw, Loader2,
+} from "lucide-react";
+
+const REASON_LABELS: Record<ReplacementReason, { label: string; icon: React.ReactNode; desc: string }> = {
+  vida_util: { label: "Vida Útil Cumplida", icon: <CheckCircle2 size={22} />, desc: "Mi EPP ya completó su período de uso establecido." },
+  desgaste:  { label: "Desgaste / Daño",    icon: <AlertTriangle size={22} />, desc: "Mi EPP presenta daño o desgaste visible antes de completar su vida útil." },
+  extravio:  { label: "Extravío / Pérdida", icon: <DollarSign size={22} />,   desc: "He extraviado mi EPP y necesito reposición." },
+};
+
+export default function KioskoSolicitudPage() {
+  const router = useRouter();
+  const [item, setItem] = useState<PPECatalogItem | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedSku, setSelectedSku] = useState<string | null>(null);
+  const [reason, setReason] = useState<ReplacementReason | null>(null);
+  const [evaluation, setEvaluation] = useState<ReturnType<typeof evaluateReplacement> | null>(null);
+  const [lastAssignment, setLastAssignment] = useState<any>(null);
+  const [loadingAssignment, setLoadingAssignment] = useState(false);
+  const [showLossModal, setShowLossModal] = useState(false);
+  const [signatureDone, setSignatureDone] = useState(false);
+  const [photoFile, setPhotoFile] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const employeeId = typeof window !== "undefined" ? sessionStorage.getItem("kiosk_employee_id") ?? "" : "";
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem("kiosk_selected_item");
+    const verified = sessionStorage.getItem("kiosk_pin_verified");
+    if (!raw || verified !== "true") { router.push("/kiosko"); return; }
+    const parsed: PPECatalogItem = JSON.parse(raw);
+    setItem(parsed);
+
+    // Si no tiene tallas, pre-seleccionar SKU único
+    if (!parsed.hasSizes && parsed.sku) {
+      setSelectedSize("N/A");
+      setSelectedSku(parsed.sku);
+    }
+  }, []);
+
+  // Cargar asignación activa cuando se selecciona SKU
+  useEffect(() => {
+    if (!selectedSku || !employeeId) return;
+    setLoadingAssignment(true);
+    getActiveAssignment(employeeId, selectedSku).then(a => {
+      setLastAssignment(a);
+      setLoadingAssignment(false);
+    });
+  }, [selectedSku]);
+
+  // Calcular evaluación cuando cambia razón + asignación
+  useEffect(() => {
+    if (!reason || !item) return;
+    if (lastAssignment?.assignedAt) {
+      const assignedDate = lastAssignment.assignedAt.toDate
+        ? lastAssignment.assignedAt.toDate()
+        : new Date(lastAssignment.assignedAt);
+      const ev = evaluateReplacement(assignedDate, item.replacementDays, item.unitCost ?? 0, reason);
+      setEvaluation(ev);
+      if (reason === "extravio" && ev.chargeAmount > 0) {
+        setShowLossModal(true);
+      }
+    } else {
+      // No hay asignación previa → primer EPP, procede libre
+      setEvaluation({ daysUsed: 0, daysRemaining: item.replacementDays, lifeUsedPct: 0, isEligibleFree: true, requiresEvidence: false, chargeAmount: 0, chargeDescription: "" });
+    }
+  }, [reason, lastAssignment]);
+
+  const handleSizeSelect = (size: string, sku: string) => {
+    setSelectedSize(size);
+    setSelectedSku(sku);
+    setReason(null);
+    setEvaluation(null);
+  };
+
+  const canProceed = () => {
+    if (!selectedSku || !reason) return false;
+    if (reason === "desgaste" && !photoFile) return false;
+    if (reason === "extravio" && (evaluation?.chargeAmount ?? 0) > 0 && !signatureDone) return false;
+    return true;
+  };
+
+  const handleProceed = () => {
+    if (!item || !selectedSku || !selectedSize || !reason) return;
+    sessionStorage.setItem("kiosk_solicitud", JSON.stringify({
+      itemId: item.id,
+      sku: selectedSku,
+      size: selectedSize,
+      reason,
+      replacementDays: item.replacementDays,
+      chargeAmount: evaluation?.chargeAmount ?? 0,
+      photoDataUrl: photoFile,
+    }));
+    router.push("/kiosko/confirmacion");
+  };
+
+  // ── Canvas firma ──────────────────────────────────────────────────────────
+  const startDraw = (e: React.PointerEvent) => {
+    setIsDrawing(true);
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    const r = canvas.getBoundingClientRect();
+    ctx.beginPath();
+    ctx.moveTo(e.clientX - r.left, e.clientY - r.top);
+  };
+  const draw = (e: React.PointerEvent) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    const r = canvas.getBoundingClientRect();
+    ctx.strokeStyle = "#f59e0b";
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.lineTo(e.clientX - r.left, e.clientY - r.top);
+    ctx.stroke();
+  };
+  const endDraw = () => {
+    setIsDrawing(false);
+    setSignatureDone(true);
+  };
+  const clearSig = () => {
+    const canvas = canvasRef.current!;
+    canvas.getContext("2d")!.clearRect(0, 0, canvas.width, canvas.height);
+    setSignatureDone(false);
+  };
+
+  if (!item) return (
+    <div className="flex-1 flex items-center justify-center">
+      <Loader2 size={32} className="animate-spin text-amber-400" />
+    </div>
+  );
+
+  const sizes = item.hasSizes && item.sizes ? Object.entries(item.sizes) : [];
+
+  return (
+    <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-6 py-6 gap-6">
+      <button onClick={() => router.push("/kiosko/catalogo")} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors self-start">
+        <ArrowLeft size={18} /> Catálogo
+      </button>
+
+      {/* Item header */}
+      <div className="flex items-center gap-4 bg-gray-800 rounded-2xl p-4 border border-gray-700">
+        <span className="text-5xl">🦺</span>
+        <div>
+          <h2 className="text-xl font-bold">{item.name}</h2>
+          <p className="text-sm text-gray-400">{item.category} · Vida útil: {item.replacementDays} días</p>
+          {item.unitCost && <p className="text-xs text-gray-500">Costo unitario: ${item.unitCost.toFixed(2)} MXN</p>}
+        </div>
+      </div>
+
+      {/* Sección 1: Tallas */}
+      {item.hasSizes && sizes.length > 0 && (
+        <section>
+          <h3 className="text-base font-semibold mb-3 text-gray-300">1. Selecciona tu talla</h3>
+          <div className="flex flex-wrap gap-3">
+            {sizes.map(([size, variant]) => {
+              const status = getStockStatus(variant.stock, variant.minStock);
+              return (
+                <button
+                  key={size}
+                  disabled={status === "empty"}
+                  onClick={() => handleSizeSelect(size, variant.sku)}
+                  className={`relative flex flex-col items-center gap-1 px-5 py-3 rounded-xl border-2 text-sm font-bold transition-all active:scale-95
+                    ${selectedSize === size ? "border-amber-400 bg-amber-400/10 text-amber-400"
+                    : status === "empty" ? "border-gray-700 text-gray-600 opacity-40 cursor-not-allowed"
+                    : "border-gray-700 text-white hover:border-gray-500"}`}
+                >
+                  {size}
+                  <span className={`text-xs font-normal ${status === "ok" ? "text-green-400" : status === "low" ? "text-amber-400" : "text-red-400"}`}>
+                    {status === "empty" ? "Sin stock" : `${variant.stock} disp.`}
+                  </span>
+                  <span className="text-xs text-gray-600 font-mono">{variant.sku}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Sección 2: Motivo */}
+      {selectedSku && (
+        <section>
+          <h3 className="text-base font-semibold mb-3 text-gray-300">
+            {item.hasSizes ? "2." : "1."} Motivo de la solicitud
+          </h3>
+
+          {loadingAssignment ? (
+            <div className="flex items-center gap-2 text-gray-400 text-sm">
+              <Loader2 size={16} className="animate-spin" /> Verificando historial...
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {(Object.entries(REASON_LABELS) as [ReplacementReason, typeof REASON_LABELS[ReplacementReason]][]).map(([key, val]) => (
+                <button
+                  key={key}
+                  onClick={() => setReason(key)}
+                  className={`flex items-start gap-4 p-4 rounded-xl border-2 text-left transition-all
+                    ${reason === key
+                      ? key === "extravio" ? "border-red-500 bg-red-900/20"
+                      : key === "desgaste" ? "border-amber-500 bg-amber-900/20"
+                      : "border-green-500 bg-green-900/20"
+                    : "border-gray-700 bg-gray-800 hover:border-gray-600"}`}
+                >
+                  <span className={`mt-0.5 ${key === "extravio" ? "text-red-400" : key === "desgaste" ? "text-amber-400" : "text-green-400"}`}>
+                    {val.icon}
+                  </span>
+                  <div>
+                    <p className="font-semibold text-white">{val.label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{val.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Evaluación resultado */}
+      {evaluation && reason && (
+        <div className={`rounded-xl p-4 border text-sm
+          ${reason === "vida_util" ? "border-green-500/30 bg-green-900/10"
+          : reason === "desgaste" ? "border-amber-500/30 bg-amber-900/10"
+          : "border-red-500/30 bg-red-900/10"}`}>
+          {reason === "vida_util" && (
+            <p className="text-green-300 flex items-center gap-2">
+              <CheckCircle2 size={16} /> Tu EPP ha cumplido su vida útil ({evaluation.daysUsed} días). Reposición <strong>gratuita</strong>.
+            </p>
+          )}
+          {reason === "desgaste" && (
+            <p className="text-amber-300 flex items-center gap-2">
+              <AlertTriangle size={16} /> Solicitud pendiente de aprobación por supervisor. <strong>Adjunta foto del daño.</strong>
+            </p>
+          )}
+          {reason === "extravio" && evaluation.chargeAmount === 0 && (
+            <p className="text-green-300 flex items-center gap-2">
+              <CheckCircle2 size={16} /> Tu EPP ya cumplió su vida útil. Reposición <strong>gratuita</strong>.
+            </p>
+          )}
+          {reason === "extravio" && evaluation.chargeAmount > 0 && (
+            <p className="text-red-300 flex items-center gap-2">
+              <DollarSign size={16} /> Cargo por extravío: <strong>${evaluation.chargeAmount.toFixed(2)} MXN</strong> — {evaluation.chargeDescription}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Foto evidencia (desgaste) */}
+      {reason === "desgaste" && (
+        <section>
+          <h3 className="text-base font-semibold mb-3 text-gray-300">Evidencia fotográfica</h3>
+          <label className="flex flex-col items-center gap-3 border-2 border-dashed border-gray-600 rounded-xl p-6 cursor-pointer hover:border-amber-400/60 transition-colors">
+            <Camera size={28} className="text-gray-500" />
+            <span className="text-sm text-gray-400">{photoFile ? "✅ Foto adjunta" : "Toca para tomar foto o seleccionar"}</span>
+            <input type="file" accept="image/*" capture="environment" className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                const reader = new FileReader();
+                reader.onload = ev => setPhotoFile(ev.target?.result as string);
+                reader.readAsDataURL(f);
+              }}
+            />
+          </label>
+        </section>
+      )}
+
+      {/* Firma digital (extravío con cobro) */}
+      {showLossModal && reason === "extravio" && (evaluation?.chargeAmount ?? 0) > 0 && (
+        <section>
+          <h3 className="text-base font-semibold mb-1 text-red-300">Firma de responsiva</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Al firmar autorizas el descuento de <strong>${evaluation!.chargeAmount.toFixed(2)} MXN</strong> en tu próxima nómina.
+          </p>
+          <div className="relative border-2 border-gray-600 rounded-xl overflow-hidden bg-gray-900">
+            <canvas
+              ref={canvasRef}
+              width={480}
+              height={120}
+              className="w-full touch-none"
+              onPointerDown={startDraw}
+              onPointerMove={draw}
+              onPointerUp={endDraw}
+            />
+            {!signatureDone && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="text-gray-600 text-sm flex items-center gap-2">
+                  <PenLine size={16} /> Firma aquí con tu dedo
+                </span>
+              </div>
+            )}
+          </div>
+          {signatureDone && (
+            <button onClick={clearSig} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 mt-2">
+              <RotateCcw size={12} /> Limpiar firma
+            </button>
+          )}
+        </section>
+      )}
+
+      {/* CTA */}
+      <button
+        onClick={handleProceed}
+        disabled={!canProceed()}
+        className="w-full py-5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:bg-amber-500 disabled:opacity-30 text-gray-900 font-bold text-xl transition-colors mt-auto"
+      >
+        Confirmar Solicitud →
+      </button>
+    </div>
+  );
+}

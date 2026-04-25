@@ -1,0 +1,124 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { getEmployeeById } from "@/lib/kiosk-api";
+import { Loader2, HardHat } from "lucide-react";
+
+export default function KioskoHomePage() {
+  const router = useRouter();
+  const [empId, setEmpId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleContinue = async () => {
+    if (!empId.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      const emp = await getEmployeeById(empId.trim());
+      if (!emp) {
+        setError("Número de empleado no encontrado. Verifica con tu supervisor.");
+        setLoading(false);
+        return;
+      }
+      if (!emp.active) {
+        setError("Este empleado está inactivo. Contacta a Recursos Humanos.");
+        setLoading(false);
+        return;
+      }
+      // Guardar en sessionStorage (solo durante la sesión del kiosko)
+      sessionStorage.setItem("kiosk_employee_id", emp.id);
+      sessionStorage.setItem("kiosk_employee_name", emp.name);
+      sessionStorage.setItem("kiosk_first_login", String(emp.firstLogin));
+      sessionStorage.setItem("kiosk_terms_accepted", String(emp.termsAccepted));
+
+      if (emp.firstLogin || !emp.termsAccepted) {
+        router.push("/kiosko/setup");
+      } else {
+        router.push("/kiosko/login");
+      }
+    } catch (e) {
+      setError("Error de conexión. Intenta de nuevo.");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-10 px-8 py-16">
+      <div className="flex flex-col items-center gap-4 text-center">
+        <div className="w-20 h-20 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center">
+          <HardHat size={44} className="text-amber-400" />
+        </div>
+        <h1 className="text-3xl font-bold text-white">Solicitud de EPP</h1>
+        <p className="text-gray-400 max-w-sm text-lg">
+          Ingresa tu número de empleado para comenzar
+        </p>
+      </div>
+
+      <div className="w-full max-w-sm flex flex-col gap-4">
+        <input
+          type="tel"
+          inputMode="numeric"
+          placeholder="Ej. 1881"
+          value={empId}
+          onChange={e => setEmpId(e.target.value.replace(/\D/g, ""))}
+          onKeyDown={e => e.key === "Enter" && handleContinue()}
+          className="w-full text-center text-3xl font-bold tracking-widest bg-gray-800 border-2 border-gray-600 focus:border-amber-400 rounded-2xl px-6 py-5 text-white outline-none transition-colors placeholder:text-gray-600"
+          maxLength={10}
+          autoFocus
+        />
+
+        {error && (
+          <p className="text-red-400 text-center text-base bg-red-900/20 border border-red-500/30 rounded-xl px-4 py-3">
+            {error}
+          </p>
+        )}
+
+        <button
+          onClick={handleContinue}
+          disabled={!empId.trim() || loading}
+          className="w-full py-5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-gray-900 font-bold text-xl transition-colors flex items-center justify-center gap-3"
+        >
+          {loading ? <Loader2 size={24} className="animate-spin" /> : "Continuar →"}
+        </button>
+      </div>
+
+      {/* Teclado numérico visual táctil */}
+      <NumPad value={empId} onChange={setEmpId} onConfirm={handleContinue} />
+    </div>
+  );
+}
+
+// ── Teclado numérico táctil ───────────────────────────────────────────────────
+function NumPad({
+  value, onChange, onConfirm,
+}: { value: string; onChange: (v: string) => void; onConfirm: () => void }) {
+  const keys = ["1","2","3","4","5","6","7","8","9","⌫","0","✓"];
+
+  const press = (k: string) => {
+    if (k === "⌫") onChange(value.slice(0, -1));
+    else if (k === "✓") onConfirm();
+    else if (value.length < 10) onChange(value + k);
+  };
+
+  return (
+    <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
+      {keys.map(k => (
+        <button
+          key={k}
+          onClick={() => press(k)}
+          className={`h-16 rounded-xl text-2xl font-bold transition-all active:scale-95 select-none
+            ${k === "✓"
+              ? "bg-amber-400 text-gray-900 hover:bg-amber-300"
+              : k === "⌫"
+              ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
+              : "bg-gray-800 text-white hover:bg-gray-700 border border-gray-700"
+            }`}
+        >
+          {k}
+        </button>
+      ))}
+    </div>
+  );
+}
