@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "Employee": {
+      "title": "Employee",
+      "description": "An employee in the plant",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Employee Number (e.g. 1881)" },
+        "name": { "type": "string", "description": "Full name" },
+        "area": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "area", "active", "createdAt", "updatedAt"]
+    },
+    "PPEItem": {
+      "title": "PPE Item",
+      "description": "Personal Protective Equipment catalog item",
+      "type": "object",
+      "properties": {
+        "sku": { "type": "string", "description": "Unique SKU code" },
+        "name": { "type": "string" },
+        "category": { "type": "string", "enum": ["Guantes", "Cascos", "Gafas", "Calzado", "Proteccion Auditiva", "Ropa", "Respiradores", "Otros"] },
+        "replacementDays": { "type": "number", "description": "Number of days before it needs replacement" },
+        "stock": { "type": "number", "description": "Current inventory stock" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sku", "name", "category", "replacementDays", "stock", "createdAt", "updatedAt"]
+    },
+    "Assignment": {
+      "title": "PPE Assignment",
+      "description": "Ledger of PPE assigned to an employee",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "sku": { "type": "string" },
+        "assignedAt": { "type": "string", "format": "date-time" },
+        "nextReplacementAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["active", "replaced", "returned"] },
+        "issuedByUserId": { "type": "string", "description": "User ID of the store manager who issued the item" }
+      },
+      "required": ["employeeId", "sku", "assignedAt", "nextReplacementAt", "status", "issuedByUserId"]
+    }
+  },
+  "firestore": {
+    "/employees/{employeeId}": {
+      "schema": { "$ref": "#/entities/Employee" },
+      "description": "Collection of plant employees"
+    },
+    "/ppe_catalog/{itemId}": {
+      "schema": { "$ref": "#/entities/PPEItem" },
+      "description": "Catalog of available PPE and stock"
+    },
+    "/assignments/{assignmentId}": {
+      "schema": { "$ref": "#/entities/Assignment" },
+      "description": "Record of all PPE given to employees"
+    }
+  }
+}

@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitives
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidEmployee(data) {
+      return data.keys().hasAll(['id', 'name', 'area', 'active', 'createdAt', 'updatedAt'])
+        && data.id is string && data.id.size() <= 64
+        && data.name is string && data.name.size() <= 128
+        && data.area is string && data.area.size() <= 128
+        && data.active is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPPEItem(data) {
+      return data.keys().hasAll(['sku', 'name', 'category', 'replacementDays', 'stock', 'createdAt', 'updatedAt'])
+        && data.sku is string && data.sku.size() <= 64
+        && data.name is string && data.name.size() <= 128
+        && data.category is string && data.category.size() <= 64
+        && data.category in ["Guantes", "Cascos", "Gafas", "Calzado", "Proteccion Auditiva", "Ropa", "Respiradores", "Otros"]
+        && data.replacementDays is number
+        && data.stock is number && data.stock >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAssignment(data) {
+      return data.keys().hasAll(['employeeId', 'sku', 'assignedAt', 'nextReplacementAt', 'status', 'issuedByUserId'])
+        && data.employeeId is string && data.employeeId.size() <= 64
+        && data.sku is string && data.sku.size() <= 64
+        && data.assignedAt is timestamp
+        && data.nextReplacementAt is timestamp
+        && data.status is string && data.status in ["active", "replaced", "returned"]
+        && data.issuedByUserId is string && data.issuedByUserId == request.auth.uid;
+    }
+
+    match /employees/{employeeId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(employeeId) && isValidEmployee(incoming()) && incoming().createdAt == request.time;
+      allow update: if isSignedIn() && isValidId(employeeId) && isValidEmployee(incoming()) && incoming().updatedAt == request.time
+                    && incoming().id == existing().id && incoming().createdAt == existing().createdAt;
+    }
+
+    match /ppe_catalog/{itemId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(itemId) && isValidPPEItem(incoming()) && incoming().createdAt == request.time;
+      // Also allow modifying stock and basic fields
+      allow update: if isSignedIn() && isValidId(itemId) && isValidPPEItem(incoming()) && incoming().updatedAt == request.time
+                    && incoming().sku == existing().sku && incoming().createdAt == existing().createdAt;
+    }
+
+    match /assignments/{assignmentId} {
+      allow read: if isSignedIn();
+      // Requires the referenced employee and item to exist.
+      allow create: if isSignedIn() && isValidId(assignmentId) && isValidAssignment(incoming())
+                    && exists(/databases/$(database)/documents/employees/$(incoming().employeeId))
+                    && exists(/databases/$(database)/documents/ppe_catalog/$(incoming().sku));
+      
+      allow update: if isSignedIn() && isValidId(assignmentId) && isValidAssignment(incoming())
+                    && incoming().employeeId == existing().employeeId
+                    && incoming().sku == existing().sku
+                    && incoming().assignedAt == existing().assignedAt
+                    && incoming().issuedByUserId == existing().issuedByUserId;
+    }
+  }
+}
