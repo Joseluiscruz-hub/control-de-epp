@@ -13,7 +13,7 @@ const NAV_LINKS = [
 ];
 
 export function NavBar() {
-  const { user, logOut, isAdmin } = useAuth();
+  const { user: authUser, logOut, isAdmin } = useAuth();
   const pathname = usePathname();
 
   // No mostrar navbar en el portal público si queremos una experiencia full screen
@@ -81,21 +81,21 @@ export function NavBar() {
             <div className="flex items-center gap-2 pl-2">
               <div className="flex flex-col items-end hidden xl:flex">
                 <span className="text-xs font-bold text-gray-900 truncate max-w-[120px]">
-                  {user?.displayName || 'Administrador'}
+                  {authUser?.displayName || 'Administrador'}
                 </span>
                 <span className="text-[9px] text-green-600 font-bold uppercase tracking-tighter">
                   {isAdmin ? 'Modo Admin' : 'Editor'}
                 </span>
               </div>
-              {user?.photoURL ? (
+              {authUser?.photoURL ? (
                 <img
-                  src={user.photoURL}
+                  src={authUser.photoURL}
                   alt="Perfil"
                   className="h-8 w-8 rounded-full border-2 border-white shadow-sm ring-1 ring-gray-100"
                 />
               ) : (
                 <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold border-2 border-white shadow-sm">
-                  {user?.email?.charAt(0).toUpperCase() || 'A'}
+                  {authUser?.email?.charAt(0).toUpperCase() || 'A'}
                 </div>
               )}
               <Button

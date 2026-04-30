@@ -39,7 +39,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
   const [recentAssignments, setRecentAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
@@ -172,7 +172,7 @@ export default function DashboardPage() {
             Panel de Control Central
           </Badge>
           <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 lg:text-5xl">
-            ¡Hola, {user?.displayName?.split(' ')[0] || 'Admin'}! 👋
+            ¡Hola, {authUser?.displayName?.split(' ')[0] || 'Admin'}! 👋
           </h1>
           <p className="text-gray-500 mt-3 flex items-center gap-2 text-lg">
             <Activity className="h-5 w-5 text-green-500 animate-pulse" />
