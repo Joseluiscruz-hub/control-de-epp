@@ -11,12 +11,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   HardHat, Users, AlertTriangle, ArrowRight, Package,
-  TrendingUp, Clock, CheckCircle2, Activity
+  TrendingUp, Clock, CheckCircle2, Activity, Bot, ExternalLink
 } from 'lucide-react';
 import { handleFirestoreError, OperationType } from '@/lib/firestore-error';
 import { format, isToday, isBefore, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AssignPpeDialog } from '@/components/assign-ppe-dialog';
+import { useAuth } from '@/components/auth-provider';
 import Link from 'next/link';
 
 interface Assignment {
@@ -38,6 +39,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [recentAssignments, setRecentAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
