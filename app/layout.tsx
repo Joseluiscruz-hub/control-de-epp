@@ -40,6 +40,18 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
             <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               {children}
             </main>
+            {/* FEMSA Corporate Footer */}
+            <footer className="relative z-10 no-print mt-auto">
+              <div className="femsa-divider mx-8" />
+              <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+                <span className="text-slate-400 text-[10px] uppercase tracking-[0.2em] font-bold">
+                  AssetGuard Corporate v4.0
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'rgba(218,41,28,0.4)' }}>
+                  Coca-Cola FEMSA · Powered by IA Gemini
+                </span>
+              </div>
+            </footer>
             <AiChatPanel />
           </AuthGuard>
         </AuthProvider>

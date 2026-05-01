@@ -7,6 +7,19 @@
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
+    /* Coca-Cola FEMSA Brand Colors */
+    --color-femsa-red: #DA291C;
+    --color-femsa-red-dark: #B01E13;
+    --color-coca-cola-red: #F40009;
+    --color-femsa-black: #000000;
+    --color-femsa-white: #FFFFFF;
+    --color-femsa-gold: #D4A017;
+    --color-femsa-gold-light: #F5C842;
+    /* Corporate Dark Theme */
+    --color-corporate-dark: #0F172A;
+    --color-corporate-slate: #1E293B;
+    --color-corporate-card: #1C2333;
+    /* Standard tokens */
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -82,6 +95,18 @@
     --sidebar-ring: oklch(0.708 0 0);
     --brand-red: #F40009;
     --brand-dark: #0a0a0a;
+    /* Coca-Cola FEMSA Brand System */
+    --femsa-red: #DA291C;
+    --femsa-red-dark: #B01E13;
+    --femsa-gold: #D4A017;
+    --femsa-gold-light: #F5C842;
+    --femsa-black: #000000;
+    --brand-primary: var(--femsa-red);
+    --brand-accent: var(--femsa-gold);
+    /* Glass Morphism Premium */
+    --glass-bg: rgba(255, 255, 255, 0.08);
+    --glass-border: rgba(218, 41, 28, 0.15);
+    --glass-glow: rgba(218, 41, 28, 0.08);
 }
 
 .dark {
@@ -320,6 +345,59 @@
     background: #F40009;
     transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   }
+}
+
+/* ── FEMSA Premium Card ─────────────────────────── */
+.femsa-premium-card {
+  background: linear-gradient(135deg, rgba(218,41,28,0.08) 0%, rgba(0,0,0,0.6) 100%);
+  border: 1px solid rgba(218, 41, 28, 0.25);
+  box-shadow: 0 0 20px rgba(218, 41, 28, 0.12), 0 8px 32px rgba(0,0,0,0.3);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Badge Coca-Cola FEMSA */
+.badge-femsa {
+  background: linear-gradient(135deg, #DA291C, #B01E13);
+  color: white;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(218,41,28,0.4);
+}
+
+/* Línea decorativa roja FEMSA */
+.femsa-divider {
+  height: 3px;
+  background: linear-gradient(90deg, #DA291C, #F40009, transparent);
+  border: none;
+}
+
+/* Glow rojo en KPIs críticos */
+.kpi-femsa-glow {
+  text-shadow: 0 0 20px rgba(218,41,28,0.6);
+  color: #DA291C;
+}
+
+/* Gold accent for premium KPIs */
+.kpi-gold-glow {
+  text-shadow: 0 0 20px rgba(212,160,23,0.5);
+  color: #D4A017;
+}
+
+.badge-femsa-gold {
+  background: linear-gradient(135deg, #D4A017, #F5C842);
+  color: #0F172A;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(212,160,23,0.35);
 }
 
 /* Premium scrollbar */

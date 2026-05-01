@@ -43,17 +43,20 @@ export function NavBar() {
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
+            {/* Logo - Coca-Cola FEMSA Branding */}
             <Link href="/" className="flex items-center gap-3 group relative">
               <div className="relative">
-                <div className="absolute inset-0 bg-red-600 rounded-2xl blur-md opacity-0 group-hover:opacity-30 transition-opacity duration-500" />
-                <div className="relative h-10 w-10 rounded-2xl bg-[#F40009] flex items-center justify-center shadow-lg shadow-red-200 group-hover:shadow-red-300 transition-all group-hover:scale-110 active:scale-95 group-hover:rotate-3">
+                <div className="absolute inset-0 bg-femsa-red rounded-2xl blur-md opacity-0 group-hover:opacity-30 transition-opacity duration-500" />
+                <div className="relative h-10 w-10 rounded-2xl bg-femsa-red flex items-center justify-center shadow-lg shadow-red-200 group-hover:shadow-red-300 transition-all group-hover:scale-110 active:scale-95 group-hover:rotate-3">
                   <ShieldCheck className="h-6 w-6 text-white" />
                 </div>
               </div>
               <div className="hidden sm:block">
                 <span className="font-black text-slate-900 text-lg leading-none block tracking-tighter uppercase">AssetGuard</span>
-                <span className="text-[10px] text-[#F40009] font-black tracking-[0.2em] uppercase leading-none mt-1">Coca-Cola FEMSA</span>
+                <span className="text-[10px] text-femsa-red font-black tracking-[0.15em] uppercase leading-none mt-0.5 flex items-center gap-1.5">
+                  Coca-Cola FEMSA
+                  <span className="text-[8px] text-slate-400 font-bold tracking-widest">· Corporate</span>
+                </span>
               </div>
             </Link>
 
@@ -98,13 +101,19 @@ export function NavBar() {
 
               <div className="h-6 w-px bg-gray-100 mx-1 hidden sm:block" />
 
-              {/* AI status */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-100 rounded-xl group cursor-default hover:bg-red-100/50 transition-colors duration-300">
+              {/* FEMSA Corporate Tag */}
+              <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-femsa-red/10 border border-femsa-red/20">
+                <div className="w-2 h-2 rounded-full bg-femsa-red animate-pulse" />
+                <span className="text-femsa-red text-[9px] font-black uppercase tracking-widest">Coca-Cola FEMSA</span>
+              </div>
+
+              {/* AI status - Gold accent */}
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-femsa-gold/10 border border-femsa-gold/20 rounded-xl group cursor-default hover:bg-femsa-gold/15 transition-colors duration-300">
                 <div className="relative">
-                  <Bot className="h-4 w-4 text-[#F40009] group-hover:rotate-12 transition-transform duration-300" />
+                  <Bot className="h-4 w-4 text-femsa-gold group-hover:rotate-12 transition-transform duration-300" />
                   <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-green-500 rounded-full border border-white" />
                 </div>
-                <span className="text-[10px] font-black text-[#F40009] uppercase tracking-tight">ARIA AI</span>
+                <span className="text-[10px] font-black text-femsa-gold uppercase tracking-tight">ARIA AI</span>
               </div>
 
               {/* User Profile */}

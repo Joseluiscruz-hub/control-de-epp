@@ -108,7 +108,7 @@ export default function UserPortal() {
             <ShieldCheck className="h-12 w-12 text-[#F40009]" />
           </div>
           <h1 className="text-5xl font-black text-white tracking-tighter uppercase mb-2">Portal de Seguridad</h1>
-          <p className="text-red-500/80 font-black tracking-[0.3em] uppercase text-xs">Coca-Cola FEMSA Corporativo</p>
+          <p className="text-femsa-red font-black tracking-[0.3em] uppercase text-xs">Coca-Cola FEMSA Corporativo</p>
         </motion.div>
 
         <AnimatePresence mode="wait">
@@ -261,7 +261,7 @@ export default function UserPortal() {
         
         {/* Footer */}
         <div className="mt-16 text-center space-y-6">
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em]">AssetGuard • Coca-Cola FEMSA v2.5</p>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em]">AssetGuard · Coca-Cola FEMSA v4.0</p>
           <div className="flex items-center justify-center gap-8">
             <Link href="/" className="text-slate-400 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest">Admin Login</Link>
             <div className="h-1.5 w-1.5 rounded-full bg-red-600" />

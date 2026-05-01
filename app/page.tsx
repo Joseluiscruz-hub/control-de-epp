@@ -210,7 +210,7 @@ export default function DashboardPage() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <Badge className="bg-[#F40009] text-white border-none px-5 py-2 rounded-full font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-red-200">
+              <Badge className="badge-femsa">
                 Seguridad Industrial & Salud Ocupacional
               </Badge>
             </motion.div>
@@ -221,7 +221,7 @@ export default function DashboardPage() {
             
             <div className="space-y-4">
               <p className="text-slate-500 text-xl font-bold leading-relaxed">
-                Panel de Control de EPP <span className="text-slate-950 underline decoration-[#F40009] decoration-4 underline-offset-8">Coca-Cola FEMSA</span>.
+                Panel de Control de EPP <span className="text-slate-950 underline decoration-femsa-red decoration-4 underline-offset-8">Coca-Cola FEMSA</span>.
               </p>
               <p className="text-slate-400 font-medium">
                 Monitoreo activo de <span className="text-slate-900 font-black">{stats.activeEmployees} colaboradores</span> con respaldo de <span className="text-red-600 font-black italic">ARIA AI</span>.
@@ -247,17 +247,17 @@ export default function DashboardPage() {
                    <div className="absolute top-0 right-0 p-6 opacity-20">
                       <ShieldCheck className="h-20 w-20 text-white" />
                    </div>
-                   <p className="text-[10px] font-black text-red-500 uppercase tracking-[0.3em] mb-4">Operational Pulse</p>
+                   <p className="text-[10px] font-black text-femsa-gold uppercase tracking-[0.3em] mb-4">Operational Pulse</p>
                    <div className="space-y-2">
-                      <p className="text-5xl font-black text-white tracking-tighter tabular-nums">
+                      <p className="text-5xl font-black text-white tracking-tighter tabular-nums kpi-femsa-glow" style={{color: 'white'}}>
                         {stats.activeEmployees > 0 ? Math.min(99.9, 95 + (stats.activeEmployees * 0.1)).toFixed(1) : '98.4'}%
                       </p>
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Compliance Rate</p>
                       {/* Mini bar chart visual */}
                       <div className="flex items-end gap-1 pt-3">
                         {[65,80,45,90,70,85,95].map((v,i) => (
-                          <div key={i} className="flex-1 rounded-sm bg-red-500/30 overflow-hidden" style={{height: `${v * 0.3}px`}}>
-                            <div className="w-full bg-red-500 rounded-sm" style={{height: `${v}%`, transition: `height 1s ${i*0.1}s ease`}} />
+                          <div key={i} className="flex-1 rounded-sm bg-femsa-gold/20 overflow-hidden" style={{height: `${v * 0.3}px`}}>
+                            <div className="w-full bg-femsa-gold rounded-sm" style={{height: `${v}%`, transition: `height 1s ${i*0.1}s ease`}} />
                           </div>
                         ))}
                       </div>

@@ -105,11 +105,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6 relative overflow-hidden">
-        {/* Background Effects */}
+        {/* Background Effects - FEMSA Premium */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-red-600/10 via-transparent to-slate-900/50" />
-          <div className="absolute -top-40 -left-40 w-96 h-96 bg-red-600/15 rounded-full blur-[120px]" />
-          <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-red-900/20 rounded-full blur-[120px]" />
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-femsa-red/20 via-transparent to-femsa-black/80" />
+          <div className="absolute -top-40 -left-40 w-96 h-96 bg-femsa-red/15 rounded-full blur-[120px]" />
+          <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-femsa-red-dark/20 rounded-full blur-[120px]" />
           {/* Grid pattern */}
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
         </div>
@@ -139,8 +139,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
           {/* Login Card */}
           <div className="bg-white rounded-[3rem] shadow-2xl shadow-red-900/10 overflow-hidden">
-            {/* Red accent stripe */}
-            <div className="h-1.5 bg-gradient-to-r from-[#F40009] via-red-500 to-[#F40009]" />
+            {/* FEMSA gradient stripe */}
+            <div className="h-1.5 bg-gradient-to-r from-femsa-red via-coca-cola-red to-femsa-gold" />
             
             <div className="p-12 text-center space-y-8">
               <div className="space-y-3">
@@ -190,7 +190,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em]">Sistemas Operativos</span>
           </div>
-          <p className="text-[9px] text-slate-600 uppercase tracking-[0.4em]">AssetGuard v3.0 • Seguridad Industrial</p>
+          {/* Badge FEMSA */}
+          <div className="badge-femsa inline-block">
+            Coca-Cola FEMSA · Plataforma Corporativa Oficial
+          </div>
+          <p className="text-[9px] text-slate-600 uppercase tracking-[0.4em]">AssetGuard v4.0 · Seguridad Industrial</p>
         </motion.div>
       </div>
     );
