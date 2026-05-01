@@ -17,8 +17,8 @@ import { handleFirestoreError, OperationType } from '@/lib/firestore-error';
 import { format, isToday, isBefore, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AssignPpeDialog } from '@/components/assign-ppe-dialog';
-import { useAuth } from '@/components/auth-provider';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface Assignment {
   id: string;
@@ -163,9 +163,14 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
+    <div className="space-y-10">
       {/* Welcome Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl shadow-indigo-50/50 relative overflow-hidden">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="flex flex-col md:flex-row md:items-end justify-between gap-6 bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl shadow-indigo-50/50 relative overflow-hidden"
+      >
         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50/30 rounded-full -mr-20 -mt-20 blur-3xl" />
         <div className="relative z-10">
           <Badge className="bg-indigo-50 text-indigo-700 hover:bg-indigo-50 border-none px-3 py-1 mb-4 rounded-full font-bold text-[10px] uppercase tracking-widest">
@@ -189,30 +194,36 @@ export default function DashboardPage() {
             {format(new Date(), "EEEE, d 'de' MMMM yyyy", { locale: es })}
           </p>
         </div>
-      </div>
+      </motion.div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((card, idx) => (
-          <Card key={card.title} 
-            className={`group relative overflow-hidden border-none shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-white rounded-3xl animate-in fade-in slide-in-from-bottom-4`}
-            style={{ animationDelay: `${idx * 100}ms` }}
+          <motion.div
+            key={card.title}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: idx * 0.1, duration: 0.5 }}
           >
-            <div className={`absolute top-0 left-0 w-1.5 h-full ${card.color.replace('border-l-', 'bg-')}`} />
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-6 px-6">
-              <CardTitle className="text-xs font-bold text-gray-400 uppercase tracking-widest">{card.title}</CardTitle>
-              <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${card.iconBg} shadow-inner transition-transform group-hover:scale-110 duration-500`}>
-                {card.icon}
-              </div>
-            </CardHeader>
-            <CardContent className="px-6 pb-8">
-              <div className="text-4xl font-black text-gray-900 tracking-tight">{card.value}</div>
-              <div className="mt-3 flex items-center gap-1.5">
-                <div className={`h-1.5 w-1.5 rounded-full ${card.subColor.replace('text-', 'bg-')} animate-pulse`} />
-                <p className={`text-xs font-bold ${card.subColor}`}>{card.sub}</p>
-              </div>
-            </CardContent>
-          </Card>
+            <Card 
+              className={`group relative overflow-hidden border-none shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 bg-white rounded-3xl`}
+            >
+              <div className={`absolute top-0 left-0 w-1.5 h-full ${card.color.replace('border-l-', 'bg-')}`} />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 pt-6 px-6">
+                <CardTitle className="text-xs font-bold text-gray-400 uppercase tracking-widest">{card.title}</CardTitle>
+                <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${card.iconBg} shadow-inner transition-transform group-hover:rotate-12 duration-500`}>
+                  {card.icon}
+                </div>
+              </CardHeader>
+              <CardContent className="px-6 pb-8">
+                <div className="text-4xl font-black text-gray-900 tracking-tight">{card.value}</div>
+                <div className="mt-3 flex items-center gap-1.5">
+                  <div className={`h-1.5 w-1.5 rounded-full ${card.subColor.replace('text-', 'bg-')} animate-pulse`} />
+                  <p className={`text-xs font-bold ${card.subColor}`}>{card.sub}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         ))}
       </div>
 
@@ -375,29 +386,62 @@ export default function DashboardPage() {
           </Card>
 
           {/* AI Insights Card */}
-          <Card className="border-none shadow-xl bg-white rounded-[2rem] p-8 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4">
-              <div className="h-2 w-2 rounded-full bg-green-500 animate-ping" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Bot className="h-5 w-5 text-indigo-500" />
-              ARIA AI Insights
-            </h3>
-            <div className="space-y-4">
-              <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                <p className="text-xs font-bold text-indigo-700 uppercase tracking-widest mb-2">Predicción de Stock</p>
-                <p className="text-sm text-gray-700 leading-relaxed font-medium">
-                  Se recomienda reabastecer <span className="text-indigo-600 font-black">Cascos de Seguridad</span> en los próximos 15 días basado en la tasa de reposición actual.
-                </p>
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5, duration: 0.8 }}
+          >
+            <Card className="border-none shadow-2xl bg-white rounded-[2rem] p-8 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-6">
+                <div className="flex gap-1">
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
               </div>
-              <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
-                <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest mb-2">Cumplimiento</p>
-                <p className="text-sm text-gray-700 leading-relaxed font-medium">
-                  El área de <span className="text-emerald-600 font-black">Soldadura</span> mantiene un cumplimiento del 98% en equipos activos.
-                </p>
+              
+              <div className="absolute -bottom-20 -left-20 w-48 h-48 bg-indigo-100/30 rounded-full blur-3xl group-hover:bg-indigo-200/40 transition-colors duration-700" />
+              
+              <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200">
+                  <Bot className="h-5 w-5 text-white" />
+                </div>
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+                  ARIA Intelligence
+                </span>
+              </h3>
+              
+              <div className="space-y-4 relative z-10">
+                <div className="p-5 bg-gradient-to-br from-indigo-50/80 to-white rounded-2xl border border-indigo-100/50 hover:border-indigo-200 transition-colors">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-3.5 w-3.5 text-indigo-600" />
+                    <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">Predicción de Stock</p>
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed font-semibold">
+                    Reabastecer <span className="text-indigo-600 font-black">Cascos Pro</span> en <span className="bg-indigo-100 px-1.5 py-0.5 rounded text-indigo-700">12 días</span> para evitar quiebre.
+                  </p>
+                </div>
+                
+                <div className="p-5 bg-gradient-to-br from-emerald-50/80 to-white rounded-2xl border border-emerald-100/50 hover:border-emerald-200 transition-colors">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Cumplimiento</p>
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed font-semibold">
+                    Área de <span className="text-emerald-600 font-black">Soldadura</span> alcanzó 100% de uso de EPP hoy.
+                  </p>
+                </div>
               </div>
-            </div>
-          </Card>
+              
+              <div className="mt-6 pt-4 border-t border-gray-50 flex items-center justify-between">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Análisis en tiempo real</p>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-[10px] font-black text-green-600 uppercase">Live</span>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
         </div>
       </div>
     </div>

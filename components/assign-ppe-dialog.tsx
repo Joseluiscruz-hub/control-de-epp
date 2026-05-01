@@ -9,13 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowRight, Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "./auth-provider";
-import { collection, query, getDocs, doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import { collection, query, getDocs, doc, setDoc, serverTimestamp, getDoc, increment, updateDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-error";
 import { toast } from "sonner";
 import { addDays } from "date-fns";
 
 export function AssignPpeDialog() {
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -59,20 +59,28 @@ export function AssignPpeDialog() {
       if (!itemRecord) throw new Error("Item no encontrado");
 
       if (itemRecord.stock <= 0) {
-        toast.error("Atención: No hay stock disponible para este item.");
+        toast.error("No hay stock disponible para este artículo.");
+        setLoading(false);
+        return;
       }
 
       const assignmentId = doc(collection(db, 'assignments')).id;
       
-      await setDoc(doc(db, 'assignments', assignmentId), {
-        employeeId: selectedEmployee,
-        sku: selectedItem,
-        assignedAt: serverTimestamp(),
-        // Client-side date generation as fallback, but ideally should be calculated on Cloud Function.
-        nextReplacementAt: addDays(new Date(), itemRecord.replacementDays),
-        status: 'active',
-        issuedByUserId: user.uid
-      });
+      // Batch-like operations (though separate calls for simplicity here)
+      await Promise.all([
+        setDoc(doc(db, 'assignments', assignmentId), {
+          employeeId: selectedEmployee,
+          sku: selectedItem,
+          assignedAt: serverTimestamp(),
+          nextReplacementAt: addDays(new Date(), itemRecord.replacementDays),
+          status: 'active',
+          issuedByUserId: authUser.uid
+        }),
+        updateDoc(doc(db, 'ppe_catalog', selectedItem), {
+          stock: increment(-1),
+          updatedAt: serverTimestamp()
+        })
+      ]);
 
       toast.success("EPP Asignado exitosamente");
       setOpen(false);
@@ -90,15 +98,20 @@ export function AssignPpeDialog() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-indigo-50 hover:border-indigo-200 rounded-xl transition-all border border-gray-200 text-left cursor-pointer text-gray-700 font-medium group"
+        className="w-full flex items-center justify-between p-5 bg-gradient-to-r from-indigo-50 to-white hover:from-indigo-100 hover:to-indigo-50 rounded-2xl transition-all border border-indigo-100 shadow-sm hover:shadow-md text-left cursor-pointer group"
       >
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-            <ArrowRight className="h-4 w-4 text-blue-600" />
+        <div className="flex items-center gap-4">
+          <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200 group-hover:scale-110 transition-transform">
+            <ArrowRight className="h-5 w-5 text-white" />
           </div>
-          <span className="text-sm">Registrar Nueva Entrega</span>
+          <div>
+            <p className="text-sm font-bold text-gray-900 leading-none">Registrar Nueva Entrega</p>
+            <p className="text-xs text-gray-500 mt-1">Asignar material a un colaborador</p>
+          </div>
         </div>
-        <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-indigo-600 transition-colors" />
+        <div className="h-8 w-8 rounded-full flex items-center justify-center bg-white border border-gray-100 group-hover:border-indigo-200 transition-colors">
+          <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-indigo-600 transition-colors" />
+        </div>
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-[425px]">

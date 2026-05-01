@@ -12,6 +12,7 @@ import { format, isBefore } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface Assignment {
   id: string;
@@ -87,49 +88,78 @@ export default function UserPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
-        {/* Logo and Header */}
-        <div className="text-center mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
-          <div className="inline-flex h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 items-center justify-center shadow-xl shadow-indigo-200 mb-4">
-            <ShieldCheck className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Portal del Colaborador</h1>
-          <p className="text-gray-500 mt-2">Consulta el estado de tu Equipo de Protección Personal</p>
-        </div>
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-100/40 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-100/40 rounded-full blur-[120px]" />
+      </div>
 
-        {!employee ? (
-          <Card className="shadow-2xl border-none overflow-hidden animate-in fade-in zoom-in-95 duration-500">
-            <div className="h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
-            <CardHeader>
-              <CardTitle>Identificación</CardTitle>
-              <CardDescription>Ingresa tu número de empleado para ver tu historial de EPP.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSearch} className="space-y-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <Input
-                    placeholder="Ej: 1881"
-                    className="pl-10 py-6 text-lg"
-                    value={employeeId}
-                    onChange={(e) => setEmployeeId(e.target.value)}
-                    autoFocus
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full py-6 text-lg bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-[0.98]"
-                  disabled={loading || !employeeId}
-                >
-                  {loading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Search className="h-5 w-5 mr-2" />}
-                  Consultar mi EPP
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="w-full max-w-2xl relative z-10">
+        {/* Logo and Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7 }}
+          className="text-center mb-10"
+        >
+          <div className="inline-flex h-20 w-20 rounded-3xl bg-gradient-to-br from-indigo-600 to-indigo-800 items-center justify-center shadow-2xl shadow-indigo-200 mb-6 group hover:rotate-3 transition-transform duration-500">
+            <ShieldCheck className="h-10 w-10 text-white" />
+          </div>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Portal del Colaborador</h1>
+          <p className="text-slate-500 mt-3 font-medium text-lg">Monitorea tu seguridad industrial en tiempo real</p>
+        </motion.div>
+
+        <AnimatePresence mode="wait">
+          {!employee ? (
+            <motion.div
+              key="search-box"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.4 }}
+            >
+              <Card className="shadow-[0_20px_50px_rgba(79,70,229,0.1)] border-none overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-xl border border-white">
+                <div className="h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600" />
+                <CardHeader className="p-10 pb-4">
+                  <CardTitle className="text-2xl font-bold text-slate-900">Identificación</CardTitle>
+                  <CardDescription className="text-base text-slate-500">Ingresa tu número de empleado para acceder.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-10 pt-4">
+                  <form onSubmit={handleSearch} className="space-y-6">
+                    <div className="relative group">
+                      <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-10 group-hover:opacity-20 transition duration-1000 group-focus-within:opacity-30" />
+                      <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                        <Input
+                          placeholder="Ej: 1881"
+                          className="pl-12 py-8 text-xl rounded-2xl border-slate-100 focus-visible:ring-indigo-500 transition-all shadow-sm"
+                          value={employeeId}
+                          onChange={(e) => setEmployeeId(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                    <Button 
+                      type="submit" 
+                      className="w-full py-8 text-xl font-bold bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all active:scale-[0.98] rounded-2xl"
+                      disabled={loading || !employeeId}
+                    >
+                      {loading ? <Loader2 className="h-6 w-6 animate-spin mr-3" /> : <Search className="h-6 w-6 mr-3" />}
+                      Consultar mi EPP
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="profile-data"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="space-y-8"
+            >
             {/* Profile Info */}
             <Card className="border-none shadow-lg bg-white overflow-hidden">
               <div className="h-2 bg-indigo-500" />
@@ -216,13 +246,14 @@ export default function UserPortal() {
               )}
             </div>
             
-            <div className="text-center pt-4">
-              <p className="text-xs text-gray-400 italic">
-                Si detectas algún error en tu historial, contacta a Seguridad Industrial.
+            <div className="text-center pt-8">
+              <p className="text-sm text-slate-400 italic font-medium">
+                Si detectas algún error en tu historial, contacta a <span className="text-indigo-500 font-bold">Seguridad Industrial</span>.
               </p>
             </div>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
         
         {/* Footer */}
         <div className="mt-12 text-center text-xs text-gray-400">
