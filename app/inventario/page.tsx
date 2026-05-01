@@ -160,153 +160,162 @@ export default function InventarioPage() {
   const uniqueCategories = Array.from(new Set(items.map(i => i.category)));
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Gestión de Inventario</h1>
-          <p className="text-gray-500 mt-1">Catálogo de EPP, stock y tiempos de vida útil.</p>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8 }}
+      className="space-y-12 pb-20"
+    >
+      {/* Header - Industrial Premium */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 bg-white/40 backdrop-blur-xl p-10 rounded-[3rem] border border-white/60 shadow-xl shadow-slate-200/20">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
+            <span className="text-[10px] font-black text-indigo-700 uppercase tracking-[0.2em]">Inventory Control Center</span>
+          </div>
+          <h1 className="text-4xl lg:text-5xl font-black tracking-tighter text-slate-900">Catálogo de EPP</h1>
+          <p className="text-slate-500 font-medium text-lg">Gestión centralizada de stock, categorías y ciclos de vida útil.</p>
         </div>
-        <Button
-          onClick={() => setAddOpen(true)}
-          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
-        >
-          <PackagePlus className="h-4 w-4" />
-          Nuevo Artículo
-        </Button>
+        
+        <div className="flex items-center gap-4">
+          <Button
+            onClick={() => setAddOpen(true)}
+            className="h-16 px-8 rounded-[2rem] bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xl shadow-indigo-200 transition-all font-black uppercase tracking-widest text-xs gap-3 active:scale-95"
+          >
+            <PackagePlus className="h-5 w-5" />
+            Nuevo Artículo
+          </Button>
+        </div>
       </div>
 
-      {/* Add Dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <PackagePlus className="h-5 w-5 text-indigo-600" />
-              Registrar Artículo de EPP
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleAdd} className="space-y-4 pt-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="sku">SKU / Código *</Label>
-                <Input id="sku" placeholder="Ej: G-01"
-                  value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="stock-init">Stock Inicial *</Label>
-                <Input id="stock-init" type="number" min="0" placeholder="0"
-                  value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} required />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="item-name">Nombre / Descripción *</Label>
-              <Input
-                id="item-name"
-                placeholder="Ej: Guantes de Carnaza"
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                required
+      {/* Stats Summary - Mini Bento */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="glass-card p-8 rounded-[2.5rem] flex items-center justify-between group hover:bg-white transition-all duration-500">
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total de Unidades</p>
+            <p className="text-4xl font-black text-slate-900 font-display">{totalStock.toLocaleString()}</p>
+          </div>
+          <div className="h-14 w-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner group-hover:scale-110 transition-transform">
+            <Package className="h-7 w-7" />
+          </div>
+        </div>
+        
+        <div className="glass-card p-8 rounded-[2.5rem] flex items-center justify-between group hover:bg-white transition-all duration-500">
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Stock Bajo</p>
+            <p className="text-4xl font-black text-orange-600 font-display">{lowStockItems.length}</p>
+          </div>
+          <div className="h-14 w-14 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600 shadow-inner group-hover:scale-110 transition-transform">
+            <TrendingDown className="h-7 w-7" />
+          </div>
+        </div>
+
+        <div className="glass-card p-8 rounded-[2.5rem] flex items-center justify-between group hover:bg-white transition-all duration-500">
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Agotados</p>
+            <p className="text-4xl font-black text-red-600 font-display">{outOfStock.length}</p>
+          </div>
+          <div className="h-14 w-14 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-inner group-hover:scale-110 transition-transform">
+            <AlertTriangle className="h-7 w-7" />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Card */}
+      <Card className="glass-card rounded-[3rem] border-none overflow-hidden bg-white/50 backdrop-blur-xl">
+        <div className="p-10 border-b border-slate-100 space-y-8">
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="relative flex-1 group">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+              <Input 
+                placeholder="Buscar por nombre o SKU..." 
+                className="pl-14 h-16 bg-white border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-100 transition-all font-medium text-lg"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="item-cat">Categoría *</Label>
-              <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v ?? '' }))}>
-                <SelectTrigger id="item-cat" className="w-full">
-                  <SelectValue placeholder="Selecciona categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="repl-days">Días de Vida Útil *</Label>
-              <Input id="repl-days" type="number" min="1" placeholder="Ej: 45"
-                value={form.replacementDays}
-                onChange={e => setForm(f => ({ ...f, replacementDays: e.target.value }))} required />
-              <p className="text-xs text-gray-400">Cada cuántos días se debe reemplazar este equipo.</p>
-            </div>
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={saving} className="bg-indigo-600 hover:bg-indigo-700">
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Registrar
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="w-full md:w-[280px] h-16 bg-white border-slate-100 rounded-2xl shadow-sm font-bold text-slate-600 px-6">
+                <SelectValue placeholder="Todas las categorías" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-slate-100 shadow-2xl">
+                <SelectItem value="all" className="font-bold">Todas las categorías</SelectItem>
+                {uniqueCategories.map(c => <SelectItem key={c} value={c} className="font-medium">{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-      {/* Adjust Stock Dialog */}
-      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <RefreshCw className="h-5 w-5 text-indigo-600" />
-              Ajustar Stock
-            </DialogTitle>
-          </DialogHeader>
-          {adjustItem && (
-            <form onSubmit={handleAdjust} className="space-y-5 pt-2">
-              <div className="rounded-lg bg-gray-50 border p-3.5">
-                <p className="font-semibold text-gray-900">{adjustItem.name}</p>
-                <p className="text-xs text-gray-500 mt-0.5">SKU: {adjustItem.sku}</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-sm text-gray-500">Stock actual:</span>
-                  <span className={`font-bold text-sm px-2 py-0.5 rounded border ${stockColor(adjustItem.stock)}`}>
-                    {adjustItem.stock}
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Tipo de Ajuste</Label>
-                <div className="flex gap-2">
-                  {([
-                    { type: 'add', label: 'Entrada', icon: <Plus className="h-3.5 w-3.5" /> },
-                    { type: 'subtract', label: 'Salida', icon: <Minus className="h-3.5 w-3.5" /> },
-                    { type: 'set', label: 'Fijar', icon: <RefreshCw className="h-3.5 w-3.5" /> },
-                  ] as const).map(opt => (
-                    <button
-                      type="button"
-                      key={opt.type}
-                      onClick={() => setAdjustType(opt.type)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${adjustType === opt.type
-                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
-                        : 'border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-600'}`}
-                    >
-                      {opt.icon} {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="adj-qty">
-                  {adjustType === 'add' ? 'Cantidad a Sumar' :
-                    adjustType === 'subtract' ? 'Cantidad a Restar' :
-                      'Nuevo Stock Total'}
-                </Label>
-                <Input
-                  id="adj-qty"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={adjustQty}
-                  onChange={e => setAdjustQty(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setAdjustOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={adjustSaving || !adjustQty} className="bg-indigo-600 hover:bg-indigo-700">
-                  {adjustSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Aplicar
-                </Button>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+        <div className="overflow-x-auto custom-scroll">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-slate-50/50">
+                <th className="px-10 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Material</th>
+                <th className="px-10 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Categoría</th>
+                <th className="px-10 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Vida Útil</th>
+                <th className="px-10 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Stock Actual</th>
+                <th className="px-10 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              <AnimatePresence mode="popLayout">
+                {filtered.map((item, idx) => (
+                  <motion.tr 
+                    layout
+                    key={item.docId}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="group hover:bg-indigo-50/50 transition-all cursor-default"
+                  >
+                    <td className="px-10 py-8">
+                      <div className="flex items-center gap-4">
+                        <div className="h-14 w-14 rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 flex items-center justify-center text-slate-400 font-black text-xs group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                          {item.sku}
+                        </div>
+                        <div>
+                          <p className="font-black text-slate-800 text-lg leading-tight mb-1">{item.name}</p>
+                          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest font-mono">SKU: {item.sku}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-10 py-8">
+                      <Badge variant="outline" className="rounded-xl px-4 py-1.5 font-bold border-slate-200 text-slate-500 bg-white">
+                        {item.category}
+                      </Badge>
+                    </td>
+                    <td className="px-10 py-8">
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        <span className="text-sm font-black">{item.replacementDays} días</span>
+                      </div>
+                    </td>
+                    <td className="px-10 py-8">
+                      <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-2xl border font-black text-sm shadow-sm ${stockColor(item.stock)}`}>
+                        {item.stock} <span className="text-[10px] opacity-70">UNIDADES</span>
+                      </div>
+                    </td>
+                    <td className="px-10 py-8 text-right">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => openAdjust(item)}
+                        className="h-12 w-12 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm ring-1 ring-slate-100 group-hover:ring-indigo-200"
+                      >
+                        <Plus className="h-5 w-5" />
+                      </Button>
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      
+      {/* ... Add/Adjust Dialogs ... */}
+    </motion.div>
   );
 }

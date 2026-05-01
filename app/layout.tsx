@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="es" className={cn("font-sans", geist.variable)}>
-      <body suppressHydrationWarning className="min-h-screen bg-gray-50 text-gray-900">
+      <body suppressHydrationWarning className="min-h-screen mesh-bg text-gray-900 selection:bg-indigo-100 selection:text-indigo-900">
         <AuthProvider>
           <AuthGuard>
             <NavBar />

@@ -17,6 +17,7 @@ import { handleFirestoreError, OperationType } from '@/lib/firestore-error';
 import { format, isToday, isBefore, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AssignPpeDialog } from '@/components/assign-ppe-dialog';
+import { useAuth } from '@/components/auth-provider';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -106,14 +107,14 @@ export default function DashboardPage() {
         ]);
 
         const invData = invSnap.docs.map(d => d.data());
-        const totalStock = invData.reduce((sum, d) => sum + (d.stock || 0), 0);
+        const totalStockValue = invData.reduce((sum, d) => sum + (d.stock || 0), 0);
         const lowStock = invData.filter(d => d.stock <= 20).length;
 
         setStats(prev => ({
           ...prev,
           activeEmployees: empSnap.size,
           totalInventoryItems: invSnap.size,
-          totalStock,
+          totalStock: totalStockValue,
           lowStockItems: lowStock,
         }));
       } catch { /* silently fail */ }
@@ -263,52 +264,40 @@ export default function DashboardPage() {
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        {/* Recent Activity Table */}
+        {/* Recent Activity */}
         <Card className="xl:col-span-2 border-none shadow-xl bg-white rounded-[2rem] overflow-hidden">
-          <CardHeader className="p-8 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Clock className="h-6 w-6 text-indigo-500" />
-                  Actividad Reciente
-                </CardTitle>
-                <p className="text-sm text-gray-400 mt-1">Sincronizado en tiempo real con la nube</p>
-              </div>
-              <Badge variant="outline" className="text-[10px] font-black tracking-widest uppercase border-indigo-100 text-indigo-500 px-3">
-                Live Feed
-              </Badge>
+          <CardHeader className="p-8 border-b border-gray-50 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-xl font-bold text-gray-900">Actividad Reciente</CardTitle>
+              <p className="text-xs text-gray-400 mt-1 font-medium">Últimas 10 asignaciones de equipo</p>
             </div>
+            <Clock className="h-5 w-5 text-gray-300" />
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
-              <div className="space-y-4 p-8">
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i} className="animate-pulse h-12 bg-gray-50 rounded-2xl" />
-                ))}
+              <div className="flex items-center justify-center p-12">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
               </div>
             ) : recentAssignments.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="h-20 w-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Package className="h-10 w-10 text-gray-200" />
-                </div>
-                <p className="font-bold text-gray-400">Sin registros recientes</p>
+              <div className="text-center p-12 text-gray-400">
+                <p>No hay actividad registrada aún.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left border-b border-gray-50 bg-gray-50/30">
-                      <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Colaborador</th>
-                      <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Material SKU</th>
-                      <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Fecha/Hora</th>
-                      <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Estado</th>
+                    <tr className="bg-gray-50/50">
+                      <th className="px-8 py-4 text-left font-bold text-gray-400 uppercase text-[10px] tracking-widest">Empleado</th>
+                      <th className="px-8 py-4 text-left font-bold text-gray-400 uppercase text-[10px] tracking-widest">Equipo</th>
+                      <th className="px-8 py-4 text-left font-bold text-gray-400 uppercase text-[10px] tracking-widest">Fecha/Hora</th>
+                      <th className="px-8 py-4 text-right font-bold text-gray-400 uppercase text-[10px] tracking-widest">Estado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {recentAssignments.map((a) => {
                       const isOverdue = a.nextReplacementAt && isBefore(a.nextReplacementAt, new Date());
                       return (
-                        <tr key={a.id} className="group hover:bg-indigo-50/30 transition-colors">
+                        <tr key={a.id} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-8 py-5">
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-bold text-xs">
@@ -446,4 +435,8 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+function Loader2({ className }: { className?: string }) {
+  return <Activity className={className} />;
 }
