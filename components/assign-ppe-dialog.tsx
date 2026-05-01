@@ -51,7 +51,7 @@ export function AssignPpeDialog() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEmployee || !selectedItem || !user) return;
+    if (!selectedEmployee || !selectedItem || !authUser) return;
 
     setLoading(true);
     try {
@@ -74,7 +74,7 @@ export function AssignPpeDialog() {
           assignedAt: serverTimestamp(),
           nextReplacementAt: addDays(new Date(), itemRecord.replacementDays),
           status: 'active',
-          issuedByUserId: authUser.uid
+          issuedByUserId: authUser?.uid || 'unknown'
         }),
         updateDoc(doc(db, 'ppe_catalog', selectedItem), {
           stock: increment(-1),

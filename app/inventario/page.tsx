@@ -22,6 +22,7 @@ import {
   Loader2, PackageCheck, Plus, Minus, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface PpeItem {
   docId: string;
@@ -235,7 +236,7 @@ export default function InventarioPage() {
               />
             </div>
             
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <Select value={filterCategory} onValueChange={(v) => setFilterCategory(v || 'all')}>
               <SelectTrigger className="w-full md:w-[280px] h-16 bg-white border-slate-100 rounded-2xl shadow-sm font-bold text-slate-600 px-6">
                 <SelectValue placeholder="Todas las categorías" />
               </SelectTrigger>
