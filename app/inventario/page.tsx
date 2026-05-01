@@ -288,8 +288,16 @@ export default function InventarioPage() {
                       </div>
                     </td>
                     <td className="px-12 py-10">
-                      <div className={`inline-flex items-center gap-3 px-6 py-2.5 rounded-2xl border-2 font-black text-sm shadow-sm ${stockColor(item.stock)}`}>
-                        {item.stock} <span className="text-[9px] opacity-60 tracking-widest">UNIDADES</span>
+                      <div className="space-y-2">
+                        <div className={`inline-flex items-center gap-3 px-6 py-2.5 rounded-2xl border-2 font-black text-sm shadow-sm ${stockColor(item.stock)}`}>
+                          {item.stock} <span className="text-[9px] opacity-60 tracking-widest">UNIDADES</span>
+                        </div>
+                        <div className="stock-bar w-32">
+                          <div
+                            className={`stock-bar-fill ${item.stock === 0 ? 'bg-red-500' : item.stock <= LOW_STOCK_THRESHOLD ? 'bg-gradient-to-r from-orange-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-emerald-500'}`}
+                            style={{ width: `${Math.min((item.stock / 100) * 100, 100)}%` }}
+                          />
+                        </div>
                       </div>
                     </td>
                     <td className="px-12 py-10 text-right">
