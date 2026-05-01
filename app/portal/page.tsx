@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { HardHat, Search, Calendar, AlertTriangle, CheckCircle2, ArrowLeft, Loader2, ShieldCheck } from 'lucide-react';
+import { HardHat, Search, Calendar, AlertTriangle, CheckCircle2, ArrowLeft, Loader2, ShieldCheck, Activity } from 'lucide-react';
 import { format, isBefore } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Link from 'next/link';
@@ -28,6 +28,8 @@ interface Employee {
   area: string;
 }
 
+const BRAND_RED = "#F40009";
+
 export default function UserPortal() {
   const [employeeId, setEmployeeId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,14 +44,13 @@ export default function UserPortal() {
     setLoading(true);
     setSearched(true);
     try {
-      // Find employee
       const empQuery = query(collection(db, 'employees'), where('id', '==', employeeId.trim()));
       const empSnap = await getDocs(empQuery);
 
       if (empSnap.empty) {
         setEmployee(null);
         setAssignments([]);
-        toast.error('Empleado no encontrado');
+        toast.error('Número de empleado no válido');
         return;
       }
 
@@ -60,7 +61,6 @@ export default function UserPortal() {
         area: empDoc.data().area,
       });
 
-      // Find assignments
       const assQuery = query(
         collection(db, 'assignments'),
         where('employeeId', '==', empDoc.id),
@@ -81,72 +81,74 @@ export default function UserPortal() {
       setAssignments(assData);
     } catch (error) {
       console.error(error);
-      toast.error('Error al buscar información');
+      toast.error('Error de conexión con el servidor corporativo');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-100/40 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-100/40 rounded-full blur-[120px]" />
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+      {/* Dynamic Background */}
+      <div className="absolute inset-0 pointer-events-none">
+         <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-red-600/20 via-transparent to-slate-900/50" />
+         <div className="absolute -top-40 -left-40 w-96 h-96 bg-red-600/20 rounded-full blur-[120px]" />
+         <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-red-900/20 rounded-full blur-[120px]" />
       </div>
 
       <div className="w-full max-w-2xl relative z-10">
-        {/* Logo and Header */}
+        {/* Branding */}
         <motion.div 
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
-          className="text-center mb-10"
+          transition={{ duration: 0.8 }}
+          className="text-center mb-12"
         >
-          <div className="inline-flex h-20 w-20 rounded-3xl bg-gradient-to-br from-indigo-600 to-indigo-800 items-center justify-center shadow-2xl shadow-indigo-200 mb-6 group hover:rotate-3 transition-transform duration-500">
-            <ShieldCheck className="h-10 w-10 text-white" />
+          <div className="inline-flex h-24 w-24 rounded-[2rem] bg-white items-center justify-center shadow-2xl shadow-red-900/40 mb-8 group hover:scale-110 transition-transform duration-500">
+            <ShieldCheck className="h-12 w-12 text-[#F40009]" />
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Portal del Colaborador</h1>
-          <p className="text-slate-500 mt-3 font-medium text-lg">Monitorea tu seguridad industrial en tiempo real</p>
+          <h1 className="text-5xl font-black text-white tracking-tighter uppercase mb-2">Portal de Seguridad</h1>
+          <p className="text-red-500/80 font-black tracking-[0.3em] uppercase text-xs">Coca-Cola FEMSA Corporativo</p>
         </motion.div>
 
         <AnimatePresence mode="wait">
           {!employee ? (
             <motion.div
               key="search-box"
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.4 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.5, type: "spring", damping: 20 }}
             >
-              <Card className="shadow-[0_20px_50px_rgba(79,70,229,0.1)] border-none overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-xl border border-white">
-                <div className="h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600" />
-                <CardHeader className="p-10 pb-4">
-                  <CardTitle className="text-2xl font-bold text-slate-900">Identificación</CardTitle>
-                  <CardDescription className="text-base text-slate-500">Ingresa tu número de empleado para acceder.</CardDescription>
+              <Card className="border-none overflow-hidden rounded-[3rem] bg-white shadow-2xl shadow-red-900/20">
+                <div className="h-3 bg-[#F40009]" />
+                <CardHeader className="p-12 pb-6">
+                  <CardTitle className="text-3xl font-black text-slate-950 tracking-tight">Bienvenido, Colaborador</CardTitle>
+                  <CardDescription className="text-lg text-slate-500 font-medium">Consulta el estado de tu Equipo de Protección Personal.</CardDescription>
                 </CardHeader>
-                <CardContent className="p-10 pt-4">
-                  <form onSubmit={handleSearch} className="space-y-6">
+                <CardContent className="p-12 pt-6">
+                  <form onSubmit={handleSearch} className="space-y-8">
                     <div className="relative group">
-                      <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-10 group-hover:opacity-20 transition duration-1000 group-focus-within:opacity-30" />
-                      <div className="relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                        <Input
-                          placeholder="Ej: 1881"
-                          className="pl-12 py-8 text-xl rounded-2xl border-slate-100 focus-visible:ring-indigo-500 transition-all shadow-sm"
-                          value={employeeId}
-                          onChange={(e) => setEmployeeId(e.target.value)}
-                          autoFocus
-                        />
-                      </div>
+                      <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-7 w-7 text-slate-400 group-focus-within:text-[#F40009] transition-colors" />
+                      <Input
+                        placeholder="Número de Nómina"
+                        className="pl-16 py-10 text-2xl rounded-[1.5rem] border-slate-100 bg-slate-50 focus-visible:ring-[#F40009] transition-all shadow-inner font-black"
+                        value={employeeId}
+                        onChange={(e) => setEmployeeId(e.target.value)}
+                        autoFocus
+                      />
                     </div>
                     <Button 
                       type="submit" 
-                      className="w-full py-8 text-xl font-bold bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all active:scale-[0.98] rounded-2xl"
+                      className="w-full py-10 text-2xl font-black bg-[#F40009] hover:bg-slate-950 text-white shadow-2xl shadow-red-200 transition-all active:scale-[0.98] rounded-[1.5rem] uppercase tracking-widest group"
                       disabled={loading || !employeeId}
                     >
-                      {loading ? <Loader2 className="h-6 w-6 animate-spin mr-3" /> : <Search className="h-6 w-6 mr-3" />}
-                      Consultar mi EPP
+                      {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : (
+                        <>
+                          Validar Identidad
+                          <ArrowLeft className="ml-4 h-6 w-6 rotate-180 group-hover:translate-x-2 transition-transform" />
+                        </>
+                      )}
                     </Button>
                   </form>
                 </CardContent>
@@ -155,100 +157,102 @@ export default function UserPortal() {
           ) : (
             <motion.div
               key="profile-data"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+              transition={{ duration: 0.6 }}
               className="space-y-8"
             >
-            {/* Profile Info */}
-            <Card className="border-none shadow-lg bg-white overflow-hidden">
-              <div className="h-2 bg-indigo-500" />
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="h-14 w-14 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-                      <HardHat className="h-8 w-8" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-gray-900">{employee.name}</h2>
-                      <p className="text-sm text-gray-500">ID: {employee.id} • Área: {employee.area}</p>
+            {/* Corporate Profile Card */}
+            <Card className="border-none shadow-2xl bg-white rounded-[3rem] overflow-hidden">
+              <div className="bg-slate-900 p-10 flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-6 text-center sm:text-left">
+                  <div className="h-20 w-20 rounded-3xl bg-[#F40009] flex items-center justify-center text-white shadow-xl shadow-red-900/20">
+                    <HardHat className="h-10 w-10" />
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-black text-white tracking-tight">{employee.name}</h2>
+                    <div className="flex flex-wrap justify-center sm:justify-start gap-3 mt-2">
+                       <Badge className="bg-white/10 text-white border-none px-3 py-1 font-bold">ID: {employee.id}</Badge>
+                       <Badge className="bg-[#F40009] text-white border-none px-3 py-1 font-bold uppercase tracking-widest text-[9px]">{employee.area}</Badge>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => setEmployee(null)} className="text-gray-400 hover:text-gray-600">
-                    <ArrowLeft className="h-4 w-4 mr-2" /> Cambiar
-                  </Button>
                 </div>
-              </CardContent>
-            </Card>
+                <Button variant="ghost" size="sm" onClick={() => setEmployee(null)} className="text-slate-400 hover:text-white hover:bg-white/10 rounded-xl px-4 py-6 font-bold uppercase tracking-tighter">
+                  <ArrowLeft className="h-5 w-5 mr-2" /> Salir
+                </Button>
+              </div>
 
-            {/* Assignments List */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider px-1">Tu Equipo Actual</h3>
-              {assignments.length === 0 ? (
-                <Card className="border-dashed border-2 bg-transparent">
-                  <CardContent className="py-12 text-center text-gray-400">
-                    <HardHat className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                    <p>No tienes equipos registrados actualmente.</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                assignments.map((ass) => {
-                  const isOverdue = ass.nextReplacementAt && isBefore(ass.nextReplacementAt, new Date());
-                  const isActive = ass.status === 'active';
+              <CardContent className="p-10 bg-slate-50/50">
+                <div className="space-y-6">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] pl-1 mb-8">Inventario de Seguridad Personal</h3>
                   
-                  return (
-                    <Card key={ass.id} className={`border-none shadow-md transition-all hover:shadow-lg ${!isActive ? 'opacity-60' : ''}`}>
-                      <CardContent className="p-0">
-                        <div className="flex items-stretch">
-                          <div className={`w-2 ${isActive ? (isOverdue ? 'bg-red-500' : 'bg-green-500') : 'bg-gray-300'}`} />
-                          <div className="flex-1 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                              <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${isActive ? (isOverdue ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600') : 'bg-gray-50 text-gray-400'}`}>
-                                {isActive ? <CheckCircle2 className="h-6 w-6" /> : <Calendar className="h-6 w-6" />}
+                  {assignments.length === 0 ? (
+                    <div className="py-20 text-center space-y-4">
+                       <div className="h-20 w-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto opacity-50">
+                          <Activity className="h-10 w-10 text-slate-400" />
+                       </div>
+                       <p className="text-slate-400 font-bold">No se registran equipos asignados a esta nómina.</p>
+                    </div>
+                  ) : (
+                    <div className="grid gap-4">
+                      {assignments.map((ass) => {
+                        const isOverdue = ass.nextReplacementAt && isBefore(ass.nextReplacementAt, new Date());
+                        const isActive = ass.status === 'active';
+                        
+                        return (
+                          <motion.div
+                            key={ass.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className={`bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-6 hover:shadow-md transition-all ${!isActive ? 'opacity-50 grayscale' : ''}`}
+                          >
+                            <div className="flex items-center gap-5 w-full sm:w-auto">
+                              <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shadow-inner ${isActive ? (isOverdue ? 'bg-red-50 text-[#F40009]' : 'bg-emerald-50 text-emerald-600') : 'bg-slate-100 text-slate-400'}`}>
+                                <ShieldCheck className="h-7 w-7" />
                               </div>
                               <div>
-                                <h4 className="font-bold text-gray-900">{ass.sku}</h4>
-                                <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                                  Entregado el {format(ass.assignedAt, "d 'de' MMMM", { locale: es })}
+                                <h4 className="text-xl font-black text-slate-900 tracking-tight">{ass.sku}</h4>
+                                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                  Entrega: {format(ass.assignedAt, "d 'de' MMMM, yyyy", { locale: es })}
                                 </p>
                               </div>
                             </div>
                             
-                            <div className="flex flex-col items-start sm:items-end gap-2">
+                            <div className="flex flex-col items-center sm:items-end gap-3 w-full sm:w-auto">
                               {isActive ? (
                                 isOverdue ? (
-                                  <Badge className="bg-red-100 text-red-700 border-red-200 gap-1.5 py-1 px-3">
-                                    <AlertTriangle className="h-3.5 w-3.5" /> Requiere Cambio
+                                  <Badge className="bg-[#F40009] text-white border-none gap-2 py-2 px-5 rounded-full font-black text-[10px] tracking-widest shadow-lg shadow-red-200 uppercase">
+                                    <AlertTriangle className="h-4 w-4" /> Reposición Urgente
                                   </Badge>
                                 ) : (
-                                  <Badge className="bg-green-100 text-green-700 border-green-200 gap-1.5 py-1 px-3">
-                                    <CheckCircle2 className="h-3.5 w-3.5" /> En buen estado
+                                  <Badge className="bg-emerald-500 text-white border-none gap-2 py-2 px-5 rounded-full font-black text-[10px] tracking-widest shadow-lg shadow-emerald-200 uppercase">
+                                    <CheckCircle2 className="h-4 w-4" /> Equipo Vigente
                                   </Badge>
                                 )
                               ) : (
-                                <Badge variant="secondary" className="gap-1.5 py-1 px-3">
+                                <Badge className="bg-slate-200 text-slate-500 border-none px-5 py-2 rounded-full font-black text-[10px] tracking-widest uppercase">
                                   Histórico
                                 </Badge>
                               )}
                               
                               {ass.nextReplacementAt && isActive && (
-                                <p className={`text-[10px] font-medium uppercase tracking-tight ${isOverdue ? 'text-red-600' : 'text-gray-400'}`}>
+                                <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${isOverdue ? 'text-[#F40009] animate-pulse' : 'text-slate-400'}`}>
                                   Próximo cambio: {format(ass.nextReplacementAt, "dd/MM/yyyy")}
                                 </p>
                               )}
                             </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })
-              )}
-            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
             
-            <div className="text-center pt-8">
-              <p className="text-sm text-slate-400 italic font-medium">
-                Si detectas algún error en tu historial, contacta a <span className="text-indigo-500 font-bold">Seguridad Industrial</span>.
+            <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-8 border border-white/10 text-center">
+              <p className="text-slate-400 text-sm font-medium leading-relaxed">
+                Si encuentras alguna discrepancia en tu historial, por favor reportalo de inmediato al área de <span className="text-red-500 font-black uppercase tracking-widest">Seguridad Industrial</span> de tu planta.
               </p>
             </div>
           </motion.div>
@@ -256,12 +260,12 @@ export default function UserPortal() {
         </AnimatePresence>
         
         {/* Footer */}
-        <div className="mt-12 text-center text-xs text-gray-400">
-          <p>© 2026 Control de EPP Industrial • Sistema de Gestión de Seguridad</p>
-          <div className="mt-4 flex items-center justify-center gap-4">
-            <Link href="/" className="hover:text-indigo-600 transition-colors">Acceso Admin</Link>
-            <span className="w-1 h-1 rounded-full bg-gray-300" />
-            <a href="#" className="hover:text-indigo-600 transition-colors">Soporte Técnico</a>
+        <div className="mt-16 text-center space-y-6">
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em]">AssetGuard • Coca-Cola FEMSA v2.5</p>
+          <div className="flex items-center justify-center gap-8">
+            <Link href="/" className="text-slate-400 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest">Admin Login</Link>
+            <div className="h-1.5 w-1.5 rounded-full bg-red-600" />
+            <a href="#" className="text-slate-400 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest">Soporte Técnico</a>
           </div>
         </div>
       </div>

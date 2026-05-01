@@ -41,6 +41,7 @@ const CATEGORIES = [
 ];
 
 const LOW_STOCK_THRESHOLD = 20;
+const BRAND_RED = "#F40009";
 
 export default function InventarioPage() {
   const [items, setItems] = useState<PpeItem[]>([]);
@@ -155,7 +156,7 @@ export default function InventarioPage() {
   const stockColor = (stock: number) => {
     if (stock === 0) return 'text-red-700 bg-red-50 border-red-200';
     if (stock <= LOW_STOCK_THRESHOLD) return 'text-orange-700 bg-orange-50 border-orange-200';
-    return 'text-green-700 bg-green-50 border-green-200';
+    return 'text-emerald-700 bg-emerald-50 border-emerald-200';
   };
 
   const uniqueCategories = Array.from(new Set(items.map(i => i.category)));
@@ -168,98 +169,91 @@ export default function InventarioPage() {
       className="space-y-12 pb-20"
     >
       {/* Header - Industrial Premium */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 bg-white/40 backdrop-blur-xl p-10 rounded-[3rem] border border-white/60 shadow-xl shadow-slate-200/20">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
-            <span className="text-[10px] font-black text-indigo-700 uppercase tracking-[0.2em]">Inventory Control Center</span>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-white p-12 rounded-[3.5rem] border border-slate-100 shadow-2xl shadow-red-100/30 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-full bg-red-600/5 -mr-20 -skew-x-12" />
+        
+        <div className="relative z-10 space-y-3">
+          <div className="flex items-center gap-3 mb-2">
+             <Badge className="bg-red-600 text-white border-none px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest">Master Catalog</Badge>
           </div>
-          <h1 className="text-4xl lg:text-5xl font-black tracking-tighter text-slate-900">Catálogo de EPP</h1>
-          <p className="text-slate-500 font-medium text-lg">Gestión centralizada de stock, categorías y ciclos de vida útil.</p>
+          <h1 className="text-5xl lg:text-6xl font-black tracking-tighter text-slate-950">Inventario <span className="text-red-600">FEMSA</span></h1>
+          <p className="text-slate-400 font-bold text-lg max-w-xl">Control de activos críticos y gestión de suministros de seguridad industrial.</p>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="relative z-10">
           <Button
             onClick={() => setAddOpen(true)}
-            className="h-16 px-8 rounded-[2rem] bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xl shadow-indigo-200 transition-all font-black uppercase tracking-widest text-xs gap-3 active:scale-95"
+            className="h-20 px-10 rounded-[2rem] bg-slate-950 hover:bg-[#F40009] text-white shadow-2xl transition-all font-black uppercase tracking-widest text-xs gap-4 active:scale-95 group"
           >
-            <PackagePlus className="h-5 w-5" />
-            Nuevo Artículo
+            <PackagePlus className="h-6 w-6 group-hover:rotate-12 transition-transform" />
+            Añadir Material
           </Button>
         </div>
       </div>
 
-      {/* Stats Summary - Mini Bento */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="glass-card p-8 rounded-[2.5rem] flex items-center justify-between group hover:bg-white transition-all duration-500">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total de Unidades</p>
-            <p className="text-4xl font-black text-slate-900 font-display">{totalStock.toLocaleString()}</p>
+      {/* Corporate Mini Bento */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <Card className="bg-slate-950 p-10 rounded-[3rem] border-none shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+             <Package className="h-20 w-20 text-white" />
           </div>
-          <div className="h-14 w-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner group-hover:scale-110 transition-transform">
-            <Package className="h-7 w-7" />
-          </div>
-        </div>
+          <p className="text-[11px] font-black text-red-500 uppercase tracking-[0.3em] mb-3">Unidades Totales</p>
+          <p className="text-6xl font-black text-white tracking-tighter">{totalStock.toLocaleString()}</p>
+        </Card>
         
-        <div className="glass-card p-8 rounded-[2.5rem] flex items-center justify-between group hover:bg-white transition-all duration-500">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Stock Bajo</p>
-            <p className="text-4xl font-black text-orange-600 font-display">{lowStockItems.length}</p>
+        <Card className="bg-white p-10 rounded-[3rem] border-none shadow-xl relative overflow-hidden group border border-slate-100">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+             <TrendingDown className="h-20 w-20 text-red-600" />
           </div>
-          <div className="h-14 w-14 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600 shadow-inner group-hover:scale-110 transition-transform">
-            <TrendingDown className="h-7 w-7" />
-          </div>
-        </div>
+          <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">Stock Crítico</p>
+          <p className="text-6xl font-black text-red-600 tracking-tighter">{lowStockItems.length}</p>
+        </Card>
 
-        <div className="glass-card p-8 rounded-[2.5rem] flex items-center justify-between group hover:bg-white transition-all duration-500">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Agotados</p>
-            <p className="text-4xl font-black text-red-600 font-display">{outOfStock.length}</p>
+        <Card className="bg-white p-10 rounded-[3rem] border-none shadow-xl relative overflow-hidden group border border-slate-100">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+             <AlertTriangle className="h-20 w-20 text-slate-900" />
           </div>
-          <div className="h-14 w-14 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-inner group-hover:scale-110 transition-transform">
-            <AlertTriangle className="h-7 w-7" />
-          </div>
-        </div>
+          <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">Agotado Total</p>
+          <p className="text-6xl font-black text-slate-950 tracking-tighter">{outOfStock.length}</p>
+        </Card>
       </div>
 
-      {/* Main Content Card */}
-      <Card className="glass-card rounded-[3rem] border-none overflow-hidden bg-white/50 backdrop-blur-xl">
-        <div className="p-10 border-b border-slate-100 space-y-8">
-          <div className="flex flex-col md:flex-row gap-6">
+      {/* Main Catalog View */}
+      <Card className="bg-white rounded-[3.5rem] border-none shadow-2xl overflow-hidden">
+        <div className="p-12 border-b border-slate-50 flex flex-col md:flex-row gap-8">
             <div className="relative flex-1 group">
-              <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-red-600 transition-colors" />
               <Input 
-                placeholder="Buscar por nombre o SKU..." 
-                className="pl-14 h-16 bg-white border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-100 transition-all font-medium text-lg"
+                placeholder="Filtrar por nombre o SKU técnico..." 
+                className="pl-16 h-20 bg-slate-50 border-none rounded-[1.5rem] shadow-inner focus-visible:ring-2 focus-visible:ring-red-100 transition-all font-bold text-lg"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
             
             <Select value={filterCategory} onValueChange={(v) => setFilterCategory(v || 'all')}>
-              <SelectTrigger className="w-full md:w-[280px] h-16 bg-white border-slate-100 rounded-2xl shadow-sm font-bold text-slate-600 px-6">
-                <SelectValue placeholder="Todas las categorías" />
+              <SelectTrigger className="w-full md:w-[320px] h-20 bg-slate-50 border-none rounded-[1.5rem] shadow-inner font-black text-slate-600 px-8">
+                <SelectValue placeholder="Categoría" />
               </SelectTrigger>
-              <SelectContent className="rounded-2xl border-slate-100 shadow-2xl">
-                <SelectItem value="all" className="font-bold">Todas las categorías</SelectItem>
-                {uniqueCategories.map(c => <SelectItem key={c} value={c} className="font-medium">{c}</SelectItem>)}
+              <SelectContent className="rounded-[1.5rem] border-slate-50 shadow-2xl">
+                <SelectItem value="all" className="font-black">TODAS LAS CATEGORÍAS</SelectItem>
+                {uniqueCategories.map(c => <SelectItem key={c} value={c} className="font-bold">{c.toUpperCase()}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
         </div>
 
-        <div className="overflow-x-auto custom-scroll">
+        <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50/50">
-                <th className="px-10 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Material</th>
-                <th className="px-10 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Categoría</th>
-                <th className="px-10 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Vida Útil</th>
-                <th className="px-10 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Stock Actual</th>
-                <th className="px-10 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Acciones</th>
+              <tr className="bg-slate-50/70 text-left">
+                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Especificación</th>
+                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Clasificación</th>
+                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Ciclo Vida</th>
+                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Stock</th>
+                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-50">
               <AnimatePresence mode="popLayout">
                 {filtered.map((item, idx) => (
                   <motion.tr 
@@ -269,43 +263,43 @@ export default function InventarioPage() {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ delay: idx * 0.05 }}
-                    className="group hover:bg-indigo-50/50 transition-all cursor-default"
+                    className="group hover:bg-red-50/30 transition-all cursor-default"
                   >
-                    <td className="px-10 py-8">
-                      <div className="flex items-center gap-4">
-                        <div className="h-14 w-14 rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 flex items-center justify-center text-slate-400 font-black text-xs group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
-                          {item.sku}
+                    <td className="px-12 py-10">
+                      <div className="flex items-center gap-6">
+                        <div className="h-16 w-16 rounded-2xl bg-white shadow-md ring-1 ring-slate-100 flex items-center justify-center text-slate-900 font-black text-sm group-hover:bg-[#F40009] group-hover:text-white transition-all duration-500">
+                          {item.sku.slice(0, 3)}
                         </div>
                         <div>
-                          <p className="font-black text-slate-800 text-lg leading-tight mb-1">{item.name}</p>
-                          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest font-mono">SKU: {item.sku}</p>
+                          <p className="font-black text-slate-900 text-xl tracking-tight leading-tight">{item.name}</p>
+                          <p className="text-[10px] text-red-600 font-black uppercase tracking-[0.2em] mt-1">ID: {item.sku}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-10 py-8">
-                      <Badge variant="outline" className="rounded-xl px-4 py-1.5 font-bold border-slate-200 text-slate-500 bg-white">
+                    <td className="px-12 py-10">
+                      <Badge className="bg-slate-900 text-white border-none px-4 py-1.5 rounded-xl font-black text-[9px] tracking-widest uppercase">
                         {item.category}
                       </Badge>
                     </td>
-                    <td className="px-10 py-8">
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <RefreshCw className="h-3.5 w-3.5" />
+                    <td className="px-12 py-10">
+                      <div className="flex items-center gap-3 text-slate-500">
+                        <RefreshCw className="h-4 w-4" />
                         <span className="text-sm font-black">{item.replacementDays} días</span>
                       </div>
                     </td>
-                    <td className="px-10 py-8">
-                      <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-2xl border font-black text-sm shadow-sm ${stockColor(item.stock)}`}>
-                        {item.stock} <span className="text-[10px] opacity-70">UNIDADES</span>
+                    <td className="px-12 py-10">
+                      <div className={`inline-flex items-center gap-3 px-6 py-2.5 rounded-2xl border-2 font-black text-sm shadow-sm ${stockColor(item.stock)}`}>
+                        {item.stock} <span className="text-[9px] opacity-60 tracking-widest">UNIDADES</span>
                       </div>
                     </td>
-                    <td className="px-10 py-8 text-right">
+                    <td className="px-12 py-10 text-right">
                       <Button 
                         variant="ghost" 
                         size="icon" 
                         onClick={() => openAdjust(item)}
-                        className="h-12 w-12 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm ring-1 ring-slate-100 group-hover:ring-indigo-200"
+                        className="h-14 w-14 rounded-2xl bg-white shadow-md ring-1 ring-slate-100 hover:bg-[#F40009] hover:text-white transition-all group-hover:scale-110"
                       >
-                        <Plus className="h-5 w-5" />
+                        <Plus className="h-6 w-6" />
                       </Button>
                     </td>
                   </motion.tr>
@@ -315,8 +309,115 @@ export default function InventarioPage() {
           </table>
         </div>
       </Card>
-      
-      {/* ... Add/Adjust Dialogs ... */}
+
+      {/* Add Item Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-[600px] rounded-[3rem] border-none p-0 overflow-hidden shadow-2xl">
+          <div className="bg-slate-950 p-10 text-white relative">
+             <div className="absolute top-0 right-0 p-8 opacity-20">
+                <PackagePlus className="h-20 w-20" />
+             </div>
+             <DialogHeader>
+                <DialogTitle className="text-3xl font-black tracking-tight uppercase">Alta de Material</DialogTitle>
+                <p className="text-slate-400 font-bold mt-2">Registrar nueva especificación en el catálogo corporativo.</p>
+             </DialogHeader>
+          </div>
+          <form onSubmit={handleAdd} className="p-10 space-y-8 bg-white">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Código SKU</Label>
+                <Input 
+                  className="h-14 rounded-2xl bg-slate-50 border-none shadow-inner font-bold" 
+                  value={form.sku} 
+                  onChange={e => setForm({...form, sku: e.target.value.toUpperCase()})}
+                  placeholder="Ej: CAS-001"
+                />
+              </div>
+              <div className="space-y-3">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Categoría</Label>
+                <Select value={form.category} onValueChange={v => setForm({...form, category: v || ''})}>
+                  <SelectTrigger className="h-14 rounded-2xl bg-slate-50 border-none shadow-inner font-bold">
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Nombre Descriptivo</Label>
+              <Input 
+                className="h-14 rounded-2xl bg-slate-50 border-none shadow-inner font-bold" 
+                value={form.name} 
+                onChange={e => setForm({...form, name: e.target.value})}
+                placeholder="Ej: Casco Pro-Vent Red"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Vida Útil (Días)</Label>
+                <Input 
+                  type="number" 
+                  className="h-14 rounded-2xl bg-slate-50 border-none shadow-inner font-bold" 
+                  value={form.replacementDays} 
+                  onChange={e => setForm({...form, replacementDays: e.target.value})}
+                />
+              </div>
+              <div className="space-y-3">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Stock Inicial</Label>
+                <Input 
+                  type="number" 
+                  className="h-14 rounded-2xl bg-slate-50 border-none shadow-inner font-bold" 
+                  value={form.stock} 
+                  onChange={e => setForm({...form, stock: e.target.value})}
+                />
+              </div>
+            </div>
+            <DialogFooter className="pt-6">
+              <Button type="submit" disabled={saving} className="w-full h-16 rounded-[1.5rem] bg-[#F40009] hover:bg-slate-900 text-white font-black uppercase tracking-widest shadow-2xl">
+                {saving ? <Loader2 className="h-6 w-6 animate-spin" /> : "Confirmar Registro"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Adjust Stock Dialog */}
+      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
+        <DialogContent className="sm:max-w-[500px] rounded-[3rem] border-none p-0 overflow-hidden shadow-2xl">
+          <div className="bg-[#F40009] p-10 text-white">
+             <DialogHeader>
+                <DialogTitle className="text-2xl font-black uppercase tracking-tight">Ajuste de Existencias</DialogTitle>
+                <p className="text-white/70 font-bold mt-1">{adjustItem?.name}</p>
+             </DialogHeader>
+          </div>
+          <form onSubmit={handleAdjust} className="p-10 space-y-8 bg-white">
+            <div className="flex bg-slate-100 p-2 rounded-2xl">
+               <Button type="button" variant={adjustType === 'add' ? 'default' : 'ghost'} onClick={() => setAdjustType('add')} className={`flex-1 h-14 rounded-xl font-black ${adjustType === 'add' ? 'bg-slate-950 text-white shadow-xl' : 'text-slate-400'}`}>+ AÑADIR</Button>
+               <Button type="button" variant={adjustType === 'subtract' ? 'default' : 'ghost'} onClick={() => setAdjustType('subtract')} className={`flex-1 h-14 rounded-xl font-black ${adjustType === 'subtract' ? 'bg-slate-950 text-white shadow-xl' : 'text-slate-400'}`}>- QUITAR</Button>
+               <Button type="button" variant={adjustType === 'set' ? 'default' : 'ghost'} onClick={() => setAdjustType('set')} className={`flex-1 h-14 rounded-xl font-black ${adjustType === 'set' ? 'bg-slate-950 text-white shadow-xl' : 'text-slate-400'}`}>= SET</Button>
+            </div>
+            
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Cantidad a procesar</Label>
+              <Input 
+                type="number" 
+                className="h-20 text-center text-4xl font-black rounded-3xl bg-slate-50 border-none shadow-inner" 
+                value={adjustQty} 
+                onChange={e => setAdjustQty(e.target.value)}
+                autoFocus
+              />
+            </div>
+            
+            <DialogFooter>
+               <Button type="submit" disabled={adjustSaving} className="w-full h-16 rounded-[1.5rem] bg-slate-950 hover:bg-[#F40009] text-white font-black uppercase tracking-widest shadow-2xl transition-all">
+                  {adjustSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : "Aplicar Movimiento"}
+               </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

@@ -6,7 +6,7 @@ import {
   serverTimestamp, query, where, getDocs, orderBy
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,11 +19,12 @@ import {
 } from '@/components/ui/select';
 import {
   Users, UserPlus, Search, UserX, UserCheck,
-  HardHat, Loader2, Eye
+  HardHat, Loader2, Eye, ShieldCheck, Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface Employee {
   docId: string;
@@ -46,6 +47,8 @@ const AREAS = [
   'Soldadura', 'Ensamble', 'Pintura', 'Logística', 'Mantenimiento',
   'Calidad', 'Almacén', 'Administración', 'Seguridad Industrial', 'Producción'
 ];
+
+const BRAND_RED = "#F40009";
 
 export default function EmpleadosPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -94,7 +97,7 @@ export default function EmpleadosPage() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      toast.success(`Empleado ${form.name} registrado exitosamente`);
+      toast.success(`Empleado registrado: ${form.name}`);
       setForm({ id: '', name: '', area: '' });
       setAddOpen(false);
     } catch {
@@ -110,7 +113,7 @@ export default function EmpleadosPage() {
         active: !emp.active,
         updatedAt: serverTimestamp(),
       });
-      toast.success(`Empleado ${emp.active ? 'desactivado' : 'activado'} correctamente`);
+      toast.success(`Estado de ${emp.name} actualizado`);
     } catch {
       toast.error('Error al actualizar el estado');
     }
@@ -135,7 +138,7 @@ export default function EmpleadosPage() {
         status: d.data().status,
       })));
     } catch {
-      toast.error('No se pudo cargar el historial');
+      toast.error('Error al cargar historial corporativo');
     } finally {
       setHistoryLoading(false);
     }
@@ -154,269 +157,280 @@ export default function EmpleadosPage() {
   const inactiveCount = employees.filter(e => !e.active).length;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Directorio de Empleados</h1>
-          <p className="text-gray-500 mt-1">Gestiona el personal activo y su historial de EPP.</p>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8 }}
+      className="space-y-12 pb-20"
+    >
+      {/* Header - Corporate Style */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-white p-12 rounded-[3.5rem] border border-slate-100 shadow-2xl shadow-red-100/30 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-full bg-red-600/5 -mr-20 -skew-x-12" />
+        
+        <div className="relative z-10 space-y-3">
+          <div className="flex items-center gap-3 mb-2">
+             <Badge className="bg-red-600 text-white border-none px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest">Human Capital Security</Badge>
+          </div>
+          <h1 className="text-5xl lg:text-6xl font-black tracking-tighter text-slate-950">Directorio de <span className="text-red-600">Talento</span></h1>
+          <p className="text-slate-400 font-bold text-lg max-w-xl">Gestión integral del personal y trazabilidad de su equipamiento de seguridad.</p>
         </div>
-        <Button
-          onClick={() => setAddOpen(true)}
-          className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
-        >
-          <UserPlus className="h-4 w-4" />
-          Nuevo Empleado
-        </Button>
+        
+        <div className="relative z-10">
+          <Button
+            onClick={() => setAddOpen(true)}
+            className="h-20 px-10 rounded-[2rem] bg-slate-950 hover:bg-[#F40009] text-white shadow-2xl transition-all font-black uppercase tracking-widest text-xs gap-4 active:scale-95 group"
+          >
+            <UserPlus className="h-6 w-6 group-hover:scale-110 transition-transform" />
+            Vincular Nuevo
+          </Button>
+        </div>
       </div>
 
-      {/* Add Dialog */}
+      {/* Mini Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <Card className="bg-slate-950 p-10 rounded-[3rem] border-none shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+             <Users className="h-20 w-20 text-white" />
+          </div>
+          <p className="text-[11px] font-black text-red-500 uppercase tracking-[0.3em] mb-3">Plantilla Total</p>
+          <p className="text-6xl font-black text-white tracking-tighter">{employees.length}</p>
+        </Card>
+        
+        <Card className="bg-white p-10 rounded-[3rem] border-none shadow-xl relative overflow-hidden group border border-slate-100">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+             <UserCheck className="h-20 w-20 text-emerald-600" />
+          </div>
+          <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">Colaboradores Activos</p>
+          <p className="text-6xl font-black text-emerald-600 tracking-tighter">{activeCount}</p>
+        </Card>
+
+        <Card className="bg-white p-10 rounded-[3rem] border-none shadow-xl relative overflow-hidden group border border-slate-100">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+             <UserX className="h-20 w-20 text-red-600" />
+          </div>
+          <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">En Baja / Inactivos</p>
+          <p className="text-6xl font-black text-red-600 tracking-tighter">{inactiveCount}</p>
+        </Card>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col md:flex-row gap-6 bg-white p-4 rounded-[2.5rem] border border-slate-100 shadow-lg">
+        <div className="relative flex-1 group">
+          <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-red-600 transition-colors" />
+          <Input
+            placeholder="Filtrar por nombre, nómina o departamento..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-16 h-16 bg-transparent border-none rounded-2xl focus-visible:ring-0 font-bold text-lg"
+          />
+        </div>
+        <div className="flex p-1 bg-slate-100 rounded-2xl gap-1">
+          {(['all', 'active', 'inactive'] as const).map(s => (
+            <Button
+              key={s}
+              variant={filterStatus === s ? 'default' : 'ghost'}
+              onClick={() => setFilterStatus(s)}
+              className={`h-14 px-8 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${filterStatus === s ? 'bg-slate-950 text-white shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              {s === 'all' ? 'Ver Todos' : s === 'active' ? 'Solo Activos' : 'Solo Bajas'}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Corporate Table View */}
+      <Card className="bg-white rounded-[3.5rem] border-none shadow-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-slate-50/70 text-left">
+                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Identificación</th>
+                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Nombre Completo</th>
+                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Unidad de Negocio / Área</th>
+                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Estatus Laboral</th>
+                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Controles</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              <AnimatePresence mode="popLayout">
+                {filtered.map((emp, idx) => (
+                  <motion.tr 
+                    layout
+                    key={emp.docId}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="group hover:bg-red-50/30 transition-all cursor-default"
+                  >
+                    <td className="px-12 py-10 font-black text-slate-900 font-mono tracking-tighter text-lg">#{emp.id}</td>
+                    <td className="px-12 py-10">
+                       <p className="font-black text-slate-900 text-xl tracking-tight leading-tight">{emp.name}</p>
+                       <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Colaborador FEMSA</p>
+                    </td>
+                    <td className="px-12 py-10">
+                      <Badge className="bg-slate-100 text-slate-600 border-slate-200 px-4 py-1.5 rounded-xl font-black text-[9px] tracking-widest uppercase">
+                        {emp.area}
+                      </Badge>
+                    </td>
+                    <td className="px-12 py-10">
+                      <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-2xl border-2 font-black text-[10px] shadow-sm uppercase tracking-widest ${emp.active ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-red-700 bg-red-50 border-red-100'}`}>
+                        <div className={`h-2 w-2 rounded-full ${emp.active ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                        {emp.active ? 'Activo' : 'Inactivo'}
+                      </div>
+                    </td>
+                    <td className="px-12 py-10 text-right">
+                      <div className="flex items-center justify-end gap-3">
+                        <Button
+                          size="sm" variant="outline"
+                          className="h-12 px-6 rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 hover:ring-[#F40009] hover:text-[#F40009] font-black uppercase tracking-tighter text-[10px] transition-all active:scale-95"
+                          onClick={() => openHistory(emp)}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          EXPEDIENTE
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className={`h-12 w-12 rounded-2xl transition-all active:scale-90 ${emp.active
+                            ? 'bg-red-50 text-red-600 hover:bg-[#F40009] hover:text-white'
+                            : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
+                          onClick={() => toggleStatus(emp)}
+                          title={emp.active ? "Dar de baja" : "Reactivar"}
+                        >
+                          {emp.active ? <UserX className="h-5 w-5" /> : <UserCheck className="h-5 w-5" />}
+                        </Button>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Add Employee Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-indigo-600" />
-              Registrar Nuevo Empleado
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleAdd} className="space-y-5 pt-2">
-            <div className="space-y-2">
-              <Label htmlFor="emp-id">Número de Empleado *</Label>
-              <Input
-                id="emp-id"
-                placeholder="Ej: 1881"
-                value={form.id}
-                onChange={e => setForm(f => ({ ...f, id: e.target.value }))}
-                required
-              />
+        <DialogContent className="sm:max-w-[600px] rounded-[3rem] border-none p-0 overflow-hidden shadow-2xl">
+          <div className="bg-slate-950 p-12 text-white relative">
+             <div className="absolute top-0 right-0 p-10 opacity-10">
+                <UserPlus className="h-24 w-24" />
+             </div>
+             <DialogHeader>
+                <DialogTitle className="text-3xl font-black tracking-tight uppercase">Registro de Nómina</DialogTitle>
+                <p className="text-slate-400 font-bold mt-2">Añadir nuevo colaborador al sistema central de activos.</p>
+             </DialogHeader>
+          </div>
+          <form onSubmit={handleAdd} className="p-12 space-y-8 bg-white">
+            <div className="grid grid-cols-2 gap-8">
+              <div className="space-y-3">
+                <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-1">Nº de Nómina / ID</Label>
+                <Input
+                  placeholder="Ej: 1881"
+                  className="h-16 rounded-2xl bg-slate-50 border-none shadow-inner font-black text-lg"
+                  value={form.id}
+                  onChange={e => setForm(f => ({ ...f, id: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-3">
+                <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-1">Unidad de Negocio</Label>
+                <Select value={form.area} onValueChange={v => setForm(f => ({ ...f, area: v ?? '' }))}>
+                  <SelectTrigger className="h-16 rounded-2xl bg-slate-50 border-none shadow-inner font-black">
+                    <SelectValue placeholder="Área..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    {AREAS.map(a => <SelectItem key={a} value={a} className="font-bold">{a.toUpperCase()}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="emp-name">Nombre Completo *</Label>
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-1">Nombre Completo del Colaborador</Label>
               <Input
-                id="emp-name"
-                placeholder="Ej: Juan Pérez García"
+                placeholder="Nombre y Apellidos"
+                className="h-16 rounded-2xl bg-slate-50 border-none shadow-inner font-black text-lg"
                 value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="emp-area">Área de Trabajo *</Label>
-              <Select value={form.area} onValueChange={v => setForm(f => ({ ...f, area: v ?? '' }))}>
-                <SelectTrigger id="emp-area" className="w-full">
-                  <SelectValue placeholder="Selecciona un área" />
-                </SelectTrigger>
-                <SelectContent>
-                  {AREAS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>
-                Cancelar
-              </Button>
+            <DialogFooter className="pt-6">
               <Button
                 type="submit"
                 disabled={saving || !form.id || !form.name || !form.area}
-                className="bg-indigo-600 hover:bg-indigo-700"
+                className="w-full h-20 rounded-[1.5rem] bg-[#F40009] hover:bg-slate-900 text-white font-black uppercase tracking-widest shadow-2xl transition-all"
               >
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Registrar
+                {saving ? <Loader2 className="h-8 w-8 animate-spin" /> : "Vincular a la Red FEMSA"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-l-4 border-l-indigo-500">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 font-medium">Total Empleados</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{employees.length}</p>
-              </div>
-              <Users className="h-8 w-8 text-indigo-400" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-green-500">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 font-medium">Activos</p>
-                <p className="text-3xl font-bold text-green-700 mt-1">{activeCount}</p>
-              </div>
-              <UserCheck className="h-8 w-8 text-green-400" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-red-400">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 font-medium">Inactivos</p>
-                <p className="text-3xl font-bold text-red-600 mt-1">{inactiveCount}</p>
-              </div>
-              <UserX className="h-8 w-8 text-red-300" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Buscar por nombre, ID o área..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex gap-2">
-          {(['all', 'active', 'inactive'] as const).map(s => (
-            <Button
-              key={s}
-              size="sm"
-              variant={filterStatus === s ? 'default' : 'outline'}
-              onClick={() => setFilterStatus(s)}
-              className={filterStatus === s ? 'bg-indigo-600 hover:bg-indigo-700' : ''}
-            >
-              {s === 'all' ? 'Todos' : s === 'active' ? 'Activos' : 'Inactivos'}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex items-center justify-center p-16">
-              <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center p-16 text-gray-400">
-              <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No se encontraron empleados</p>
-              <p className="text-sm mt-1">Intenta ajustar los filtros o agrega uno nuevo</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-gray-50/60">
-                    <th className="h-11 px-5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">ID</th>
-                    <th className="h-11 px-5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Nombre</th>
-                    <th className="h-11 px-5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Área</th>
-                    <th className="h-11 px-5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Estado</th>
-                    <th className="h-11 px-5 text-left font-semibold text-gray-500 text-xs uppercase tracking-wider">Alta</th>
-                    <th className="h-11 px-5 text-right font-semibold text-gray-500 text-xs uppercase tracking-wider">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(emp => (
-                    <tr key={emp.docId} className="border-b last:border-0 hover:bg-gray-50/50 transition-colors">
-                      <td className="px-5 py-3.5 font-mono font-semibold text-gray-600 text-xs">{emp.id}</td>
-                      <td className="px-5 py-3.5 font-semibold text-gray-900">{emp.name}</td>
-                      <td className="px-5 py-3.5 text-gray-600">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
-                          {emp.area}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <Badge variant={emp.active ? 'default' : 'secondary'}
-                          className={emp.active ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}>
-                          {emp.active ? 'Activo' : 'Inactivo'}
-                        </Badge>
-                      </td>
-                      <td className="px-5 py-3.5 text-gray-500 text-xs">
-                        {emp.createdAt ? format(emp.createdAt, 'dd MMM yyyy', { locale: es }) : '—'}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            size="sm" variant="outline"
-                            className="gap-1.5 text-xs h-8"
-                            onClick={() => openHistory(emp)}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            Historial
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className={`gap-1.5 text-xs h-8 ${emp.active
-                              ? 'border-red-200 text-red-600 hover:bg-red-50'
-                              : 'border-green-200 text-green-600 hover:bg-green-50'}`}
-                            onClick={() => toggleStatus(emp)}
-                          >
-                            {emp.active
-                              ? <><UserX className="h-3.5 w-3.5" />Dar de Baja</>
-                              : <><UserCheck className="h-3.5 w-3.5" />Reactivar</>
-                            }
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* History Dialog */}
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <HardHat className="h-5 w-5 text-indigo-600" />
-              Historial EPP — {selectedEmployee?.name}
-              <span className="ml-1 text-sm font-normal text-gray-500">#{selectedEmployee?.id}</span>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="max-h-96 overflow-y-auto">
+        <DialogContent className="sm:max-w-3xl rounded-[3rem] border-none p-0 overflow-hidden shadow-2xl">
+          <div className="bg-[#F40009] p-12 text-white flex items-center justify-between">
+            <div>
+              <DialogTitle className="text-3xl font-black uppercase tracking-tight">Expediente de Seguridad</DialogTitle>
+              <div className="flex items-center gap-3 mt-2">
+                 <p className="text-white font-bold opacity-90 text-lg">{selectedEmployee?.name}</p>
+                 <Badge className="bg-white/10 text-white border-none font-black text-[9px] tracking-widest">NÓMINA #{selectedEmployee?.id}</Badge>
+              </div>
+            </div>
+            <div className="h-20 w-20 rounded-full bg-white/10 flex items-center justify-center backdrop-blur-md">
+               <ShieldCheck className="h-10 w-10 text-white" />
+            </div>
+          </div>
+          <div className="p-12 max-h-[600px] overflow-y-auto bg-slate-50/30">
             {historyLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-7 w-7 animate-spin text-indigo-500" />
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-12 w-12 animate-spin text-[#F40009]" />
               </div>
             ) : history.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                <HardHat className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p>Sin entregas registradas para este empleado</p>
+              <div className="text-center py-20 bg-white rounded-3xl border border-slate-100 shadow-inner">
+                <Activity className="h-16 w-16 mx-auto mb-4 text-slate-200" />
+                <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Sin registros de dotación detectados</p>
               </div>
             ) : (
-              <div className="space-y-3 py-2">
+              <div className="grid gap-4">
                 {history.map(h => (
-                  <div key={h.id} className="flex items-center justify-between p-3.5 rounded-lg border bg-gray-50/60">
-                    <div>
-                      <p className="font-semibold text-gray-900 text-sm">{h.sku}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Entrega: {format(h.assignedAt, 'dd MMM yyyy', { locale: es })}
-                        {h.nextReplacementAt && (
-                          <span className={`ml-3 ${new Date() > h.nextReplacementAt ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
-                            · Cambio: {format(h.nextReplacementAt, 'dd MMM yyyy', { locale: es })}
-                            {new Date() > h.nextReplacementAt && ' ⚠️'}
-                          </span>
-                        )}
-                      </p>
+                  <motion.div 
+                    key={h.id} 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex items-center justify-between p-6 rounded-3xl bg-white shadow-sm border border-slate-100 group hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-center gap-5">
+                       <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shadow-inner ${h.status === 'active' ? 'bg-red-50 text-[#F40009]' : 'bg-slate-100 text-slate-400'}`}>
+                          <HardHat className="h-7 w-7" />
+                       </div>
+                       <div>
+                          <p className="font-black text-slate-900 text-lg tracking-tight uppercase">{h.sku}</p>
+                          <p className="text-[10px] text-slate-400 font-black tracking-widest uppercase mt-1">
+                            DOTACIÓN: {format(h.assignedAt, 'dd MMM, yyyy', { locale: es })}
+                          </p>
+                       </div>
                     </div>
-                    <Badge variant={h.status === 'active' ? 'default' : 'secondary'}
-                      className={h.status === 'active' ? 'bg-blue-100 text-blue-700 hover:bg-blue-100' : ''}>
-                      {h.status === 'active' ? 'En uso' : 'Reemplazado'}
-                    </Badge>
-                  </div>
+                    <div className="text-right">
+                       <Badge className={`font-black text-[9px] tracking-widest px-4 py-1.5 border-none shadow-sm ${h.status === 'active' ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                          {h.status === 'active' ? 'EN OPERACIÓN' : 'HISTÓRICO'}
+                       </Badge>
+                       {h.nextReplacementAt && h.status === 'active' && (
+                         <p className="text-[9px] font-black text-red-600 uppercase tracking-widest mt-2 animate-pulse">
+                           Cambio: {format(h.nextReplacementAt, 'dd/MM/yyyy')}
+                         </p>
+                       )}
+                    </div>
+                  </motion.div>
                 ))}
               </div>
             )}
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 }

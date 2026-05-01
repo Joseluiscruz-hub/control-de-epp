@@ -1,25 +1,25 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, HardHat, UserCheck, ShieldCheck } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "./auth-provider";
-import { collection, query, getDocs, doc, setDoc, serverTimestamp, getDoc, increment, updateDoc } from "firebase/firestore";
+import { collection, query, getDocs, doc, setDoc, serverTimestamp, increment, updateDoc } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-error";
 import { toast } from "sonner";
 import { addDays } from "date-fns";
+import { motion } from "motion/react";
 
 export function AssignPpeDialog() {
   const { user: authUser } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // Minimal data state for dropdowns
   const [employees, setEmployees] = useState<{id: string, name: string}[]>([]);
   const [items, setItems] = useState<{id: string, name: string, stock: number, replacementDays: number}[]>([]);
 
@@ -66,7 +66,6 @@ export function AssignPpeDialog() {
 
       const assignmentId = doc(collection(db, 'assignments')).id;
       
-      // Batch-like operations (though separate calls for simplicity here)
       await Promise.all([
         setDoc(doc(db, 'assignments', assignmentId), {
           employeeId: selectedEmployee,
@@ -98,64 +97,84 @@ export function AssignPpeDialog() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-between p-5 bg-gradient-to-r from-indigo-50 to-white hover:from-indigo-100 hover:to-indigo-50 rounded-2xl transition-all border border-indigo-100 shadow-sm hover:shadow-md text-left cursor-pointer group"
+        className="w-full flex items-center justify-between p-6 bg-white hover:bg-red-50 rounded-[1.5rem] transition-all border border-slate-100 shadow-xl shadow-red-100/20 group text-left"
       >
-        <div className="flex items-center gap-4">
-          <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200 group-hover:scale-110 transition-transform">
-            <ArrowRight className="h-5 w-5 text-white" />
+        <div className="flex items-center gap-5">
+          <div className="h-14 w-14 rounded-2xl bg-[#F40009] flex items-center justify-center shadow-xl shadow-red-200 group-hover:scale-110 transition-transform">
+            <ShieldCheck className="h-7 w-7 text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900 leading-none">Registrar Nueva Entrega</p>
-            <p className="text-xs text-gray-500 mt-1">Asignar material a un colaborador</p>
+            <p className="text-lg font-black text-slate-950 leading-tight uppercase tracking-tighter">Nueva Dotación</p>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Asignar material a nómina</p>
           </div>
         </div>
-        <div className="h-8 w-8 rounded-full flex items-center justify-center bg-white border border-gray-100 group-hover:border-indigo-200 transition-colors">
-          <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-indigo-600 transition-colors" />
+        <div className="h-10 w-10 rounded-full flex items-center justify-center bg-slate-50 group-hover:bg-[#F40009] transition-colors">
+          <ArrowRight className="h-5 w-5 text-slate-300 group-hover:text-white transition-colors" />
         </div>
       </button>
+
       <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Asignar Nuevo EPP</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6 pt-4">
-          <div className="space-y-2">
-            <Label>Empleado</Label>
-            <Select value={selectedEmployee} onValueChange={v => setSelectedEmployee(v ?? '')} disabled={loading}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione un empleado" />
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map(emp => (
-                  <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
-                ))}
-                {employees.length === 0 && <SelectItem value="placeholder-emp" disabled>No hay empleados cargados</SelectItem>}
-              </SelectContent>
-            </Select>
+        <DialogContent className="sm:max-w-[500px] rounded-[3rem] border-none p-0 overflow-hidden shadow-2xl">
+          <div className="bg-slate-950 p-10 text-white relative">
+             <div className="absolute top-0 right-0 p-8 opacity-10">
+                <HardHat className="h-20 w-20" />
+             </div>
+             <DialogHeader>
+                <DialogTitle className="text-3xl font-black uppercase tracking-tight">Registro de Entrega</DialogTitle>
+                <p className="text-slate-400 font-bold mt-1">Vincular EPP a un colaborador en planta.</p>
+             </DialogHeader>
           </div>
+          
+          <form onSubmit={handleSubmit} className="p-10 space-y-8 bg-white">
+            <div className="space-y-4">
+              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Seleccionar Colaborador</Label>
+              <Select value={selectedEmployee} onValueChange={v => setSelectedEmployee(v || '')} disabled={loading}>
+                <SelectTrigger className="h-16 rounded-2xl bg-slate-50 border-none shadow-inner font-bold text-lg px-6">
+                  <div className="flex items-center gap-3">
+                    <UserCheck className="h-5 w-5 text-red-600" />
+                    <SelectValue placeholder="Buscar por nombre..." />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-none shadow-2xl">
+                  {employees.map(emp => (
+                    <SelectItem key={emp.id} value={emp.id} className="font-bold py-3 px-4">{emp.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label>Equipo (SKU)</Label>
-            <Select value={selectedItem} onValueChange={v => setSelectedItem(v ?? '')} disabled={loading}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione un modelo/equipo" />
-              </SelectTrigger>
-              <SelectContent>
-                {items.map(it => (
-                  <SelectItem key={it.id} value={it.id}>{it.name} (Stock: {it.stock})</SelectItem>
-                ))}
-                {items.length === 0 && <SelectItem value="placeholder-item" disabled>No hay items en el catálogo</SelectItem>}
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="space-y-4">
+              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Especificación de Equipo (SKU)</Label>
+              <Select value={selectedItem} onValueChange={v => setSelectedItem(v || '')} disabled={loading}>
+                <SelectTrigger className="h-16 rounded-2xl bg-slate-50 border-none shadow-inner font-bold text-lg px-6">
+                  <div className="flex items-center gap-3">
+                    <HardHat className="h-5 w-5 text-red-600" />
+                    <SelectValue placeholder="Seleccionar material..." />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-none shadow-2xl">
+                  {items.map(it => (
+                    <SelectItem key={it.id} value={it.id} className="font-bold py-3 px-4">
+                       <div className="flex justify-between items-center w-full gap-10">
+                          <span>{it.name}</span>
+                          <Badge className="bg-slate-100 text-slate-500 border-none font-black text-[9px]">STOCK: {it.stock}</Badge>
+                       </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <Button type="submit" className="w-full" disabled={loading || !selectedEmployee || !selectedItem}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Confirmar Entrega
-          </Button>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <Button 
+              type="submit" 
+              className="w-full h-20 rounded-[1.5rem] bg-[#F40009] hover:bg-slate-950 text-white font-black uppercase tracking-widest shadow-2xl transition-all text-sm active:scale-95" 
+              disabled={loading || !selectedEmployee || !selectedItem}
+            >
+              {loading ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : "Confirmar Dotación Técnica"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
