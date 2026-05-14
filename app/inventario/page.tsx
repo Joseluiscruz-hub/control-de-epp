@@ -6,7 +6,7 @@ import {
   serverTimestamp, query, increment
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
