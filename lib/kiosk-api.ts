@@ -156,5 +156,5 @@ export async function getKioskRequestStatus(requestId: string): Promise<KioskReq
   if (status === "approved" || status === "rejected" || status === "pending") {
     return status;
   }
-  return "pending";
+  throw new Error("kiosk_request_invalid_status");
 }

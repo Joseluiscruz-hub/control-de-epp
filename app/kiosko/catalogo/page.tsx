@@ -42,6 +42,7 @@ export default function KioskoCatalogoPage() {
   const [employeeId, setEmployeeId] = useState("");
   const [selectedByItem, setSelectedByItem] = useState<Record<string, SelectedVariant>>({});
   const [sizeByItem, setSizeByItem] = useState<Record<string, string>>({});
+  const selectedCount = Object.keys(selectedByItem).length;
 
   const returnToLogin = () => {
     clearKioskSession();
@@ -93,7 +94,7 @@ export default function KioskoCatalogoPage() {
     if (item.hasSizes && (!item.sizes || !item.sizes[size])) return;
 
     const sku = item.hasSizes ? item.sizes?.[size]?.sku : item.sku;
-    if (!sku || !size) return;
+    if (!sku) return;
 
     setSelectedByItem((prev) => {
       if (prev[item.id]?.sku === sku && prev[item.id]?.size === size) {
@@ -260,13 +261,13 @@ export default function KioskoCatalogoPage() {
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div className="flex flex-col">
             <p className="text-sm text-gray-400">
-            Seleccionados: <span className="text-white font-bold">{Object.keys(selectedByItem).length}</span>
+            Seleccionados: <span className="text-white font-bold">{selectedCount}</span>
             </p>
             {submitError && <p className="text-xs text-red-400 mt-1">{submitError}</p>}
           </div>
           <button
             onClick={submitRequest}
-            disabled={submitting || Object.keys(selectedByItem).length === 0}
+            disabled={submitting || selectedCount === 0}
             className="px-8 py-4 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-gray-900 font-bold text-lg flex items-center gap-2"
           >
             {submitting ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
