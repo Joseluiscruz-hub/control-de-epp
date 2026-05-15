@@ -35,4 +35,3 @@ export function useKioskInactivityTimeout({ timeoutMs, onTimeout }: UseKioskInac
     };
   }, [onTimeout, timeoutMs]);
 }
-

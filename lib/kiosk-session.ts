@@ -15,4 +15,3 @@ export function clearKioskSession() {
     sessionStorage.removeItem(key);
   }
 }
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clock3, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { getKioskRequestStatus } from "@/lib/kiosk-api";
@@ -14,10 +14,10 @@ export default function KioskoEsperaPage() {
   const [status, setStatus] = useState<ViewStatus>("pending");
   const [loading, setLoading] = useState(true);
 
-  const returnToLogin = () => {
+  const returnToLogin = useCallback(() => {
     clearKioskSession();
     router.replace("/kiosko");
-  };
+  }, [router]);
 
   useKioskInactivityTimeout({
     timeoutMs: 2 * 60 * 1000,
@@ -50,7 +50,7 @@ export default function KioskoEsperaPage() {
       active = false;
       window.clearInterval(interval);
     };
-  }, []);
+  }, [returnToLogin]);
 
   useEffect(() => {
     if (status === "pending") return;
@@ -59,7 +59,7 @@ export default function KioskoEsperaPage() {
     }, 6000);
 
     return () => window.clearTimeout(t);
-  }, [status]);
+  }, [status, returnToLogin]);
 
   const content = useMemo(() => {
     if (loading || status === "pending") {
@@ -120,4 +120,3 @@ export default function KioskoEsperaPage() {
     </div>
   );
 }
-
