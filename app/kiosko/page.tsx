@@ -17,6 +17,9 @@ export default function KioskoHomePage() {
     timeoutMs: 2 * 60 * 1000,
     onTimeout: () => {
       clearKioskSession();
+      setEmpId("");
+      setError("");
+      router.replace("/kiosko");
     },
   });
 

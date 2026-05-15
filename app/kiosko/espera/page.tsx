@@ -7,11 +7,14 @@ import { getKioskRequestStatus } from "@/lib/kiosk-api";
 import { clearKioskSession } from "@/lib/kiosk-session";
 import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
 
-type ViewStatus = "pending" | "approved" | "rejected" | "not_found";
+type ViewStatus = "pending" | "approved" | "rejected";
+const POLL_INTERVAL_MS = 12_000;
+const AUTO_RETURN_DELAY_MS = 6_000;
 
 export default function KioskoEsperaPage() {
   const router = useRouter();
   const [status, setStatus] = useState<ViewStatus>("pending");
+  const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const returnToLogin = useCallback(() => {
@@ -37,14 +40,19 @@ export default function KioskoEsperaPage() {
       try {
         const next = await getKioskRequestStatus(requestId);
         if (!active) return;
+        setNotFound(false);
         setStatus(next);
+      } catch {
+        if (!active) return;
+        setNotFound(true);
+        setStatus("rejected");
       } finally {
         if (active) setLoading(false);
       }
     };
 
     poll();
-    const interval = window.setInterval(poll, 12000);
+    const interval = window.setInterval(poll, POLL_INTERVAL_MS);
 
     return () => {
       active = false;
@@ -56,7 +64,7 @@ export default function KioskoEsperaPage() {
     if (status === "pending") return;
     const t = window.setTimeout(() => {
       returnToLogin();
-    }, 6000);
+    }, AUTO_RETURN_DELAY_MS);
 
     return () => window.clearTimeout(t);
   }, [status, returnToLogin]);
@@ -86,16 +94,16 @@ export default function KioskoEsperaPage() {
 
     return {
       icon: <XCircle className="text-red-400" size={56} />,
-      title: status === "not_found" ? "Solicitud no encontrada" : "Solicitud rechazada",
+      title: notFound ? "Solicitud no encontrada" : "Solicitud rechazada",
       body:
-        status === "not_found"
+        notFound
           ? "No encontramos esta solicitud. Regresaremos al inicio por seguridad."
           : "Tu solicitud no pudo ser aprobada. Contacta a tu supervisor.",
       badge: <XCircle size={16} />,
-      badgeText: status === "not_found" ? "No encontrada" : "Rechazada",
+      badgeText: notFound ? "No encontrada" : "Rechazada",
       badgeClass: "bg-red-900/30 text-red-300 border-red-500/30",
     };
-  }, [loading, status]);
+  }, [loading, status, notFound]);
 
   return (
     <div className="flex-1 flex items-center justify-center px-6 py-10">

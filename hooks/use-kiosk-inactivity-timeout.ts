@@ -20,7 +20,7 @@ export function useKioskInactivityTimeout({ timeoutMs, onTimeout }: UseKioskInac
       }, timeoutMs);
     };
 
-    const events = ["click", "touchstart", "keydown", "mousemove"];
+    const events = ["click", "touchstart", "keydown"];
     for (const event of events) {
       window.addEventListener(event, resetTimer, { passive: true });
     }
