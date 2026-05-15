@@ -3,7 +3,7 @@ import {
   serverTimestamp, increment, query, where, getDocs, limit
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { KioskEmployee, PPECatalogItem, ReplacementReason } from "./kiosk-types";
+import { KioskEmployee, KioskRequestItem, KioskRequestStatus, PPECatalogItem, ReplacementReason } from "./kiosk-types";
 import { calcNextReplacementDate } from "./replacement-logic";
 
 // ── Empleado ──────────────────────────────────────────────────────────────────
@@ -126,4 +126,35 @@ export async function dispenseEPP(params: DispenseParams): Promise<string> {
   }
 
   return ref.id;
+}
+
+// ── Solicitudes de kiosko ─────────────────────────────────────────────────────
+
+export async function createKioskRequest(input: {
+  employeeId: string;
+  employeeName: string;
+  items: KioskRequestItem[];
+}): Promise<string> {
+  const ref = await addDoc(collection(db, "kiosk_requests"), {
+    employeeId: input.employeeId,
+    employeeName: input.employeeName,
+    items: input.items,
+    status: "pending",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    source: "kiosk",
+  });
+
+  return ref.id;
+}
+
+export async function getKioskRequestStatus(requestId: string): Promise<KioskRequestStatus> {
+  const snap = await getDoc(doc(db, "kiosk_requests", requestId));
+  if (!snap.exists()) return "rejected";
+
+  const status = (snap.data().status ?? "pending") as string;
+  if (status === "approved" || status === "rejected" || status === "pending") {
+    return status;
+  }
+  return "pending";
 }

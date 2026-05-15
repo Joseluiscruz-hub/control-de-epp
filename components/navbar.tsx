@@ -20,8 +20,8 @@ export function NavBar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
-  // No mostrar navbar en el portal público si queremos una experiencia full screen
-  if (pathname === '/portal') return null;
+  // No mostrar navbar en portal/kiosko para experiencia full screen
+  if (pathname === '/portal' || pathname?.startsWith('/kiosko')) return null;
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);

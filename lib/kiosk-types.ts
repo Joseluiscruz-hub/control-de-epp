@@ -32,6 +32,16 @@ export interface PPECatalogItem {
 
 export type ReplacementReason = "vida_util" | "desgaste" | "extravio";
 
+export interface KioskRequestItem {
+  itemId: string;
+  itemName: string;
+  sku: string;
+  size: string;
+  replacementDays: number;
+}
+
+export type KioskRequestStatus = "pending" | "approved" | "rejected";
+
 export interface KioskSession {
   employeeId: string;
   employeeName: string;
