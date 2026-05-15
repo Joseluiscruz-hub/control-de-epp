@@ -8,6 +8,7 @@ import { clearKioskSession } from "@/lib/kiosk-session";
 import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
 
 type ViewStatus = "pending" | "approved" | "rejected";
+// Balancea refresco percibido por usuario y carga de lecturas en Firestore.
 const POLL_INTERVAL_MS = 12_000;
 const AUTO_RETURN_DELAY_MS = 6_000;
 
@@ -42,9 +43,10 @@ export default function KioskoEsperaPage() {
         if (!active) return;
         setNotFound(false);
         setStatus(next);
-      } catch {
+      } catch (error) {
         if (!active) return;
-        setNotFound(true);
+        const isNotFound = error instanceof Error && error.message === "kiosk_request_not_found";
+        setNotFound(isNotFound);
         setStatus("rejected");
       } finally {
         if (active) setLoading(false);

@@ -9,6 +9,10 @@ const KIOSK_SESSION_KEYS = [
   "kiosk_request_id",
 ];
 
+/**
+ * Clears kiosk-scoped session data after logout, timeout, cancellation,
+ * completion, or any flow reset that must remove sensitive in-session values.
+ */
 export function clearKioskSession() {
   if (typeof window === "undefined") return;
   for (const key of KIOSK_SESSION_KEYS) {

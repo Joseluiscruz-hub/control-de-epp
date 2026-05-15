@@ -3,7 +3,9 @@
 import { useEffect } from "react";
 
 interface UseKioskInactivityTimeoutOptions {
+  /** Inactivity duration in milliseconds before timeout callback executes. */
   timeoutMs: number;
+  /** Callback invoked when inactivity timer is reached. */
   onTimeout: () => void;
 }
 

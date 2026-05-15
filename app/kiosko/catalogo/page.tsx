@@ -37,6 +37,7 @@ export default function KioskoCatalogoPage() {
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Todos");
+  const [submitError, setSubmitError] = useState("");
   const [employeeName, setEmployeeName] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [selectedByItem, setSelectedByItem] = useState<Record<string, SelectedVariant>>({});
@@ -119,6 +120,7 @@ export default function KioskoCatalogoPage() {
     if (!employeeId || selectedItems.length === 0) return;
 
     setSubmitting(true);
+    setSubmitError("");
     try {
       const requestId = await createKioskRequest({
         employeeId,
@@ -127,6 +129,8 @@ export default function KioskoCatalogoPage() {
       });
       sessionStorage.setItem("kiosk_request_id", requestId);
       router.push("/kiosko/espera");
+    } catch {
+      setSubmitError("No se pudo enviar la solicitud. Intenta nuevamente.");
     } finally {
       setSubmitting(false);
     }
@@ -254,9 +258,12 @@ export default function KioskoCatalogoPage() {
 
       <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur border-t border-gray-800 p-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-          <p className="text-sm text-gray-400">
+          <div className="flex flex-col">
+            <p className="text-sm text-gray-400">
             Seleccionados: <span className="text-white font-bold">{Object.keys(selectedByItem).length}</span>
-          </p>
+            </p>
+            {submitError && <p className="text-xs text-red-400 mt-1">{submitError}</p>}
+          </div>
           <button
             onClick={submitRequest}
             disabled={submitting || Object.keys(selectedByItem).length === 0}
