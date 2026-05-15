@@ -4,7 +4,8 @@ service cloud.firestore {
 
     // ── Empleados ──────────────────────────────────────────────────────────
     match /employees/{employeeId} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.auth != null;
       allow create: if request.auth != null && isValidEmployee(request.resource.data);
       allow update: if request.auth != null && (
         // Admin puede actualizar todo
@@ -17,6 +18,7 @@ service cloud.firestore {
 
     // ── Catálogo EPP ───────────────────────────────────────────────────────
     match /ppe_catalog/{itemId} {
+      // El kiosko requiere consulta anónima del catálogo disponible.
       allow read: if true;
       allow create, update: if request.auth != null && isAdmin();
       // Kiosko puede solo decrementar stock (via server-side)
@@ -25,7 +27,8 @@ service cloud.firestore {
 
     // ── Solicitudes Kiosko ─────────────────────────────────────────────────
     match /kiosk_requests/{requestId} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.auth != null;
       allow create: if isValidKioskRequest(request.resource.data);
       allow update: if request.auth != null && isAdmin();
       allow delete: if false;

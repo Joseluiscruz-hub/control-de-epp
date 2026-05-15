@@ -40,7 +40,7 @@ export interface KioskRequestItem {
   replacementDays: number;
 }
 
-export type KioskRequestStatus = "pending" | "approved" | "rejected";
+export type KioskRequestStatus = "pending" | "approved" | "rejected" | "not_found";
 
 export interface KioskSession {
   employeeId: string;

@@ -89,6 +89,7 @@ export default function KioskoCatalogoPage() {
   const toggleSelection = (item: PPECatalogItem) => {
     const size = item.hasSizes ? sizeByItem[item.id] : "N/A";
     if (item.hasSizes && !size) return;
+    if (item.hasSizes && (!item.sizes || !item.sizes[size])) return;
 
     const sku = item.hasSizes ? item.sizes?.[size]?.sku : item.sku;
     if (!sku || !size) return;

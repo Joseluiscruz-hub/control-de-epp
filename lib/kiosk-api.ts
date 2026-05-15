@@ -150,7 +150,7 @@ export async function createKioskRequest(input: {
 
 export async function getKioskRequestStatus(requestId: string): Promise<KioskRequestStatus> {
   const snap = await getDoc(doc(db, "kiosk_requests", requestId));
-  if (!snap.exists()) return "rejected";
+  if (!snap.exists()) return "not_found";
 
   const status = (snap.data().status ?? "pending") as string;
   if (status === "approved" || status === "rejected" || status === "pending") {

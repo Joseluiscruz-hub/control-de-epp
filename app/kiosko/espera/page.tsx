@@ -7,7 +7,7 @@ import { getKioskRequestStatus } from "@/lib/kiosk-api";
 import { clearKioskSession } from "@/lib/kiosk-session";
 import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
 
-type ViewStatus = "pending" | "approved" | "rejected";
+type ViewStatus = "pending" | "approved" | "rejected" | "not_found";
 
 export default function KioskoEsperaPage() {
   const router = useRouter();
@@ -44,7 +44,7 @@ export default function KioskoEsperaPage() {
     };
 
     poll();
-    const interval = window.setInterval(poll, 4000);
+    const interval = window.setInterval(poll, 12000);
 
     return () => {
       active = false;
@@ -86,10 +86,13 @@ export default function KioskoEsperaPage() {
 
     return {
       icon: <XCircle className="text-red-400" size={56} />,
-      title: "Solicitud rechazada",
-      body: "Tu solicitud no pudo ser aprobada. Contacta a tu supervisor.",
+      title: status === "not_found" ? "Solicitud no encontrada" : "Solicitud rechazada",
+      body:
+        status === "not_found"
+          ? "No encontramos esta solicitud. Regresaremos al inicio por seguridad."
+          : "Tu solicitud no pudo ser aprobada. Contacta a tu supervisor.",
       badge: <XCircle size={16} />,
-      badgeText: "Rechazada",
+      badgeText: status === "not_found" ? "No encontrada" : "Rechazada",
       badgeClass: "bg-red-900/30 text-red-300 border-red-500/30",
     };
   }, [loading, status]);
