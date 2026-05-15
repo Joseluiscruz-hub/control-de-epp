@@ -1,16 +1,24 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest } from 'next/server';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
-
 export async function POST(req: NextRequest) {
   try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return Response.json(
+        { error: 'Configuración incompleta: define GEMINI_API_KEY en el servidor.' },
+        { status: 503 }
+      );
+    }
+
     const body = await req.json();
     const { message, context } = body;
 
     if (!message) {
       return Response.json({ error: 'Mensaje requerido' }, { status: 400 });
     }
+
+    const ai = new GoogleGenAI({ apiKey });
 
     const systemInstruction = `
 Eres ARIA (Asistente de Riesgo e Inventario Automatizado), un asistente virtual experto en:
@@ -67,8 +75,42 @@ ${JSON.stringify(context?.alerts ?? [], null, 2)}
     const text = response.text;
 
     return Response.json({ text, success: true });
-  } catch (error) {
+  } catch (error: unknown) {
+    const status =
+      typeof error === 'object' &&
+      error !== null &&
+      'status' in error &&
+      typeof (error as { status?: unknown }).status === 'number'
+        ? (error as { status: number }).status
+        : 500;
+
+    const message =
+      typeof error === 'object' &&
+      error !== null &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+        ? (error as { message: string }).message
+        : '';
+
     console.error('[Chat API Error]:', error);
+
+    if (status === 403 && message.toLowerCase().includes('api key was reported as leaked')) {
+      return Response.json(
+        {
+          error:
+            'La API key de Gemini fue deshabilitada por exposición. Genera una nueva key y actualiza GEMINI_API_KEY en el servidor.',
+        },
+        { status: 403 }
+      );
+    }
+
+    if (status === 403) {
+      return Response.json(
+        { error: 'Gemini rechazó la solicitud por permisos de API key. Verifica GEMINI_API_KEY.' },
+        { status: 403 }
+      );
+    }
+
     return Response.json(
       { error: 'Error al procesar la consulta con IA. Verifica tu API key de Gemini.' },
       { status: 500 }
