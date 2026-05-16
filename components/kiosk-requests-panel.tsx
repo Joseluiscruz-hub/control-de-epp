@@ -25,7 +25,10 @@ export function KioskRequestsPanel() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    const timeout = window.setTimeout(() => {
+      void refresh();
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [refresh]);
 
   const resolve = async (requestId: string, status: "approved" | "rejected") => {

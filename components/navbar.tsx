@@ -29,7 +29,10 @@ export function NavBar() {
 
   // Close mobile menu on route change
   useEffect(() => {
-    setMobileOpen(false);
+    const timeout = window.setTimeout(() => {
+      setMobileOpen(false);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [pathname]);
 
   if (hideNav) return null;
