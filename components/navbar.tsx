@@ -54,7 +54,7 @@ export function NavBar() {
                 <span className="font-black text-slate-900 text-lg leading-none block tracking-tighter uppercase">AssetGuard</span>
                 <span className="text-[10px] text-femsa-red font-black tracking-[0.15em] uppercase leading-none mt-0.5 flex items-center gap-1.5">
                   Coca-Cola FEMSA
-                  <span className="text-[8px] text-slate-400 font-bold tracking-widest">· Corporate</span>
+                  <span className="text-[8px] text-slate-400 font-bold tracking-widest">· Corporativo</span>
                 </span>
               </div>
             </Link>
@@ -107,7 +107,7 @@ export function NavBar() {
                   <Bot className="h-4 w-4 text-femsa-gold group-hover:rotate-12 transition-transform duration-300" />
                   <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-green-500 rounded-full border border-white" />
                 </div>
-                <span className="text-[10px] font-black text-femsa-gold uppercase tracking-tight">ARIA AI</span>
+                <span className="text-[10px] font-black text-femsa-gold uppercase tracking-tight">ARIA IA</span>
               </div>
 
               <div className="hidden sm:flex items-center gap-2 pl-2">

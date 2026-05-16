@@ -174,7 +174,7 @@ export default function InventarioPage() {
         
         <div className="relative z-10 space-y-3">
           <div className="flex items-center gap-3 mb-2">
-             <Badge className="bg-red-600 text-white border-none px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest">Master Catalog</Badge>
+             <Badge className="bg-red-600 text-white border-none px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest">Catálogo Maestro</Badge>
           </div>
           <h1 className="text-5xl lg:text-6xl font-black tracking-tighter text-slate-950">Inventario <span className="text-red-600">FEMSA</span></h1>
           <p className="text-slate-400 font-bold text-lg max-w-xl">Control de activos críticos y gestión de suministros de seguridad industrial.</p>
