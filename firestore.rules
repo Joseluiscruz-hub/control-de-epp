@@ -50,7 +50,9 @@ service cloud.firestore {
     match /kiosk_request_status/{requestId} {
       allow get: if true;
       allow list: if false;
-      allow create: if isValidKioskRequestStatus(request.resource.data, requestId);
+      allow create: if request.auth != null
+        && isValidKioskRequestStatus(request.resource.data, requestId)
+        && request.resource.data.status == "pending";
       allow update: if request.auth != null && isAdmin() && isValidKioskRequestStatus(request.resource.data, requestId);
       allow delete: if false;
     }

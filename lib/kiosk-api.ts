@@ -9,9 +9,17 @@ import { calcNextReplacementDate } from "./replacement-logic";
 // ── Empleado ──────────────────────────────────────────────────────────────────
 
 export async function getEmployeeById(employeeId: string): Promise<KioskEmployee | null> {
-  const snap = await getDoc(doc(db, "kiosk_employees", employeeId));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as KioskEmployee;
+  const kioskEmployeeSnap = await getDoc(doc(db, "kiosk_employees", employeeId));
+  if (kioskEmployeeSnap.exists()) {
+    return { id: kioskEmployeeSnap.id, ...kioskEmployeeSnap.data() } as KioskEmployee;
+  }
+
+  const legacyEmployeeSnap = await getDoc(doc(db, "employees", employeeId));
+  if (legacyEmployeeSnap.exists()) {
+    return { id: legacyEmployeeSnap.id, ...legacyEmployeeSnap.data() } as KioskEmployee;
+  }
+
+  return null;
 }
 
 export async function saveEmployeePin(employeeId: string, pinHash: string): Promise<void> {
