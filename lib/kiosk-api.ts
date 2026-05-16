@@ -11,12 +11,14 @@ import { calcNextReplacementDate } from "./replacement-logic";
 export async function getEmployeeById(employeeId: string): Promise<KioskEmployee | null> {
   const kioskEmployeeSnap = await getDoc(doc(db, "kiosk_employees", employeeId));
   if (kioskEmployeeSnap.exists()) {
-    return { id: kioskEmployeeSnap.id, ...kioskEmployeeSnap.data() } as KioskEmployee;
+    const { pin: _pin, ...safeData } = kioskEmployeeSnap.data() as Record<string, unknown>;
+    return { id: kioskEmployeeSnap.id, ...safeData } as KioskEmployee;
   }
 
   const legacyEmployeeSnap = await getDoc(doc(db, "employees", employeeId));
   if (legacyEmployeeSnap.exists()) {
-    return { id: legacyEmployeeSnap.id, ...legacyEmployeeSnap.data() } as KioskEmployee;
+    const { pin: _pin, ...safeData } = legacyEmployeeSnap.data() as Record<string, unknown>;
+    return { id: legacyEmployeeSnap.id, ...safeData } as KioskEmployee;
   }
 
   return null;
@@ -47,9 +49,19 @@ export async function validateEmployeePin(
   employeeId: string,
   candidateHash: string
 ): Promise<boolean> {
-  const emp = await getEmployeeById(employeeId);
-  if (!emp || !emp.pin) return false;
-  return emp.pin === candidateHash;  // en prod usar bcrypt.compare en API Route
+  const kioskEmployeeSnap = await getDoc(doc(db, "kiosk_employees", employeeId));
+  if (kioskEmployeeSnap.exists()) {
+    const pin = kioskEmployeeSnap.data()?.pin;
+    return typeof pin === "string" && pin === candidateHash; // en prod usar bcrypt.compare en API Route
+  }
+
+  const legacyEmployeeSnap = await getDoc(doc(db, "employees", employeeId));
+  if (legacyEmployeeSnap.exists()) {
+    const pin = legacyEmployeeSnap.data()?.pin;
+    return typeof pin === "string" && pin === candidateHash; // en prod usar bcrypt.compare en API Route
+  }
+
+  return false;
 }
 
 // ── Catálogo ──────────────────────────────────────────────────────────────────
