@@ -1,6 +1,6 @@
 import {
   doc, getDoc, updateDoc, addDoc, collection,
-  serverTimestamp, increment, query, where, getDocs, limit
+  serverTimestamp, increment, query, where, getDocs, limit, writeBatch, orderBy
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { KioskEmployee, KioskRequestItem, KioskRequestStatus, PPECatalogItem, ReplacementReason } from "./kiosk-types";
@@ -9,19 +9,30 @@ import { calcNextReplacementDate } from "./replacement-logic";
 // ── Empleado ──────────────────────────────────────────────────────────────────
 
 export async function getEmployeeById(employeeId: string): Promise<KioskEmployee | null> {
-  const snap = await getDoc(doc(db, "employees", employeeId));
+  const snap = await getDoc(doc(db, "kiosk_employees", employeeId));
   if (!snap.exists()) return null;
   return { id: snap.id, ...snap.data() } as KioskEmployee;
 }
 
 export async function saveEmployeePin(employeeId: string, pinHash: string): Promise<void> {
-  await updateDoc(doc(db, "employees", employeeId), {
+  const batch = writeBatch(db);
+  batch.update(doc(db, "employees", employeeId), {
     pin: pinHash,
     firstLogin: false,
     termsAccepted: true,
     termsAcceptedAt: new Date().toISOString(),
     updatedAt: serverTimestamp(),
   });
+  batch.set(
+    doc(db, "kiosk_employees", employeeId),
+    {
+      firstLogin: false,
+      termsAccepted: true,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+  await batch.commit();
 }
 
 export async function validateEmployeePin(
@@ -36,7 +47,7 @@ export async function validateEmployeePin(
 // ── Catálogo ──────────────────────────────────────────────────────────────────
 
 export async function getPPECatalog(): Promise<PPECatalogItem[]> {
-  const snap = await getDocs(collection(db, "ppe_catalog"));
+  const snap = await getDocs(query(collection(db, "kiosk_catalog"), where("active", "==", true), orderBy("name", "asc")));
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as PPECatalogItem));
 }
 
@@ -135,7 +146,10 @@ export async function createKioskRequest(input: {
   employeeName: string;
   items: KioskRequestItem[];
 }): Promise<string> {
-  const ref = await addDoc(collection(db, "kiosk_requests"), {
+  const ref = doc(collection(db, "kiosk_requests"));
+  const batch = writeBatch(db);
+
+  batch.set(ref, {
     employeeId: input.employeeId,
     employeeName: input.employeeName,
     items: input.items,
@@ -145,11 +159,19 @@ export async function createKioskRequest(input: {
     source: "kiosk",
   });
 
+  batch.set(doc(db, "kiosk_request_status", ref.id), {
+    requestId: ref.id,
+    status: "pending",
+    source: "kiosk",
+    updatedAt: serverTimestamp(),
+  });
+
+  await batch.commit();
   return ref.id;
 }
 
 export async function getKioskRequestStatus(requestId: string): Promise<KioskRequestStatus> {
-  const snap = await getDoc(doc(db, "kiosk_requests", requestId));
+  const snap = await getDoc(doc(db, "kiosk_request_status", requestId));
   if (!snap.exists()) throw new Error("kiosk_request_not_found");
 
   const status = snap.data().status;
@@ -157,4 +179,53 @@ export async function getKioskRequestStatus(requestId: string): Promise<KioskReq
     return status;
   }
   throw new Error("kiosk_request_invalid_status");
+}
+
+export interface AdminKioskRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  items: KioskRequestItem[];
+  status: KioskRequestStatus;
+}
+
+export async function listAdminKioskRequests(status: KioskRequestStatus = "pending", max = 25): Promise<AdminKioskRequest[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, "kiosk_requests"),
+      where("status", "==", status),
+      orderBy("createdAt", "desc"),
+      limit(Math.max(1, Math.min(max, 50)))
+    )
+  );
+
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      employeeId: data.employeeId ?? "",
+      employeeName: data.employeeName ?? "",
+      items: Array.isArray(data.items) ? (data.items as KioskRequestItem[]) : [],
+      status: data.status as KioskRequestStatus,
+    };
+  });
+}
+
+export async function updateKioskRequestStatus(requestId: string, status: Extract<KioskRequestStatus, "approved" | "rejected">): Promise<void> {
+  const batch = writeBatch(db);
+  batch.update(doc(db, "kiosk_requests", requestId), {
+    status,
+    updatedAt: serverTimestamp(),
+  });
+  batch.set(
+    doc(db, "kiosk_request_status", requestId),
+    {
+      requestId,
+      status,
+      source: "kiosk",
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+  await batch.commit();
 }

@@ -16,6 +16,7 @@ export default function KioskoEsperaPage() {
   const router = useRouter();
   const [status, setStatus] = useState<ViewStatus>("pending");
   const [notFound, setNotFound] = useState(false);
+  const [connectionError, setConnectionError] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const returnToLogin = useCallback(() => {
@@ -42,12 +43,18 @@ export default function KioskoEsperaPage() {
         const next = await getKioskRequestStatus(requestId);
         if (!active) return;
         setNotFound(false);
+        setConnectionError(false);
         setStatus(next);
       } catch (error) {
         if (!active) return;
         const isNotFound = error instanceof Error && error.message === "kiosk_request_not_found";
         setNotFound(isNotFound);
-        setStatus("rejected");
+        setConnectionError(!isNotFound);
+        if (isNotFound) {
+          setStatus("rejected");
+        } else {
+          setStatus("pending");
+        }
       } finally {
         if (active) setLoading(false);
       }
@@ -63,15 +70,26 @@ export default function KioskoEsperaPage() {
   }, [returnToLogin]);
 
   useEffect(() => {
-    if (status === "pending") return;
+    if (status === "pending" || connectionError) return;
     const t = window.setTimeout(() => {
       returnToLogin();
     }, AUTO_RETURN_DELAY_MS);
 
     return () => window.clearTimeout(t);
-  }, [status, returnToLogin]);
+  }, [status, connectionError, returnToLogin]);
 
   const content = useMemo(() => {
+    if (connectionError) {
+      return {
+        icon: <Clock3 className="text-amber-400" size={56} />,
+        title: "Seguimos validando tu solicitud",
+        body: "Hay un problema temporal de conexión. Mantén esta pantalla abierta mientras reintentamos.",
+        badge: <Clock3 size={16} />,
+        badgeText: "Reintentando conexión",
+        badgeClass: "bg-amber-900/30 text-amber-300 border-amber-500/30",
+      };
+    }
+
     if (loading || status === "pending") {
       return {
         icon: <Loader2 className="animate-spin text-amber-400" size={56} />,
@@ -105,7 +123,7 @@ export default function KioskoEsperaPage() {
       badgeText: notFound ? "No encontrada" : "Rechazada",
       badgeClass: "bg-red-900/30 text-red-300 border-red-500/30",
     };
-  }, [loading, status, notFound]);
+  }, [loading, status, notFound, connectionError]);
 
   return (
     <div className="flex-1 flex items-center justify-center px-6 py-10">

@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createKioskRequest, getPPECatalog, KioskRequestItem } from "@/lib/kiosk-api";
-import { PPECatalogItem } from "@/lib/kiosk-types";
-import { getStockStatus } from "@/lib/replacement-logic";
+import { createKioskRequest, getPPECatalog } from "@/lib/kiosk-api";
+import { KioskRequestItem, PPECatalogItem } from "@/lib/kiosk-types";
 import { CheckCircle2, Loader2, Package, Search } from "lucide-react";
 import { clearKioskSession } from "@/lib/kiosk-session";
 import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
@@ -44,10 +43,10 @@ export default function KioskoCatalogoPage() {
   const [sizeByItem, setSizeByItem] = useState<Record<string, string>>({});
   const selectedCount = Object.keys(selectedByItem).length;
 
-  const returnToLogin = () => {
+  const returnToLogin = useCallback(() => {
     clearKioskSession();
     router.replace("/kiosko");
-  };
+  }, [router]);
 
   useKioskInactivityTimeout({
     timeoutMs: 2 * 60 * 1000,
@@ -71,11 +70,11 @@ export default function KioskoCatalogoPage() {
     });
   }, [router]);
 
-  const getItemStock = (item: PPECatalogItem): number => {
+  const isItemAvailable = (item: PPECatalogItem): boolean => {
     if (item.hasSizes && item.sizes) {
-      return Object.values(item.sizes).reduce((acc, s) => acc + s.stock, 0);
+      return Object.values(item.sizes).some((variant) => variant.available === true || (variant.stock ?? 0) > 0);
     }
-    return item.stock ?? 0;
+    return item.available === true || (item.stock ?? 0) > 0;
   };
 
   const filtered = useMemo(
@@ -196,8 +195,7 @@ export default function KioskoCatalogoPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((item) => {
-              const totalStock = getItemStock(item);
-              const status = getStockStatus(totalStock, item.minStock ?? 5);
+              const status = isItemAvailable(item) ? "ok" : "empty";
               const selected = !!selectedByItem[item.id];
               const selectedSize = sizeByItem[item.id];
 
@@ -222,11 +220,25 @@ export default function KioskoCatalogoPage() {
                   {item.hasSizes && item.sizes && status !== "empty" && (
                     <div className="flex flex-wrap gap-2">
                       {Object.entries(item.sizes)
-                        .filter(([, variant]) => variant.stock > 0)
+                        .filter(([, variant]) => variant.available === true || (variant.stock ?? 0) > 0)
                         .map(([size]) => (
                           <button
                             key={size}
-                            onClick={() => setSizeByItem((prev) => ({ ...prev, [item.id]: size }))}
+                            onClick={() => {
+                              setSizeByItem((prev) => ({ ...prev, [item.id]: size }));
+                              setSelectedByItem((prev) => {
+                                const current = prev[item.id];
+                                if (!current || !item.sizes?.[size]) return prev;
+                                return {
+                                  ...prev,
+                                  [item.id]: {
+                                    ...current,
+                                    size,
+                                    sku: item.sizes[size].sku,
+                                  },
+                                };
+                              });
+                            }}
                             className={`px-3 py-1 rounded-lg text-sm border ${
                               selectedSize === size
                                 ? "border-amber-400 bg-amber-400/15 text-amber-300"
