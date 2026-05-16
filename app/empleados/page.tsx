@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import {
-  collection, onSnapshot, doc, setDoc, updateDoc,
-  serverTimestamp, query, where, getDocs, orderBy
+  collection, onSnapshot, doc, setDoc,
+  serverTimestamp, query, where, getDocs, orderBy, writeBatch
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -92,14 +92,25 @@ export default function EmpleadosPage() {
     if (!form.id || !form.name || !form.area) return;
     setSaving(true);
     try {
-      await setDoc(doc(db, 'employees', form.id), {
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'employees', form.id), {
         id: form.id,
         name: form.name,
         area: form.area,
         active: true,
+        firstLogin: true,
+        termsAccepted: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      batch.set(doc(db, 'kiosk_employees', form.id), {
+        name: form.name,
+        active: true,
+        firstLogin: true,
+        termsAccepted: false,
+        updatedAt: serverTimestamp(),
+      });
+      await batch.commit();
       toast.success(`Empleado registrado: ${form.name}`);
       setForm({ id: '', name: '', area: '' });
       setAddOpen(false);
@@ -112,10 +123,22 @@ export default function EmpleadosPage() {
 
   const toggleStatus = async (emp: Employee) => {
     try {
-      await updateDoc(doc(db, 'employees', emp.docId), {
-        active: !emp.active,
+      const nextActive = !emp.active;
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'employees', emp.docId), {
+        active: nextActive,
         updatedAt: serverTimestamp(),
       });
+      batch.set(
+        doc(db, 'kiosk_employees', emp.docId),
+        {
+          name: emp.name,
+          active: nextActive,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      await batch.commit();
       toast.success(`${emp.name} fue ${emp.active ? 'dado de baja' : 'reactivado'} correctamente`);
       setConfirmToggle(null);
     } catch {

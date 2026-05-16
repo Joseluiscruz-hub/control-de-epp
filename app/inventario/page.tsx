@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import {
-  collection, onSnapshot, doc, setDoc, updateDoc,
-  serverTimestamp, query, increment
+  collection, onSnapshot, doc, setDoc,
+  serverTimestamp, query, increment, writeBatch
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Card } from '@/components/ui/card';
@@ -86,15 +86,30 @@ export default function InventarioPage() {
     if (!form.sku || !form.name || !form.category || !form.replacementDays || !form.stock) return;
     setSaving(true);
     try {
-      await setDoc(doc(db, 'ppe_catalog', form.sku), {
+      const initialStock = parseInt(form.stock);
+      const replacementDays = parseInt(form.replacementDays);
+      const batch = writeBatch(db);
+
+      batch.set(doc(db, 'ppe_catalog', form.sku), {
         sku: form.sku,
         name: form.name,
         category: form.category,
-        replacementDays: parseInt(form.replacementDays),
-        stock: parseInt(form.stock),
+        replacementDays,
+        stock: initialStock,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      batch.set(doc(db, 'kiosk_catalog', form.sku), {
+        name: form.name,
+        category: form.category,
+        replacementDays,
+        hasSizes: false,
+        sku: form.sku,
+        active: true,
+        available: initialStock > 0,
+        updatedAt: serverTimestamp(),
+      });
+      await batch.commit();
       toast.success(`Artículo "${form.name}" agregado al catálogo`);
       setForm({ sku: '', name: '', category: '', replacementDays: '', stock: '' });
       setAddOpen(false);
@@ -112,18 +127,38 @@ export default function InventarioPage() {
     if (isNaN(qty) || qty < 0) return;
     setAdjustSaving(true);
     try {
+      let nextStock = adjustItem.stock;
       let newStock: number | ReturnType<typeof increment>;
       if (adjustType === 'add') {
         newStock = increment(qty);
+        nextStock = adjustItem.stock + qty;
       } else if (adjustType === 'subtract') {
         newStock = increment(-qty);
+        nextStock = adjustItem.stock - qty;
       } else {
         newStock = qty;
+        nextStock = qty;
       }
-      await updateDoc(doc(db, 'ppe_catalog', adjustItem.docId), {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'ppe_catalog', adjustItem.docId), {
         stock: newStock,
         updatedAt: serverTimestamp(),
       });
+      batch.set(
+        doc(db, 'kiosk_catalog', adjustItem.docId),
+        {
+          name: adjustItem.name,
+          category: adjustItem.category,
+          replacementDays: adjustItem.replacementDays,
+          hasSizes: false,
+          sku: adjustItem.sku,
+          active: true,
+          available: nextStock > 0,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      await batch.commit();
       const label = adjustType === 'add' ? `+${qty}` : adjustType === 'subtract' ? `-${qty}` : `= ${qty}`;
       toast.success(`Stock de "${adjustItem.name}" actualizado (${label})`);
       setAdjustOpen(false);

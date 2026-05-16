@@ -19,6 +19,7 @@ export function NavBar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const hideNav = pathname === '/portal' || pathname?.startsWith('/kiosko');
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
@@ -28,11 +29,13 @@ export function NavBar() {
   }, []);
 
   useEffect(() => {
-    setMobileOpen(false);
+    const timeout = window.setTimeout(() => {
+      setMobileOpen(false);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [pathname]);
 
-  // Mantiene el orden de hooks estable y evita errores intermitentes de React.
-  if (pathname === '/portal') return null;
+  if (hideNav) return null;
 
   return (
     <>

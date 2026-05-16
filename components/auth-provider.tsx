@@ -73,8 +73,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading, signIn } = useAuth();
   const pathname = usePathname();
 
-  // Permitir acceso total al portal público
-  if (pathname?.startsWith('/portal')) {
+  // Permitir acceso total al portal público y kiosko
+  if (pathname?.startsWith('/portal') || pathname?.startsWith('/kiosko')) {
     return <>{children}</>;
   }
 

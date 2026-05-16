@@ -1,15 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getEmployeeById } from "@/lib/kiosk-api";
 import { Loader2, HardHat } from "lucide-react";
+import { clearKioskSession } from "@/lib/kiosk-session";
+import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
 
 export default function KioskoHomePage() {
   const router = useRouter();
   const [empId, setEmpId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const handleTimeout = useCallback(() => {
+    clearKioskSession();
+    setEmpId("");
+    setError("");
+    router.replace("/kiosko");
+  }, [router]);
+
+  useKioskInactivityTimeout({
+    timeoutMs: 2 * 60 * 1000,
+    onTimeout: handleTimeout,
+  });
 
   const handleContinue = async () => {
     if (!empId.trim()) return;
@@ -27,17 +41,21 @@ export default function KioskoHomePage() {
         setLoading(false);
         return;
       }
-      // Guardar en sessionStorage (solo durante la sesión del kiosko)
+
+      clearKioskSession();
       sessionStorage.setItem("kiosk_employee_id", emp.id);
       sessionStorage.setItem("kiosk_employee_name", emp.name);
-      sessionStorage.setItem("kiosk_first_login", String(emp.firstLogin));
-      sessionStorage.setItem("kiosk_terms_accepted", String(emp.termsAccepted));
+      sessionStorage.setItem("kiosk_first_login", String(Boolean(emp.firstLogin)));
+      sessionStorage.setItem("kiosk_terms_accepted", String(Boolean(emp.termsAccepted)));
 
       if (emp.firstLogin || !emp.termsAccepted) {
-        router.push("/kiosko/setup");
-      } else {
-        router.push("/kiosko/login");
+        setError("Tu perfil requiere completar términos y primer acceso. Contacta a tu supervisor.");
+        setLoading(false);
+        return;
       }
+
+      sessionStorage.setItem("kiosk_pin_verified", "true");
+      router.push("/kiosko/catalogo");
     } catch (e) {
       setError("Error de conexión. Intenta de nuevo.");
       setLoading(false);
