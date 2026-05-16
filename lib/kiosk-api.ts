@@ -8,17 +8,27 @@ import { calcNextReplacementDate } from "./replacement-logic";
 
 // ── Empleado ──────────────────────────────────────────────────────────────────
 
+function toKioskEmployee(id: string, data: Record<string, unknown>): KioskEmployee {
+  return {
+    id,
+    name: typeof data.name === "string" ? data.name : "",
+    active: data.active === true,
+    termsAccepted: data.termsAccepted === true,
+    firstLogin: data.firstLogin === true,
+    ...(typeof data.area === "string" ? { area: data.area } : {}),
+    ...(typeof data.termsAcceptedAt === "string" ? { termsAcceptedAt: data.termsAcceptedAt } : {}),
+  };
+}
+
 export async function getEmployeeById(employeeId: string): Promise<KioskEmployee | null> {
   const kioskEmployeeSnap = await getDoc(doc(db, "kiosk_employees", employeeId));
   if (kioskEmployeeSnap.exists()) {
-    const { pin: _pin, ...safeData } = kioskEmployeeSnap.data() as Record<string, unknown>;
-    return { id: kioskEmployeeSnap.id, ...safeData } as KioskEmployee;
+    return toKioskEmployee(kioskEmployeeSnap.id, kioskEmployeeSnap.data() as Record<string, unknown>);
   }
 
   const legacyEmployeeSnap = await getDoc(doc(db, "employees", employeeId));
   if (legacyEmployeeSnap.exists()) {
-    const { pin: _pin, ...safeData } = legacyEmployeeSnap.data() as Record<string, unknown>;
-    return { id: legacyEmployeeSnap.id, ...safeData } as KioskEmployee;
+    return toKioskEmployee(legacyEmployeeSnap.id, legacyEmployeeSnap.data() as Record<string, unknown>);
   }
 
   return null;
