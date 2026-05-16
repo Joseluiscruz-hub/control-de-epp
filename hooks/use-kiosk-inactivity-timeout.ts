@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 interface UseKioskInactivityTimeoutOptions {
   /** Inactivity duration in milliseconds before timeout callback executes. */
@@ -10,6 +10,12 @@ interface UseKioskInactivityTimeoutOptions {
 }
 
 export function useKioskInactivityTimeout({ timeoutMs, onTimeout }: UseKioskInactivityTimeoutOptions) {
+  const onTimeoutRef = useRef(onTimeout);
+
+  useEffect(() => {
+    onTimeoutRef.current = onTimeout;
+  }, [onTimeout]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -18,7 +24,7 @@ export function useKioskInactivityTimeout({ timeoutMs, onTimeout }: UseKioskInac
     const resetTimer = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        onTimeout();
+        onTimeoutRef.current();
       }, timeoutMs);
     };
 
@@ -35,5 +41,5 @@ export function useKioskInactivityTimeout({ timeoutMs, onTimeout }: UseKioskInac
         window.removeEventListener(event, resetTimer);
       }
     };
-  }, [onTimeout, timeoutMs]);
+  }, [timeoutMs]);
 }

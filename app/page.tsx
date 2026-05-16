@@ -18,6 +18,7 @@ import { handleFirestoreError, OperationType } from '@/lib/firestore-error';
 import { format, isToday, isBefore, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AssignPpeDialog } from '@/components/assign-ppe-dialog';
+import { KioskRequestsPanel } from '@/components/kiosk-requests-panel';
 import { useAuth } from '@/components/auth-provider';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
@@ -443,6 +444,8 @@ export default function DashboardPage() {
 
         {/* Sidebar Widgets */}
         <div className="space-y-12">
+          <KioskRequestsPanel />
+
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}

@@ -19,9 +19,7 @@ export function NavBar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-
-  // No mostrar navbar en portal/kiosko para experiencia full screen
-  if (pathname === '/portal' || pathname?.startsWith('/kiosko')) return null;
+  const hideNav = pathname === '/portal' || pathname?.startsWith('/kiosko');
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
@@ -31,8 +29,13 @@ export function NavBar() {
 
   // Close mobile menu on route change
   useEffect(() => {
-    setMobileOpen(false);
+    const timeout = window.setTimeout(() => {
+      setMobileOpen(false);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [pathname]);
+
+  if (hideNav) return null;
 
   return (
     <>
