@@ -40,8 +40,15 @@ function useAnimatedCounter(target: number, duration = 1200) {
       if (progress < 1) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target, duration]);
   return count;
+}
+
+interface InsightData {
+  lowStockItem: { name: string; stock: number } | null;
+  topArea: { area: string; count: number } | null;
+  complianceRate: number;
 }
 
 interface Assignment {
@@ -77,6 +84,17 @@ export default function DashboardPage() {
     totalStock: 0,
   });
   const [upcomingAlerts, setUpcomingAlerts] = useState<Assignment[]>([]);
+  const [insights, setInsights] = useState<InsightData>({
+    lowStockItem: null,
+    topArea: null,
+    complianceRate: 0,
+  });
+
+  // Animated KPI values
+  const animatedToday = useAnimatedCounter(stats.todayAssignments);
+  const animatedEmployees = useAnimatedCounter(stats.activeEmployees);
+  const animatedAlerts = useAnimatedCounter(stats.alertsThisWeek);
+  const animatedStock = useAnimatedCounter(stats.totalStock);
 
   useEffect(() => {
     // Real-time assignments feed
@@ -123,12 +141,13 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    // Fetch static stats
+    // Fetch static stats + dynamic insights
     const fetchStats = async () => {
       try {
-        const [empSnap, invSnap] = await Promise.all([
+        const [empSnap, invSnap, allAssignSnap] = await Promise.all([
           getDocs(query(collection(db, 'employees'), where('active', '==', true))),
           getDocs(collection(db, 'ppe_catalog')),
+          getDocs(query(collection(db, 'assignments'), orderBy('assignedAt', 'desc'), limit(200))),
         ]);
 
         const invData = invSnap.docs.map(d => d.data());
@@ -142,7 +161,44 @@ export default function DashboardPage() {
           totalStock: totalStockValue,
           lowStockItems: lowStock,
         }));
-      } catch { /* silently fail */ }
+
+        // --- Dynamic insights ---
+        // 1. Find lowest stock item
+        const sortedByStock = [...invData].sort((a, b) => (a.stock || 0) - (b.stock || 0));
+        const lowestItem = sortedByStock.length > 0 ? { name: sortedByStock[0].name as string, stock: sortedByStock[0].stock as number } : null;
+
+        // 2. Find top consuming area
+        const empMap = new Map<string, string>();
+        empSnap.docs.forEach(d => { empMap.set(d.id, d.data().area as string); });
+        const areaCounts: Record<string, number> = {};
+        allAssignSnap.docs.forEach(d => {
+          const area = empMap.get(d.data().employeeId as string);
+          if (area) areaCounts[area] = (areaCounts[area] || 0) + 1;
+        });
+        const topAreaEntry = Object.entries(areaCounts).sort((a, b) => b[1] - a[1])[0];
+        const topArea = topAreaEntry ? { area: topAreaEntry[0], count: topAreaEntry[1] } : null;
+
+        // 3. Compliance rate: active assignments that haven't expired / total active
+        const now = new Date();
+        const activeAssigns = allAssignSnap.docs.filter(d => d.data().status === 'active');
+        const compliant = activeAssigns.filter(d => {
+          const next = d.data().nextReplacementAt;
+          if (!next) return true;
+          const nextDate = next instanceof Timestamp ? next.toDate() : new Date(next);
+          return nextDate > now;
+        });
+        const complianceRate = activeAssigns.length > 0
+          ? Math.round((compliant.length / activeAssigns.length) * 100)
+          : 100;
+
+        setInsights({
+          lowStockItem: lowestItem,
+          topArea,
+          complianceRate,
+        });
+      } catch (err) {
+        console.error('[Dashboard stats error]', err);
+      }
     };
     fetchStats();
   }, []);
@@ -150,7 +206,7 @@ export default function DashboardPage() {
   const statCards = [
     {
       title: 'Entregas Hoy',
-      value: loading ? '—' : stats.todayAssignments,
+      value: loading ? '—' : animatedToday,
       icon: <HardHat className="h-5 w-5" />,
       color: 'border-l-slate-900',
       iconBg: 'bg-slate-50 text-slate-900',
@@ -159,16 +215,16 @@ export default function DashboardPage() {
     },
     {
       title: 'Plantilla Activa',
-      value: stats.activeEmployees || '—',
+      value: animatedEmployees || '—',
       icon: <Users className="h-5 w-5" />,
       color: `border-l-[${BRAND_RED}]`,
       iconBg: 'bg-red-50 text-red-600',
-      sub: 'Colaboradores FEMSA',
+      sub: 'Colaboradores en planta',
       subColor: 'text-red-600',
     },
     {
       title: 'Alertas Reposición',
-      value: stats.alertsThisWeek,
+      value: animatedAlerts,
       icon: <AlertTriangle className="h-5 w-5" />,
       color: stats.alertsThisWeek > 0 ? 'border-l-orange-500' : 'border-l-emerald-500',
       iconBg: stats.alertsThisWeek > 0 ? 'bg-orange-50 text-orange-500' : 'bg-emerald-50 text-emerald-600',
@@ -177,11 +233,11 @@ export default function DashboardPage() {
     },
     {
       title: 'Stock Global',
-      value: stats.totalStock || '—',
+      value: animatedStock || '—',
       icon: <Package className="h-5 w-5" />,
       color: stats.lowStockItems > 0 ? `border-l-[${BRAND_RED}]` : 'border-l-slate-900',
       iconBg: stats.lowStockItems > 0 ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-900',
-      sub: stats.lowStockItems > 0 ? `${stats.lowStockItems} SKUs críticos` : 'Inventario disponible',
+      sub: stats.lowStockItems > 0 ? `${stats.lowStockItems} SKUs críticos` : 'Inventario estable',
       subColor: stats.lowStockItems > 0 ? 'text-red-600' : 'text-slate-600',
     },
   ];
@@ -225,7 +281,7 @@ export default function DashboardPage() {
                 Panel de Control de EPP <span className="text-slate-950 underline decoration-femsa-red decoration-4 underline-offset-8">Coca-Cola FEMSA</span>.
               </p>
               <p className="text-slate-400 font-medium">
-                Monitoreo activo de <span className="text-slate-900 font-black">{stats.activeEmployees} colaboradores</span> con respaldo de <span className="text-red-600 font-black italic">ARIA AI</span>.
+                Monitoreo activo de <span className="text-slate-900 font-black">{stats.activeEmployees} colaboradores</span> con respaldo de <span className="text-red-600 font-black italic">ARIA IA</span>.
               </p>
             </div>
 
@@ -248,12 +304,12 @@ export default function DashboardPage() {
                    <div className="absolute top-0 right-0 p-6 opacity-20">
                       <ShieldCheck className="h-20 w-20 text-white" />
                    </div>
-                   <p className="text-[10px] font-black text-femsa-gold uppercase tracking-[0.3em] mb-4">Operational Pulse</p>
+                   <p className="text-[10px] font-black text-femsa-gold uppercase tracking-[0.3em] mb-4">Pulso Operativo</p>
                    <div className="space-y-2">
                       <p className="text-5xl font-black text-white tracking-tighter tabular-nums kpi-femsa-glow" style={{color: 'white'}}>
-                        {stats.activeEmployees > 0 ? Math.min(99.9, 95 + (stats.activeEmployees * 0.1)).toFixed(1) : '98.4'}%
+                        {insights.complianceRate}%
                       </p>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Compliance Rate</p>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Cumplimiento EPP</p>
                       {/* Mini bar chart visual */}
                       <div className="flex items-end gap-1 pt-3">
                         {[65,80,45,90,70,85,95].map((v,i) => (
@@ -267,7 +323,7 @@ export default function DashboardPage() {
                       <div className="flex gap-1.5">
                          {[1,2,3].map(i => <div key={i} className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" style={{ animationDelay: `${i*200}ms` }} />)}
                       </div>
-                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Global Status: Active</span>
+                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Estado Global: Activo</span>
                    </div>
                 </Card>
              </div>
@@ -362,10 +418,10 @@ export default function DashboardPage() {
                   </div>
                   Bitácora de Seguridad
                 </CardTitle>
-                <p className="text-[11px] text-slate-400 font-black uppercase tracking-[0.3em] pl-1">Coca-Cola FEMSA Industrial Ops</p>
+                <p className="text-[11px] text-slate-400 font-black uppercase tracking-[0.3em] pl-1">Coca-Cola FEMSA Operaciones Industriales</p>
               </div>
               <Badge className="bg-[#F40009] text-white border-none px-5 py-2 font-black text-[10px] tracking-widest uppercase rounded-full">
-                Real-Time Data
+                Datos en Tiempo Real
               </Badge>
             </div>
           </CardHeader>
@@ -435,7 +491,7 @@ export default function DashboardPage() {
             )}
             <div className="p-12 border-t border-slate-50 bg-slate-50/30 text-center">
               <Link href="/empleados" className="inline-flex items-center gap-4 text-sm font-black text-[#F40009] hover:text-slate-900 transition-all group tracking-tighter">
-                EXPLORAR DIRECTORIO COMPLETO FEMSA
+                EXPLORAR DIRECTORIO COMPLETO
                 <ArrowRight className="h-6 w-6 group-hover:translate-x-3 transition-transform" />
               </Link>
             </div>
@@ -461,7 +517,7 @@ export default function DashboardPage() {
                 <div className="h-12 w-12 rounded-2xl bg-red-600 flex items-center justify-center shadow-2xl shadow-red-500/20">
                   <Package className="h-6 w-6 text-white" />
                 </div>
-                Quick Actions
+                Acciones Rápidas
               </h3>
               
               <div className="space-y-5 relative z-10">
@@ -470,7 +526,7 @@ export default function DashboardPage() {
                   <Button variant="outline" className="w-full h-20 bg-white/5 border-white/10 hover:bg-white/15 text-white rounded-[1.5rem] justify-between px-8 transition-all group">
                     <div className="flex items-center gap-5">
                       <Package className="h-6 w-6 text-red-500" />
-                      <span className="font-black uppercase tracking-[0.2em] text-xs">Inventario Central</span>
+                      <span className="font-black uppercase tracking-[0.2em] text-xs">Inventario de Planta</span>
                     </div>
                     <ArrowRight className="h-5 w-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all" />
                   </Button>
@@ -479,7 +535,7 @@ export default function DashboardPage() {
                   <Button variant="outline" className="w-full h-20 bg-white/5 border-white/10 hover:bg-white/15 text-white rounded-[1.5rem] justify-between px-8 transition-all group">
                     <div className="flex items-center gap-5">
                       <ExternalLink className="h-6 w-6 text-emerald-500" />
-                      <span className="font-black uppercase tracking-[0.2em] text-xs">Public Portal</span>
+                      <span className="font-black uppercase tracking-[0.2em] text-xs">Portal del Colaborador</span>
                     </div>
                     <ArrowRight className="h-5 w-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all" />
                   </Button>
@@ -499,36 +555,41 @@ export default function DashboardPage() {
                   {[1,2,3].map(i => <div key={i} className="h-2.5 w-2.5 rounded-full bg-red-600 animate-bounce" style={{ animationDelay: `${i*150}ms` }} />)}
                 </div>
               </div>
-              
-              <h3 className="text-2xl font-black text-slate-950 mb-10 flex items-center gap-4">
+               <h3 className="text-2xl font-black text-slate-950 mb-10 flex items-center gap-4">
                 <div className="h-12 w-12 rounded-2xl bg-red-600 flex items-center justify-center shadow-2xl shadow-red-200">
                   <Bot className="h-7 w-7 text-white" />
                 </div>
-                ARIA AI
+                ARIA IA
               </h3>
-              
+               
               <div className="space-y-8 relative z-10">
                 <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 hover:bg-white transition-all shadow-sm group/item">
                   <div className="flex items-center gap-4 mb-4">
                     <div className="h-10 w-10 rounded-xl bg-red-50 flex items-center justify-center text-[#F40009]">
                       <TrendingUp className="h-5 w-5" />
                     </div>
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Smart Stock Forecast</p>
+                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Pronóstico de Stock</p>
                   </div>
                   <p className="text-base text-slate-900 leading-snug font-bold">
-                    Se recomienda ampliar stock de <span className="text-red-600 underline underline-offset-4 decoration-red-200">Cascos Contorno</span> por alta rotación estacional.
+                    {insights.lowStockItem
+                      ? <>Se recomienda reabastecer <span className="text-red-600 underline underline-offset-4 decoration-red-200">{insights.lowStockItem.name}</span> — solo quedan <span className="text-red-600 font-black">{insights.lowStockItem.stock}</span> unidades.</>
+                      : <>Todos los artículos del catálogo tienen niveles de stock <span className="text-emerald-600 font-black">saludables</span>.</>
+                    }
                   </p>
                 </div>
-                
+                 
                 <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 hover:bg-white transition-all shadow-sm">
                   <div className="flex items-center gap-4 mb-4">
                     <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
                       <CheckCircle2 className="h-5 w-5" />
                     </div>
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Team Compliance</p>
+                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Consumo por Área</p>
                   </div>
                   <p className="text-base text-slate-900 leading-snug font-bold">
-                    Planta <span className="text-emerald-600 font-black">Toluca</span> alcanzó el 100% de cumplimiento en uso de EPP hoy.
+                    {insights.topArea
+                      ? <>El área de <span className="text-emerald-600 font-black">{insights.topArea.area}</span> lidera con <span className="font-black">{insights.topArea.count}</span> dotaciones registradas.</>
+                      : <>Aún no hay datos suficientes para analizar patrones de consumo.</>
+                    }
                   </p>
                 </div>
               </div>

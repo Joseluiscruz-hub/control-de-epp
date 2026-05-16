@@ -203,7 +203,7 @@ export function AiChatPanel() {
                   <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-green-400 rounded-full border-2 border-slate-950" />
                 </div>
                 <div>
-                  <p className="font-black text-white text-sm leading-none tracking-tight">ARIA AI</p>
+                  <p className="font-black text-white text-sm leading-none tracking-tight">ARIA IA</p>
                   <p className="text-[9px] text-red-500 font-bold uppercase tracking-widest mt-0.5">Seguridad Industrial</p>
                 </div>
               </div>

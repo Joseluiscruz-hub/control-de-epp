@@ -67,6 +67,9 @@ export default function EmpleadosPage() {
   const [history, setHistory] = useState<Assignment[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // Confirm toggle dialog
+  const [confirmToggle, setConfirmToggle] = useState<Employee | null>(null);
+
   useEffect(() => {
     const q = query(collection(db, 'employees'));
     const unsub = onSnapshot(q, (snap) => {
@@ -136,7 +139,8 @@ export default function EmpleadosPage() {
         { merge: true }
       );
       await batch.commit();
-      toast.success(`Estado de ${emp.name} actualizado`);
+      toast.success(`${emp.name} fue ${emp.active ? 'dado de baja' : 'reactivado'} correctamente`);
+      setConfirmToggle(null);
     } catch {
       toast.error('Error al actualizar el estado');
     }
@@ -192,7 +196,7 @@ export default function EmpleadosPage() {
         
         <div className="relative z-10 space-y-3">
           <div className="flex items-center gap-3 mb-2">
-             <Badge className="bg-red-600 text-white border-none px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest">Human Capital Security</Badge>
+             <Badge className="bg-red-600 text-white border-none px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest">Capital Humano · Seguridad</Badge>
           </div>
           <h1 className="text-5xl lg:text-6xl font-black tracking-tighter text-slate-950">Directorio de <span className="text-red-600">Talento</span></h1>
           <p className="text-slate-400 font-bold text-lg max-w-xl">Gestión integral del personal y trazabilidad de su equipamiento de seguridad.</p>
@@ -318,7 +322,7 @@ export default function EmpleadosPage() {
                           className={`h-12 w-12 rounded-2xl transition-all active:scale-90 ${emp.active
                             ? 'bg-red-50 text-red-600 hover:bg-[#F40009] hover:text-white'
                             : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
-                          onClick={() => toggleStatus(emp)}
+                          onClick={() => setConfirmToggle(emp)}
                           title={emp.active ? "Dar de baja" : "Reactivar"}
                         >
                           {emp.active ? <UserX className="h-5 w-5" /> : <UserCheck className="h-5 w-5" />}
@@ -451,6 +455,48 @@ export default function EmpleadosPage() {
                 ))}
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Toggle Status Dialog */}
+      <Dialog open={!!confirmToggle} onOpenChange={() => setConfirmToggle(null)}>
+        <DialogContent className="sm:max-w-[450px] rounded-[3rem] border-none p-0 overflow-hidden shadow-2xl">
+          <div className={`p-10 text-white ${confirmToggle?.active ? 'bg-[#F40009]' : 'bg-emerald-600'}`}>
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black uppercase tracking-tight">
+                {confirmToggle?.active ? '¿Dar de Baja?' : '¿Reactivar Colaborador?'}
+              </DialogTitle>
+              <p className="text-white/80 font-bold mt-2">
+                {confirmToggle?.name} — Nómina #{confirmToggle?.id}
+              </p>
+            </DialogHeader>
+          </div>
+          <div className="p-10 bg-white space-y-6">
+            <p className="text-slate-600 font-medium leading-relaxed">
+              {confirmToggle?.active
+                ? 'El colaborador será marcado como inactivo. Su historial de EPP se conservará intacto para auditorías.'
+                : 'El colaborador será reactivado y podrá recibir dotación de EPP nuevamente.'}
+            </p>
+            <div className="flex gap-4">
+              <Button
+                variant="outline"
+                className="flex-1 h-14 rounded-2xl font-black uppercase tracking-widest text-[10px]"
+                onClick={() => setConfirmToggle(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className={`flex-1 h-14 rounded-2xl font-black uppercase tracking-widest text-[10px] text-white shadow-xl ${
+                  confirmToggle?.active 
+                    ? 'bg-[#F40009] hover:bg-red-700' 
+                    : 'bg-emerald-600 hover:bg-emerald-700'
+                }`}
+                onClick={() => confirmToggle && toggleStatus(confirmToggle)}
+              >
+                {confirmToggle?.active ? 'Confirmar Baja' : 'Confirmar Reactivación'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

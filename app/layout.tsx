@@ -48,7 +48,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
                   AssetGuard Corporate v4.0
                 </span>
                 <span className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'rgba(218,41,28,0.4)' }}>
-                  Coca-Cola FEMSA · Powered by IA Gemini
+                  Coca-Cola FEMSA · Impulsado por Gemini IA
                 </span>
               </div>
             </footer>
