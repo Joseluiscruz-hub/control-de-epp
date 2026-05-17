@@ -12,8 +12,8 @@ import {
 
 const REASON_LABELS: Record<ReplacementReason, { label: string; icon: React.ReactNode; desc: string }> = {
   vida_util: { label: "Vida Útil Cumplida", icon: <CheckCircle2 size={22} />, desc: "Mi EPP ya completó su período de uso establecido." },
-  desgaste:  { label: "Desgaste / Daño",    icon: <AlertTriangle size={22} />, desc: "Mi EPP presenta daño o desgaste visible antes de completar su vida útil." },
-  extravio:  { label: "Extravío / Pérdida", icon: <DollarSign size={22} />,   desc: "He extraviado mi EPP y necesito reposición." },
+  desgaste: { label: "Desgaste / Daño", icon: <AlertTriangle size={22} />, desc: "Mi EPP presenta daño o desgaste visible antes de completar su vida útil." },
+  extravio: { label: "Extravío / Pérdida", icon: <DollarSign size={22} />, desc: "He extraviado mi EPP y necesito reposición." },
 };
 
 export default function KioskoSolicitudPage() {
@@ -162,7 +162,7 @@ export default function KioskoSolicitudPage() {
           <h3 className="text-base font-semibold mb-3 text-gray-300">1. Selecciona tu talla</h3>
           <div className="flex flex-wrap gap-3">
             {sizes.map(([size, variant]) => {
-              const status = getStockStatus(variant.stock, variant.minStock);
+              const status = getStockStatus(variant.stock ?? 0, variant.minStock ?? 0);
               return (
                 <button
                   key={size}
@@ -170,8 +170,8 @@ export default function KioskoSolicitudPage() {
                   onClick={() => handleSizeSelect(size, variant.sku)}
                   className={`relative flex flex-col items-center gap-1 px-5 py-3 rounded-xl border-2 text-sm font-bold transition-all active:scale-95
                     ${selectedSize === size ? "border-amber-400 bg-amber-400/10 text-amber-400"
-                    : status === "empty" ? "border-gray-700 text-gray-600 opacity-40 cursor-not-allowed"
-                    : "border-gray-700 text-white hover:border-gray-500"}`}
+                      : status === "empty" ? "border-gray-700 text-gray-600 opacity-40 cursor-not-allowed"
+                        : "border-gray-700 text-white hover:border-gray-500"}`}
                 >
                   {size}
                   <span className={`text-xs font-normal ${status === "ok" ? "text-green-400" : status === "low" ? "text-amber-400" : "text-red-400"}`}>
@@ -205,9 +205,9 @@ export default function KioskoSolicitudPage() {
                   className={`flex items-start gap-4 p-4 rounded-xl border-2 text-left transition-all
                     ${reason === key
                       ? key === "extravio" ? "border-red-500 bg-red-900/20"
-                      : key === "desgaste" ? "border-amber-500 bg-amber-900/20"
-                      : "border-green-500 bg-green-900/20"
-                    : "border-gray-700 bg-gray-800 hover:border-gray-600"}`}
+                        : key === "desgaste" ? "border-amber-500 bg-amber-900/20"
+                          : "border-green-500 bg-green-900/20"
+                      : "border-gray-700 bg-gray-800 hover:border-gray-600"}`}
                 >
                   <span className={`mt-0.5 ${key === "extravio" ? "text-red-400" : key === "desgaste" ? "text-amber-400" : "text-green-400"}`}>
                     {val.icon}
@@ -227,8 +227,8 @@ export default function KioskoSolicitudPage() {
       {evaluation && reason && (
         <div className={`rounded-xl p-4 border text-sm
           ${reason === "vida_util" ? "border-green-500/30 bg-green-900/10"
-          : reason === "desgaste" ? "border-amber-500/30 bg-amber-900/10"
-          : "border-red-500/30 bg-red-900/10"}`}>
+            : reason === "desgaste" ? "border-amber-500/30 bg-amber-900/10"
+              : "border-red-500/30 bg-red-900/10"}`}>
           {reason === "vida_util" && (
             <p className="text-green-300 flex items-center gap-2">
               <CheckCircle2 size={16} /> Tu EPP ha cumplido su vida útil ({evaluation.daysUsed} días). Reposición <strong>gratuita</strong>.
