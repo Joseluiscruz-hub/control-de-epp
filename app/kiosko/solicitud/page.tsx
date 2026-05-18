@@ -161,27 +161,33 @@ export default function KioskoSolicitudPage() {
         <section>
           <h3 className="text-base font-semibold mb-3 text-gray-300">1. Selecciona tu talla</h3>
           <div className="flex flex-wrap gap-3">
-            {sizes.map(([size, variant]) => {
-              const stock = variant.stock ?? 0;
-              const minStock = variant.minStock ?? 0;
-              const status = getStockStatus(stock, minStock);
-              return (
-                <button
-                  key={size}
-                  disabled={status === "empty"}
-                  onClick={() => handleSizeSelect(size, variant.sku)}
-                  className={`relative flex flex-col items-center gap-1 px-5 py-3 rounded-xl border-2 text-sm font-bold transition-all active:scale-95
-                    ${selectedSize === size ? "border-amber-400 bg-amber-400/10 text-amber-400"
-                    : status === "empty" ? "border-gray-700 text-gray-600 opacity-40 cursor-not-allowed"
+             {sizes.map(([size, variant]) => {
+               const hasNumericStock = typeof variant.stock === "number";
+               const stock = variant.stock ?? 0;
+               const minStock = variant.minStock ?? 0;
+               const status = hasNumericStock
+                 ? getStockStatus(stock, minStock)
+                 : (variant.available === true ? "ok" : "empty");
+               const isDisabled = hasNumericStock
+                 ? status === "empty"
+                 : variant.available !== true;
+               return (
+                 <button
+                   key={size}
+                   disabled={isDisabled}
+                   onClick={() => handleSizeSelect(size, variant.sku)}
+                   className={`relative flex flex-col items-center gap-1 px-5 py-3 rounded-xl border-2 text-sm font-bold transition-all active:scale-95
+                     ${selectedSize === size ? "border-amber-400 bg-amber-400/10 text-amber-400"
+                    : isDisabled ? "border-gray-700 text-gray-600 opacity-40 cursor-not-allowed"
                     : "border-gray-700 text-white hover:border-gray-500"}`}
-                >
-                  {size}
-                  <span className={`text-xs font-normal ${status === "ok" ? "text-green-400" : status === "low" ? "text-amber-400" : "text-red-400"}`}>
-                    {status === "empty" ? "Sin stock" : `${stock} disp.`}
-                  </span>
-                  <span className="text-xs text-gray-600 font-mono">{variant.sku}</span>
-                </button>
-              );
+                 >
+                   {size}
+                   <span className={`text-xs font-normal ${status === "ok" ? "text-green-400" : status === "low" ? "text-amber-400" : "text-red-400"}`}>
+                     {hasNumericStock ? (status === "empty" ? "Sin stock" : `${stock} disp.`) : (variant.available === true ? "Disponible" : "Sin stock")}
+                   </span>
+                   <span className="text-xs text-gray-600 font-mono">{variant.sku}</span>
+                 </button>
+               );
             })}
           </div>
         </section>
