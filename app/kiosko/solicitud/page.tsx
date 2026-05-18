@@ -162,17 +162,16 @@ export default function KioskoSolicitudPage() {
           <h3 className="text-base font-semibold mb-3 text-gray-300">1. Selecciona tu talla</h3>
           <div className="flex flex-wrap gap-3">
              {sizes.map(([size, variant]) => {
-               const hasNumericStock = typeof variant.stock === "number";
-               const stock = variant.stock ?? 0;
-               const minStock = variant.minStock ?? 0;
-               const status = hasNumericStock
-                 ? getStockStatus(stock, minStock)
-                 : (variant.available === true ? "ok" : "empty");
-               const isDisabled = hasNumericStock
-                 ? status === "empty"
-                 : variant.available !== true;
-               return (
-                 <button
+                const hasNumericStock = typeof variant.stock === "number";
+                const status = hasNumericStock
+                  ? getStockStatus(variant.stock, variant.minStock ?? 0)
+                  : (variant.available === true ? "ok" : "empty");
+                const isDisabled = status === "empty";
+                const stockLabel = hasNumericStock
+                  ? (status === "empty" ? "Sin stock" : `${variant.stock} disp.`)
+                  : (status === "ok" ? "Disponible" : "Sin stock");
+                return (
+                  <button
                    key={size}
                    disabled={isDisabled}
                    onClick={() => handleSizeSelect(size, variant.sku)}
@@ -181,10 +180,10 @@ export default function KioskoSolicitudPage() {
                     : isDisabled ? "border-gray-700 text-gray-600 opacity-40 cursor-not-allowed"
                     : "border-gray-700 text-white hover:border-gray-500"}`}
                  >
-                   {size}
-                   <span className={`text-xs font-normal ${status === "ok" ? "text-green-400" : status === "low" ? "text-amber-400" : "text-red-400"}`}>
-                     {hasNumericStock ? (status === "empty" ? "Sin stock" : `${stock} disp.`) : (variant.available === true ? "Disponible" : "Sin stock")}
-                   </span>
+                    {size}
+                    <span className={`text-xs font-normal ${status === "ok" ? "text-green-400" : status === "low" ? "text-amber-400" : "text-red-400"}`}>
+                      {stockLabel}
+                    </span>
                    <span className="text-xs text-gray-600 font-mono">{variant.sku}</span>
                  </button>
                );
