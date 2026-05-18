@@ -48,14 +48,14 @@ export default function KioskoHomePage() {
       sessionStorage.setItem("kiosk_first_login", String(Boolean(emp.firstLogin)));
       sessionStorage.setItem("kiosk_terms_accepted", String(Boolean(emp.termsAccepted)));
 
+      // 1. Si es un empleado nuevo, lo mandamos a que lea los términos y cree su PIN
       if (emp.firstLogin || !emp.termsAccepted) {
-        setError("Tu perfil requiere completar términos y primer acceso. Contacta a tu supervisor.");
-        setLoading(false);
+        router.push("/kiosko/setup");
         return;
       }
 
-      sessionStorage.setItem("kiosk_pin_verified", "true");
-      router.push("/kiosko/catalogo");
+      // 2. Si ya es un empleado registrado, lo mandamos a la pantalla de LOGIN a que ponga su PIN
+      router.push("/kiosko/login");
     } catch (e) {
       setError("Error de conexión. Intenta de nuevo.");
       setLoading(false);
