@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   description: 'Plataforma corporativa de gestión de Equipo de Protección Personal con inteligencia artificial predictiva y monitoreo en tiempo real.',
   keywords: ['EPP', 'Seguridad Industrial', 'Coca-Cola FEMSA', 'AssetGuard', 'Control de Equipos', 'Protección Personal'],
   authors: [{ name: 'Coca-Cola FEMSA — Seguridad Industrial' }],
+  icons: {
+    icon: '/favicon.ico',
+  },
   openGraph: {
     title: 'AssetGuard EPP — Coca-Cola FEMSA',
     description: 'Plataforma corporativa de gestión de Equipo de Protección Personal',
