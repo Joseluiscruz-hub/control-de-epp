@@ -21,6 +21,9 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Enable Cloud Run API
+        run: gcloud services enable run.googleapis.com --project=gen-lang-client-0970386796
+
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy control-de-epp \
