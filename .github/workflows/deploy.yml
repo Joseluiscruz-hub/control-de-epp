@@ -9,6 +9,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      PROJECT_ID: gen-lang-client-0970386796
+      REGION: us-central1
+      SERVICE_NAME: control-de-epp
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,15 +26,40 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Enable Cloud Run API
-        run: gcloud services enable run.googleapis.com --project=gen-lang-client-0970386796
+        run: gcloud services enable run.googleapis.com --project="${PROJECT_ID}"
 
       - name: Deploy to Cloud Run
+        id: deploy
+        continue-on-error: true
         run: |
-          gcloud run deploy control-de-epp \
+          set +e
+          DEPLOY_LOG="$(mktemp)"
+          gcloud run deploy "${SERVICE_NAME}" \
             --source . \
-            --region=us-central1 \
+            --region="${REGION}" \
             --allow-unauthenticated \
             --memory=1Gi \
             --port=8080 \
             --set-env-vars="NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyAwNfsHHwiAPRHhQalKDqP89PNCdNRdyw0,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=gen-lang-client-0970386796.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=gen-lang-client-0970386796,NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=gen-lang-client-0970386796.firebasestorage.app,NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=659644890317,NEXT_PUBLIC_FIREBASE_APP_ID=1:659644890317:web:80f1ac637b54e9afc17d84,NEXT_PUBLIC_FIREBASE_DATABASE_ID=ai-studio-43de38b5-a9c6-4b31-be67-595584a513fc" \
-            --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest"
+            --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" 2>&1 | tee "${DEPLOY_LOG}"
+
+          DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
+          echo "deploy_exit_code=${DEPLOY_EXIT_CODE}" >> "${GITHUB_OUTPUT}"
+
+          if [ "${DEPLOY_EXIT_CODE}" -ne 0 ] && grep -Eqi 'Cloud Run Admin API has not been used|run\.googleapis\.com|api/run\.googleapis\.com/overview' "${DEPLOY_LOG}"; then
+            echo "missing_run_api=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+          exit 0
+
+      - name: Instrucciones para habilitar Cloud Run Admin API
+        if: steps.deploy.outputs.missing_run_api == 'true'
+        run: |
+          echo "❌ El deploy falló porque la Cloud Run Admin API (run.googleapis.com) no está habilitada en el proyecto ${PROJECT_ID}."
+          echo "➡️  Habilítala aquí:"
+          echo "https://console.developers.google.com/apis/api/run.googleapis.com/overview?project=${PROJECT_ID}"
+          echo "🔁 Cuando se termine de habilitar, vuelve a ejecutar este workflow."
+
+      - name: Fallar workflow si el deploy no fue exitoso
+        if: steps.deploy.outputs.deploy_exit_code != '0'
+        run: exit 1
