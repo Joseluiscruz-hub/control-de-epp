@@ -19,7 +19,8 @@ service cloud.firestore {
     match /kiosk_employees/{employeeId} {
       allow get: if true;
       allow list: if false;
-      allow create, update: if request.auth != null && isAdmin();
+      allow create: if request.auth != null && isAdmin();
+      allow update: if (request.auth != null && isAdmin()) || isValidFirstKioskSetup(request.resource.data, resource.data);
       allow delete: if false;
     }
 
@@ -99,6 +100,22 @@ service cloud.firestore {
       let allowedFields = ["pin", "firstLogin", "termsAccepted", "termsAcceptedAt", "updatedAt"];
       let changedFields = newData.diff(oldData).affectedKeys();
       return changedFields.hasOnly(allowedFields);
+    }
+
+    function isValidFirstKioskSetup(newData, oldData) {
+      let changedFields = newData.diff(oldData).affectedKeys();
+      return oldData.active == true
+        && oldData.firstLogin == true
+        && oldData.termsAccepted == false
+        && changedFields.hasOnly(["pin", "firstLogin", "termsAccepted", "termsAcceptedAt", "updatedAt"])
+        && newData.active == oldData.active
+        && newData.name == oldData.name
+        && newData.pin is string
+        && newData.pin.size() >= 8
+        && newData.firstLogin == false
+        && newData.termsAccepted == true
+        && newData.termsAcceptedAt is timestamp
+        && newData.updatedAt is timestamp;
     }
 
     function isValidAssignment(data) {

@@ -7,6 +7,26 @@ import { Loader2, HardHat } from "lucide-react";
 import { clearKioskSession } from "@/lib/kiosk-session";
 import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
 
+function getKioskConnectionErrorMessage(error: unknown) {
+  const code =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as { code?: unknown }).code === "string"
+      ? (error as { code: string }).code
+      : "";
+
+  if (code === "permission-denied") {
+    return "El kiosko no tiene permisos en Firebase. Despliega firestore.rules y sincroniza el empleado desde el panel de Empleados.";
+  }
+
+  if (code === "unavailable") {
+    return "No hay conexión con Firebase. Revisa internet o intenta de nuevo.";
+  }
+
+  return "Error de conexión. Intenta de nuevo.";
+}
+
 export default function KioskoHomePage() {
   const router = useRouter();
   const [empId, setEmpId] = useState("");
@@ -56,8 +76,9 @@ export default function KioskoHomePage() {
 
       // 2. Si ya es un empleado registrado, lo mandamos a la pantalla de LOGIN a que ponga su PIN
       router.push("/kiosko/login");
-    } catch (e) {
-      setError("Error de conexión. Intenta de nuevo.");
+    } catch (error) {
+      console.error("[Kiosko employee lookup error]", error);
+      setError(getKioskConnectionErrorMessage(error));
       setLoading(false);
     }
   };

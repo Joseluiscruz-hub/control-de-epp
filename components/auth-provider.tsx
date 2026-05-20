@@ -5,7 +5,7 @@ import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut 
 import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
-import { ShieldCheck, LogIn, Fingerprint, Lock, ArrowRight } from 'lucide-react';
+import { ShieldCheck, LogIn, Fingerprint, Lock, ArrowRight, HardHat } from 'lucide-react';
 import { motion } from 'motion/react';
 
 // Lista de administradores (en un app real esto vendría de una base de datos o custom claims)
@@ -167,13 +167,23 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
               
               <div className="pt-6 border-t border-slate-100 space-y-3">
                 <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">¿Eres colaborador?</p>
-                <a 
-                  href="/portal" 
-                  className="inline-flex items-center gap-2 text-sm font-black text-[#F40009] hover:text-red-700 transition-colors uppercase tracking-wider group"
-                >
-                  Ir al Portal de Seguridad
-                  <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </a>
+                <div className="flex flex-col gap-3">
+                  <a
+                    href="/portal"
+                    className="inline-flex items-center justify-center gap-2 text-sm font-black text-[#F40009] hover:text-red-700 transition-colors uppercase tracking-wider group"
+                  >
+                    Ir al Portal de Seguridad
+                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </a>
+                  <a
+                    href="/kiosko"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-5 py-3 text-xs font-black text-slate-700 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 transition-colors uppercase tracking-wider group"
+                  >
+                    <HardHat className="h-4 w-4" />
+                    Solicitar EPP en Kiosko
+                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </a>
+                </div>
               </div>
             </div>
           </div>

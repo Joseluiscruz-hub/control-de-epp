@@ -1,38 +1,51 @@
 import {
   doc, getDoc, updateDoc, addDoc, collection,
-  serverTimestamp, increment, query, where, getDocs, limit, writeBatch, orderBy
+  serverTimestamp, increment, query, where, getDocs, limit, writeBatch
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { KioskEmployee, KioskRequestItem, KioskRequestStatus, PPECatalogItem, ReplacementReason } from "./kiosk-types";
+import {
+  createLocalKioskRequest,
+  getLocalKioskEmployee,
+  getLocalKioskRequestStatus,
+  getLocalPPECatalog,
+  isLocalKioskRequestId,
+  listLocalKioskRequests,
+  saveLocalKioskEmployeePin,
+  updateLocalKioskRequestStatus,
+} from "./kiosk-local-store";
 import { calcNextReplacementDate } from "./replacement-logic";
 
 // ── Empleado ──────────────────────────────────────────────────────────────────
 
+function isLocalRuntime() {
+  return typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
+}
+
 export async function getEmployeeById(employeeId: string): Promise<KioskEmployee | null> {
-  const snap = await getDoc(doc(db, "kiosk_employees", employeeId));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as KioskEmployee;
+  try {
+    const snap = await getDoc(doc(db, "kiosk_employees", employeeId));
+    if (snap.exists()) return { id: snap.id, ...snap.data() } as KioskEmployee;
+  } catch (error) {
+    console.warn("[Kiosko] Usando empleado local por error de Firebase.", error);
+    return getLocalKioskEmployee(employeeId, true);
+  }
+  return getLocalKioskEmployee(employeeId, isLocalRuntime());
 }
 
 export async function saveEmployeePin(employeeId: string, pinHash: string): Promise<void> {
-  const batch = writeBatch(db);
-  batch.update(doc(db, "employees", employeeId), {
-    pin: pinHash,
-    firstLogin: false,
-    termsAccepted: true,
-    termsAcceptedAt: new Date().toISOString(),
-    updatedAt: serverTimestamp(),
-  });
-  batch.set(
-    doc(db, "kiosk_employees", employeeId),
-    {
+  try {
+    await updateDoc(doc(db, "kiosk_employees", employeeId), {
+      pin: pinHash,
       firstLogin: false,
       termsAccepted: true,
+      termsAcceptedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
-  await batch.commit();
+    });
+  } catch (error) {
+    console.warn("[Kiosko] Guardando PIN en modo local.", error);
+    saveLocalKioskEmployeePin(employeeId, pinHash);
+  }
 }
 
 export async function validateEmployeePin(
@@ -47,8 +60,16 @@ export async function validateEmployeePin(
 // ── Catálogo ──────────────────────────────────────────────────────────────────
 
 export async function getPPECatalog(): Promise<PPECatalogItem[]> {
-  const snap = await getDocs(query(collection(db, "kiosk_catalog"), where("active", "==", true), orderBy("name", "asc")));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as PPECatalogItem));
+  try {
+    const snap = await getDocs(query(collection(db, "kiosk_catalog"), where("active", "==", true)));
+    const items = snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as PPECatalogItem))
+      .sort((a, b) => a.name.localeCompare(b.name, "es"));
+    return items.length > 0 ? items : getLocalPPECatalog();
+  } catch (error) {
+    console.warn("[Kiosko] Usando catalogo local por error de Firebase.", error);
+    return getLocalPPECatalog();
+  }
 }
 
 // ── Asignaciones activas del empleado ─────────────────────────────────────────
@@ -146,37 +167,54 @@ export async function createKioskRequest(input: {
   employeeName: string;
   items: KioskRequestItem[];
 }): Promise<string> {
-  const ref = doc(collection(db, "kiosk_requests"));
-  const batch = writeBatch(db);
+  try {
+    const ref = doc(collection(db, "kiosk_requests"));
+    const batch = writeBatch(db);
 
-  batch.set(ref, {
-    employeeId: input.employeeId,
-    employeeName: input.employeeName,
-    items: input.items,
-    status: "pending",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    source: "kiosk",
-  });
+    batch.set(ref, {
+      employeeId: input.employeeId,
+      employeeName: input.employeeName,
+      items: input.items,
+      status: "pending",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      source: "kiosk",
+    });
 
-  batch.set(doc(db, "kiosk_request_status", ref.id), {
-    requestId: ref.id,
-    status: "pending",
-    source: "kiosk",
-    updatedAt: serverTimestamp(),
-  });
+    batch.set(doc(db, "kiosk_request_status", ref.id), {
+      requestId: ref.id,
+      status: "pending",
+      source: "kiosk",
+      updatedAt: serverTimestamp(),
+    });
 
-  await batch.commit();
-  return ref.id;
+    await batch.commit();
+    return ref.id;
+  } catch (error) {
+    console.warn("[Kiosko] Creando solicitud en modo local.", error);
+    return createLocalKioskRequest(input);
+  }
 }
 
 export async function getKioskRequestStatus(requestId: string): Promise<KioskRequestStatus> {
-  const snap = await getDoc(doc(db, "kiosk_request_status", requestId));
-  if (!snap.exists()) throw new Error("kiosk_request_not_found");
+  if (isLocalKioskRequestId(requestId)) {
+    const localStatus = getLocalKioskRequestStatus(requestId);
+    if (!localStatus) throw new Error("kiosk_request_not_found");
+    return localStatus;
+  }
 
-  const status = snap.data().status;
-  if (status === "approved" || status === "rejected" || status === "pending") {
-    return status;
+  try {
+    const snap = await getDoc(doc(db, "kiosk_request_status", requestId));
+    if (!snap.exists()) throw new Error("kiosk_request_not_found");
+
+    const status = snap.data().status;
+    if (status === "approved" || status === "rejected" || status === "pending") {
+      return status;
+    }
+  } catch (error) {
+    const localStatus = getLocalKioskRequestStatus(requestId);
+    if (localStatus) return localStatus;
+    throw error;
   }
   throw new Error("kiosk_request_invalid_status");
 }
@@ -187,31 +225,48 @@ export interface AdminKioskRequest {
   employeeName: string;
   items: KioskRequestItem[];
   status: KioskRequestStatus;
+  createdAt?: Date;
 }
 
 export async function listAdminKioskRequests(status: KioskRequestStatus = "pending", max = 25): Promise<AdminKioskRequest[]> {
-  const snap = await getDocs(
-    query(
-      collection(db, "kiosk_requests"),
-      where("status", "==", status),
-      orderBy("createdAt", "desc"),
-      limit(Math.max(1, Math.min(max, 50)))
-    )
-  );
+  const localRequests = listLocalKioskRequests(status, max);
 
-  return snap.docs.map((d) => {
-    const data = d.data();
-    return {
-      id: d.id,
-      employeeId: data.employeeId ?? "",
-      employeeName: data.employeeName ?? "",
-      items: Array.isArray(data.items) ? (data.items as KioskRequestItem[]) : [],
-      status: data.status as KioskRequestStatus,
-    };
-  });
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, "kiosk_requests"),
+        where("status", "==", status),
+        limit(Math.max(1, Math.min(max, 50)))
+      )
+    );
+
+    const remoteRequests = snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        employeeId: data.employeeId ?? "",
+        employeeName: data.employeeName ?? "",
+        items: Array.isArray(data.items) ? (data.items as KioskRequestItem[]) : [],
+        status: data.status as KioskRequestStatus,
+        createdAt: data.createdAt?.toDate?.(),
+      };
+    });
+
+    return [...localRequests, ...remoteRequests]
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))
+      .slice(0, Math.max(1, Math.min(max, 50)));
+  } catch (error) {
+    console.warn("[Kiosko] Listando solicitudes locales por error de Firebase.", error);
+    return localRequests;
+  }
 }
 
 export async function updateKioskRequestStatus(requestId: string, status: Extract<KioskRequestStatus, "approved" | "rejected">): Promise<void> {
+  if (isLocalKioskRequestId(requestId)) {
+    updateLocalKioskRequestStatus(requestId, status);
+    return;
+  }
+
   const batch = writeBatch(db);
   batch.update(doc(db, "kiosk_requests", requestId), {
     status,

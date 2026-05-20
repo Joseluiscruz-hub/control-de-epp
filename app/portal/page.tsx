@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,11 +61,7 @@ export default function UserPortal() {
         area: empDoc.data().area,
       });
 
-      const assQuery = query(
-        collection(db, 'assignments'),
-        where('employeeId', '==', empDoc.id),
-        orderBy('assignedAt', 'desc')
-      );
+      const assQuery = query(collection(db, 'assignments'), where('employeeId', '==', empDoc.id));
       const assSnap = await getDocs(assQuery);
       
       const assData = assSnap.docs.map(doc => {
@@ -77,7 +73,7 @@ export default function UserPortal() {
           nextReplacementAt: data.nextReplacementAt instanceof Timestamp ? data.nextReplacementAt.toDate() : undefined,
           status: data.status,
         };
-      });
+      }).sort((a, b) => b.assignedAt.getTime() - a.assignedAt.getTime());
       setAssignments(assData);
     } catch (error) {
       console.error(error);
@@ -150,6 +146,13 @@ export default function UserPortal() {
                         </>
                       )}
                     </Button>
+                    <Link
+                      href="/kiosko"
+                      className="flex w-full items-center justify-center gap-3 rounded-[1.5rem] border-2 border-slate-100 bg-white py-6 text-sm font-black uppercase tracking-widest text-slate-700 shadow-sm transition-all hover:border-[#F40009] hover:text-[#F40009]"
+                    >
+                      <HardHat className="h-5 w-5" />
+                      Solicitar EPP en Kiosko
+                    </Link>
                   </form>
                 </CardContent>
               </Card>
@@ -251,6 +254,13 @@ export default function UserPortal() {
             </Card>
             
             <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-8 border border-white/10 text-center">
+              <Link
+                href="/kiosko"
+                className="mb-6 flex w-full items-center justify-center gap-3 rounded-[1.5rem] bg-[#F40009] px-6 py-5 text-sm font-black uppercase tracking-widest text-white shadow-2xl shadow-red-900/20 transition-all hover:bg-white hover:text-[#F40009]"
+              >
+                <HardHat className="h-5 w-5" />
+                Abrir Kiosko para solicitar EPP
+              </Link>
               <p className="text-slate-400 text-sm font-medium leading-relaxed">
                 Si encuentras alguna discrepancia en tu historial, por favor reportalo de inmediato al área de <span className="text-red-500 font-black uppercase tracking-widest">Seguridad Industrial</span> de tu planta.
               </p>

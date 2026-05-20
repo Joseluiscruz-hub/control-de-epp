@@ -12,12 +12,16 @@ export function KioskRequestsPanel() {
   const [requests, setRequests] = useState<AdminKioskRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const refresh = useCallback(async () => {
+    setLoadError(false);
     try {
       const data = await listAdminKioskRequests("pending", 20);
       setRequests(data);
-    } catch {
+    } catch (error) {
+      console.error("[Kiosk requests load error]", error);
+      setLoadError(true);
       toast.error("No se pudieron cargar las solicitudes de kiosko.");
     } finally {
       setLoading(false);
@@ -56,6 +60,21 @@ export function KioskRequestsPanel() {
         {loading ? (
           <div className="py-12 flex justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+          </div>
+        ) : loadError ? (
+          <div className="py-10 text-center space-y-4">
+            <p className="text-slate-500 font-semibold">No se pudieron cargar las solicitudes.</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              onClick={() => {
+                setLoading(true);
+                void refresh();
+              }}
+            >
+              Reintentar
+            </Button>
           </div>
         ) : requests.length === 0 ? (
           <div className="py-10 text-center text-slate-500 font-semibold">No hay solicitudes pendientes.</div>

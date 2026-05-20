@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   collection, onSnapshot, doc, setDoc,
-  serverTimestamp, query, where, getDocs, orderBy, writeBatch
+  serverTimestamp, query, where, getDocs, getDoc, writeBatch
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
+import { syncLocalKioskEmployees } from '@/lib/kiosk-local-store';
 
 interface Employee {
   docId: string;
@@ -59,6 +60,7 @@ export default function EmpleadosPage() {
   // Add dialog
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [syncingKiosk, setSyncingKiosk] = useState(false);
   const [form, setForm] = useState({ id: '', name: '', area: '' });
 
   // History dialog
@@ -146,6 +148,73 @@ export default function EmpleadosPage() {
     }
   };
 
+  const syncKioskEmployees = async () => {
+    setSyncingKiosk(true);
+    const localSync = syncLocalKioskEmployees(
+      employees.map(emp => ({
+        id: emp.id,
+        name: emp.name,
+        area: emp.area,
+        active: emp.active,
+      }))
+    );
+
+    try {
+      const snapshots = await Promise.all(
+        employees.map(emp => getDoc(doc(db, 'kiosk_employees', emp.docId)))
+      );
+
+      let batch = writeBatch(db);
+      let writes = 0;
+      let created = 0;
+
+      for (let i = 0; i < employees.length; i++) {
+        const emp = employees[i];
+        const kioskRef = doc(db, 'kiosk_employees', emp.docId);
+        const baseData = {
+          name: emp.name,
+          active: emp.active,
+          updatedAt: serverTimestamp(),
+        };
+
+        if (snapshots[i].exists()) {
+          batch.set(kioskRef, baseData, { merge: true });
+        } else {
+          batch.set(kioskRef, {
+            ...baseData,
+            firstLogin: true,
+            termsAccepted: false,
+          });
+          created++;
+        }
+
+        writes++;
+        if (writes >= 450) {
+          await batch.commit();
+          batch = writeBatch(db);
+          writes = 0;
+        }
+      }
+
+      if (writes > 0) {
+        await batch.commit();
+      }
+
+      toast.success(
+        created > 0
+          ? `Kiosko sincronizado: ${created} colaborador(es) habilitado(s). Copia local lista.`
+          : `Kiosko sincronizado. Copia local lista con ${localSync.total} colaborador(es).`
+      );
+    } catch (error) {
+      console.error('[Kiosk employees sync error]', error);
+      toast.warning(
+        `Firebase no permitió sincronizar, pero el kiosko local quedó listo con ${localSync.total} colaborador(es).`
+      );
+    } finally {
+      setSyncingKiosk(false);
+    }
+  };
+
   const openHistory = useCallback(async (emp: Employee) => {
     setSelectedEmployee(emp);
     setHistoryOpen(true);
@@ -153,17 +222,20 @@ export default function EmpleadosPage() {
     try {
       const q = query(
         collection(db, 'assignments'),
-        where('employeeId', '==', emp.docId),
-        orderBy('assignedAt', 'desc')
+        where('employeeId', '==', emp.docId)
       );
       const snap = await getDocs(q);
-      setHistory(snap.docs.map(d => ({
-        id: d.id,
-        sku: d.data().sku,
-        assignedAt: d.data().assignedAt?.toDate() || new Date(),
-        nextReplacementAt: d.data().nextReplacementAt?.toDate(),
-        status: d.data().status,
-      })));
+      setHistory(
+        snap.docs
+          .map(d => ({
+            id: d.id,
+            sku: d.data().sku,
+            assignedAt: d.data().assignedAt?.toDate() || new Date(),
+            nextReplacementAt: d.data().nextReplacementAt?.toDate(),
+            status: d.data().status,
+          }))
+          .sort((a, b) => b.assignedAt.getTime() - a.assignedAt.getTime())
+      );
     } catch {
       toast.error('Error al cargar historial corporativo');
     } finally {
@@ -202,7 +274,15 @@ export default function EmpleadosPage() {
           <p className="text-slate-400 font-bold text-lg max-w-xl">Gestión integral del personal y trazabilidad de su equipamiento de seguridad.</p>
         </div>
         
-        <div className="relative z-10">
+        <div className="relative z-10 flex flex-col sm:flex-row gap-4">
+          <Button
+            onClick={syncKioskEmployees}
+            disabled={syncingKiosk || employees.length === 0}
+            className="h-20 px-8 rounded-[2rem] bg-white hover:bg-amber-50 text-slate-900 hover:text-amber-700 border border-slate-100 shadow-xl transition-all font-black uppercase tracking-widest text-xs gap-4 active:scale-95 group"
+          >
+            {syncingKiosk ? <Loader2 className="h-6 w-6 animate-spin" /> : <HardHat className="h-6 w-6 group-hover:scale-110 transition-transform" />}
+            Sincronizar Kiosko
+          </Button>
           <Button
             onClick={() => setAddOpen(true)}
             className="h-20 px-10 rounded-[2rem] bg-slate-950 hover:bg-[#F40009] text-white shadow-2xl transition-all font-black uppercase tracking-widest text-xs gap-4 active:scale-95 group"

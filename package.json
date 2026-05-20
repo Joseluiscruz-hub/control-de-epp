@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "local": "next dev -H 127.0.0.1 -p 3000",
     "build": "next build",
     "start": "next start",
+    "local:start": "next start -H 127.0.0.1 -p 3000",
     "lint": "eslint .",
     "clean": "next clean"
   },

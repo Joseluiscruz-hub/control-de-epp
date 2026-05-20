@@ -540,6 +540,15 @@ export default function DashboardPage() {
                     <ArrowRight className="h-5 w-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all" />
                   </Button>
                 </Link>
+                <Link href="/kiosko" target="_blank" className="block w-full">
+                  <Button variant="outline" className="w-full h-20 bg-white/5 border-white/10 hover:bg-white/15 text-white rounded-[1.5rem] justify-between px-8 transition-all group">
+                    <div className="flex items-center gap-5">
+                      <HardHat className="h-6 w-6 text-amber-400" />
+                      <span className="font-black uppercase tracking-[0.2em] text-xs">Kiosko de EPP</span>
+                    </div>
+                    <ArrowRight className="h-5 w-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all" />
+                  </Button>
+                </Link>
               </div>
             </Card>
           </motion.div>

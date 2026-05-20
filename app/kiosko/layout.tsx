@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "../../app/globals.css";
+import { KioskoClock } from "./kiosko-clock";
 
 export const metadata: Metadata = {
   title: "Kiosko EPP — Solicitud de Equipo de Protección Personal",
@@ -23,22 +24,11 @@ export default function KioskoLayout({ children }: { children: React.ReactNode }
           </svg>
           <span className="font-bold text-xl tracking-tight text-white">Kiosko <span className="text-amber-400">EPP</span></span>
         </div>
-        <div className="ml-auto text-sm text-gray-400" id="kiosko-clock" suppressHydrationWarning />
+        <KioskoClock />
       </header>
       <main className="flex-1 flex flex-col">
         {children}
       </main>
-      {/* Clock script */}
-      <script dangerouslySetInnerHTML={{ __html: `
-        (function() {
-          function tick() {
-            var el = document.getElementById("kiosko-clock");
-            if (el) el.textContent = new Date().toLocaleTimeString("es-MX", {hour:"2-digit",minute:"2-digit",second:"2-digit"});
-          }
-          tick();
-          setInterval(tick, 1000);
-        })();
-      `}} />
     </div>
   );
 }
