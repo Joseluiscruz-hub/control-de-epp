@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { Button } from './ui/button';
-import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X } from 'lucide-react';
+import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X, HardHat } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
@@ -97,6 +97,13 @@ export function NavBar() {
                 <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-2 text-gray-500 hover:text-[#F40009] hover:bg-red-50 rounded-xl font-bold transition-all duration-300">
                   <ExternalLink className="h-3.5 w-3.5" />
                   Portal
+                </Button>
+              </Link>
+
+              <Link href="/kiosko" target="_blank">
+                <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-xl font-bold transition-all duration-300">
+                  <HardHat className="h-3.5 w-3.5" />
+                  Kiosko
                 </Button>
               </Link>
 
@@ -206,6 +213,14 @@ export function NavBar() {
                 >
                   <ExternalLink className="h-4 w-4 text-slate-400" />
                   Portal del Colaborador
+                </Link>
+                <Link
+                  href="/kiosko"
+                  target="_blank"
+                  className="flex items-center gap-4 px-6 py-4 rounded-2xl text-base font-bold text-slate-500 hover:bg-amber-50 hover:text-amber-700 transition-all"
+                >
+                  <HardHat className="h-4 w-4 text-amber-500" />
+                  Kiosko de EPP
                 </Link>
               </nav>
 

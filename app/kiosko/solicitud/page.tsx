@@ -162,13 +162,14 @@ export default function KioskoSolicitudPage() {
           <h3 className="text-base font-semibold mb-3 text-gray-300">1. Selecciona tu talla</h3>
           <div className="flex flex-wrap gap-3">
              {sizes.map(([size, variant]) => {
-                const hasNumericStock = typeof variant.stock === "number";
+                const stock = variant.stock;
+                const hasNumericStock = typeof stock === "number";
                 const status = hasNumericStock
-                  ? getStockStatus(variant.stock, variant.minStock ?? 0)
+                  ? getStockStatus(stock, variant.minStock ?? 0)
                   : (variant.available === true ? "ok" : "empty");
                 const isDisabled = status === "empty";
                 const stockLabel = hasNumericStock
-                  ? (status === "empty" ? "Sin stock" : `${variant.stock} disp.`)
+                  ? (status === "empty" ? "Sin stock" : `${stock} disp.`)
                   : (status === "ok" ? "Disponible" : "Sin stock");
                 return (
                   <button
