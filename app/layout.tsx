@@ -2,7 +2,6 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
-import { Analytics } from '@vercel/analytics/next';
 
 import { AuthProvider, AuthGuard } from '@/components/auth-provider';
 import { NavBar } from '@/components/navbar';
@@ -60,7 +59,6 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
           </AuthGuard>
         </AuthProvider>
         <Toaster />
-        <Analytics />
       </body>
     </html>
   );
