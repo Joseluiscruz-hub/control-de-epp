@@ -6,13 +6,12 @@ import {
   where, Timestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   HardHat, Users, AlertTriangle, ArrowRight, Package,
   TrendingUp, Clock, CheckCircle2, Activity, Bot, ExternalLink, ShieldCheck,
-  Zap, BarChart3
+  BarChart3, Zap, ArrowUpRight, Flame, Star
 } from 'lucide-react';
 import { handleFirestoreError, OperationType } from '@/lib/firestore-error';
 import { format, isToday, isBefore, addDays } from 'date-fns';
@@ -24,7 +23,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Animated counter hook
-function useAnimatedCounter(target: number, duration = 1200) {
+function useAnimatedCounter(target: number, duration = 1400) {
   const [count, setCount] = useState(0);
   const prevTarget = useRef(0);
   useEffect(() => {
@@ -35,7 +34,7 @@ function useAnimatedCounter(target: number, duration = 1200) {
     const tick = (now: number) => {
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
+      const eased = 1 - Math.pow(1 - progress, 4);
       setCount(Math.round(from + (target - from) * eased));
       if (progress < 1) requestAnimationFrame(tick);
     };
@@ -43,6 +42,51 @@ function useAnimatedCounter(target: number, duration = 1200) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target, duration]);
   return count;
+}
+
+// Circular gauge SVG
+function GaugeCircle({ value, size = 120 }: { value: number; size?: number }) {
+  const radius = 45;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (value / 100) * circumference;
+  const color = value >= 90 ? '#10B981' : value >= 70 ? '#D4A017' : '#F40009';
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" className="rotate-[-90deg]">
+      <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+      <circle
+        cx="50" cy="50" r={radius} fill="none"
+        stroke={color}
+        strokeWidth="8"
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={strokeDashoffset}
+        style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.22,1,0.36,1)', filter: `drop-shadow(0 0 6px ${color}80)` }}
+      />
+    </svg>
+  );
+}
+
+// Mini sparkline bars
+function SparkBars({ data, color = '#F40009' }: { data: number[]; color?: string }) {
+  const max = Math.max(...data);
+  return (
+    <div className="flex items-end gap-0.5 h-8">
+      {data.map((v, i) => (
+        <div key={i} className="flex-1 rounded-sm overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+          <div
+            className="w-full rounded-sm"
+            style={{
+              height: `${(v / max) * 100}%`,
+              background: color,
+              opacity: i === data.length - 1 ? 1 : 0.3 + (i / data.length) * 0.5,
+              transition: `height 1s ${i * 0.08}s cubic-bezier(0.22,1,0.36,1)`,
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 interface InsightData {
@@ -69,8 +113,6 @@ interface DashboardStats {
   totalStock: number;
 }
 
-const BRAND_RED = "#F40009";
-
 export default function DashboardPage() {
   const { user: authUser } = useAuth();
   const [recentAssignments, setRecentAssignments] = useState<Assignment[]>([]);
@@ -90,14 +132,12 @@ export default function DashboardPage() {
     complianceRate: 0,
   });
 
-  // Animated KPI values
   const animatedToday = useAnimatedCounter(stats.todayAssignments);
   const animatedEmployees = useAnimatedCounter(stats.activeEmployees);
   const animatedAlerts = useAnimatedCounter(stats.alertsThisWeek);
   const animatedStock = useAnimatedCounter(stats.totalStock);
 
   useEffect(() => {
-    // Real-time assignments feed
     const q = query(collection(db, 'assignments'), orderBy('assignedAt', 'desc'), limit(10));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const assignments = snapshot.docs.map(doc => {
@@ -106,42 +146,31 @@ export default function DashboardPage() {
           id: doc.id,
           employeeId: data.employeeId,
           sku: data.sku,
-          assignedAt: data.assignedAt instanceof Timestamp
-            ? data.assignedAt.toDate()
-            : new Date(),
-          nextReplacementAt: data.nextReplacementAt instanceof Timestamp
-            ? data.nextReplacementAt.toDate()
-            : undefined,
+          assignedAt: data.assignedAt instanceof Timestamp ? data.assignedAt.toDate() : new Date(),
+          nextReplacementAt: data.nextReplacementAt instanceof Timestamp ? data.nextReplacementAt.toDate() : undefined,
           status: data.status,
         };
       });
       setRecentAssignments(assignments);
-
       const todayCount = assignments.filter(a => isToday(a.assignedAt)).length;
       setStats(prev => ({ ...prev, todayAssignments: todayCount }));
-
-      // Upcoming alerts (next 7 days)
       const now = new Date();
       const nextWeek = addDays(now, 7);
       const alerts = assignments.filter(a =>
-        a.nextReplacementAt &&
-        a.status === 'active' &&
+        a.nextReplacementAt && a.status === 'active' &&
         (isBefore(a.nextReplacementAt, nextWeek) || isBefore(a.nextReplacementAt, now))
       );
       setUpcomingAlerts(alerts);
       setStats(prev => ({ ...prev, alertsThisWeek: alerts.length }));
-
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'assignments');
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    // Fetch static stats + dynamic insights
     const fetchStats = async () => {
       try {
         const [empSnap, invSnap, allAssignSnap] = await Promise.all([
@@ -149,11 +178,9 @@ export default function DashboardPage() {
           getDocs(collection(db, 'ppe_catalog')),
           getDocs(query(collection(db, 'assignments'), orderBy('assignedAt', 'desc'), limit(200))),
         ]);
-
         const invData = invSnap.docs.map(d => d.data());
         const totalStockValue = invData.reduce((sum, d) => sum + (d.stock || 0), 0);
         const lowStock = invData.filter(d => d.stock <= 20).length;
-
         setStats(prev => ({
           ...prev,
           activeEmployees: empSnap.size,
@@ -161,13 +188,8 @@ export default function DashboardPage() {
           totalStock: totalStockValue,
           lowStockItems: lowStock,
         }));
-
-        // --- Dynamic insights ---
-        // 1. Find lowest stock item
         const sortedByStock = [...invData].sort((a, b) => (a.stock || 0) - (b.stock || 0));
         const lowestItem = sortedByStock.length > 0 ? { name: sortedByStock[0].name as string, stock: sortedByStock[0].stock as number } : null;
-
-        // 2. Find top consuming area
         const empMap = new Map<string, string>();
         empSnap.docs.forEach(d => { empMap.set(d.id, d.data().area as string); });
         const areaCounts: Record<string, number> = {};
@@ -177,8 +199,6 @@ export default function DashboardPage() {
         });
         const topAreaEntry = Object.entries(areaCounts).sort((a, b) => b[1] - a[1])[0];
         const topArea = topAreaEntry ? { area: topAreaEntry[0], count: topAreaEntry[1] } : null;
-
-        // 3. Compliance rate: active assignments that haven't expired / total active
         const now = new Date();
         const activeAssigns = allAssignSnap.docs.filter(d => d.data().status === 'active');
         const compliant = activeAssigns.filter(d => {
@@ -190,12 +210,7 @@ export default function DashboardPage() {
         const complianceRate = activeAssigns.length > 0
           ? Math.round((compliant.length / activeAssigns.length) * 100)
           : 100;
-
-        setInsights({
-          lowStockItem: lowestItem,
-          topArea,
-          complianceRate,
-        });
+        setInsights({ lowStockItem: lowestItem, topArea, complianceRate });
       } catch (err) {
         console.error('[Dashboard stats error]', err);
       }
@@ -203,413 +218,457 @@ export default function DashboardPage() {
     fetchStats();
   }, []);
 
-  const statCards = [
+  const kpiCards = [
     {
       title: 'Entregas Hoy',
       value: loading ? '—' : animatedToday,
       icon: <HardHat className="h-5 w-5" />,
-      color: 'border-l-slate-900',
-      iconBg: 'bg-slate-50 text-slate-900',
+      iconColor: 'text-white',
+      iconBg: 'rgba(244,0,9,0.15)',
+      iconBorder: 'rgba(244,0,9,0.2)',
+      accentColor: '#F40009',
       sub: 'En turno actual',
-      subColor: 'text-slate-600',
+      trend: [2, 5, 3, 8, 4, 7, animatedToday || 1],
+      positive: true,
     },
     {
       title: 'Plantilla Activa',
       value: animatedEmployees || '—',
       icon: <Users className="h-5 w-5" />,
-      color: `border-l-[${BRAND_RED}]`,
-      iconBg: 'bg-red-50 text-red-600',
+      iconColor: 'text-white',
+      iconBg: 'rgba(59,130,246,0.15)',
+      iconBorder: 'rgba(59,130,246,0.2)',
+      accentColor: '#3B82F6',
       sub: 'Colaboradores en planta',
-      subColor: 'text-red-600',
+      trend: [12, 18, 15, 22, 19, 24, animatedEmployees || 1],
+      positive: true,
     },
     {
       title: 'Alertas Reposición',
       value: animatedAlerts,
       icon: <AlertTriangle className="h-5 w-5" />,
-      color: stats.alertsThisWeek > 0 ? 'border-l-orange-500' : 'border-l-emerald-500',
-      iconBg: stats.alertsThisWeek > 0 ? 'bg-orange-50 text-orange-500' : 'bg-emerald-50 text-emerald-600',
-      sub: stats.alertsThisWeek > 0 ? 'Cambios pendientes' : 'Seguridad al 100%',
-      subColor: stats.alertsThisWeek > 0 ? 'text-orange-600' : 'text-emerald-600',
+      iconColor: 'text-white',
+      iconBg: stats.alertsThisWeek > 0 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)',
+      iconBorder: stats.alertsThisWeek > 0 ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)',
+      accentColor: stats.alertsThisWeek > 0 ? '#F59E0B' : '#10B981',
+      sub: stats.alertsThisWeek > 0 ? 'Requieren atención' : 'Todo en orden',
+      trend: [1, 3, 2, 5, 3, 2, animatedAlerts || 0],
+      positive: stats.alertsThisWeek === 0,
     },
     {
       title: 'Stock Global',
       value: animatedStock || '—',
       icon: <Package className="h-5 w-5" />,
-      color: stats.lowStockItems > 0 ? `border-l-[${BRAND_RED}]` : 'border-l-slate-900',
-      iconBg: stats.lowStockItems > 0 ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-900',
+      iconColor: 'text-white',
+      iconBg: stats.lowStockItems > 0 ? 'rgba(244,0,9,0.15)' : 'rgba(212,160,23,0.15)',
+      iconBorder: stats.lowStockItems > 0 ? 'rgba(244,0,9,0.2)' : 'rgba(212,160,23,0.2)',
+      accentColor: stats.lowStockItems > 0 ? '#F40009' : '#D4A017',
       sub: stats.lowStockItems > 0 ? `${stats.lowStockItems} SKUs críticos` : 'Inventario estable',
-      subColor: stats.lowStockItems > 0 ? 'text-red-600' : 'text-slate-600',
+      trend: [200, 320, 280, 400, 350, 420, animatedStock || 1],
+      positive: stats.lowStockItems === 0,
     },
   ];
 
   return (
-    <div className="space-y-12 pb-20">
-      {/* Premium Hero Section - Coca-Cola FEMSA Style */}
-      <motion.div 
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-        className="relative"
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-red-600/5 to-slate-900/5 rounded-[3rem] blur-3xl opacity-50 transition-opacity duration-1000" />
-        
-        <div className="relative bg-white border border-slate-100 p-12 rounded-[3rem] shadow-2xl shadow-red-100/50 overflow-hidden flex flex-col lg:flex-row lg:items-center justify-between gap-10">
-          {/* Brand Wave Pattern (Subtle) */}
-          <div className="absolute top-0 right-0 w-1/2 h-full opacity-[0.03] pointer-events-none">
-             <svg viewBox="0 0 100 100" className="w-full h-full text-red-600 fill-current">
-                <path d="M0,50 Q25,0 50,50 T100,50 V100 H0 Z" />
-             </svg>
-          </div>
+    <div className="space-y-8 pb-20">
 
-          <div className="relative z-10 space-y-6 max-w-2xl">
+      {/* ── Hero Section ──────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        className="relative rounded-3xl overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, rgba(244,0,9,0.08) 0%, rgba(255,255,255,0.02) 50%, rgba(212,160,23,0.04) 100%)',
+          border: '1px solid rgba(255,255,255,0.07)',
+        }}
+      >
+        {/* Glow orb */}
+        <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full opacity-20 pointer-events-none" style={{background:'radial-gradient(circle, #F40009 0%, transparent 70%)', filter:'blur(60px)'}} />
+        <div className="absolute -bottom-10 -right-10 w-60 h-60 rounded-full opacity-10 pointer-events-none" style={{background:'radial-gradient(circle, #D4A017 0%, transparent 70%)', filter:'blur(50px)'}} />
+
+        <div className="relative z-10 p-8 lg:p-12 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+          {/* Left: Welcome text */}
+          <div className="space-y-5 max-w-xl">
             <motion.div
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: -16 }}
               animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <span className="badge-femsa">Seguridad Industrial · Coca-Cola FEMSA</span>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <Badge className="badge-femsa">
-                Seguridad Industrial & Salud Ocupacional
-              </Badge>
+              <h1 className="text-5xl lg:text-7xl font-black tracking-tighter text-white leading-[0.9]">
+                Hola,{' '}
+                <span className="text-gradient-red">
+                  {authUser?.displayName?.split(' ')[0] || 'Admin'}
+                </span>{' '}
+                <span className="inline-block animate-bounce" style={{animationDuration:'2s'}}>👋</span>
+              </h1>
+              <p className="text-white/40 text-base font-medium mt-3 leading-relaxed">
+                Panel de Control EPP · Monitoreo activo de{' '}
+                <span className="text-white/70 font-semibold">{stats.activeEmployees} colaboradores</span>
+                {' '}con respaldo de{' '}
+                <span className="font-bold" style={{color:'#D4A017'}}>ARIA IA</span>.
+              </p>
             </motion.div>
-            
-            <h1 className="text-6xl lg:text-8xl font-black tracking-tighter text-slate-950 leading-[0.9]">
-              ¡Hola, <span className="text-[#F40009]">{authUser?.displayName?.split(' ')[0] || 'Admin'}</span>! 👋
-            </h1>
-            
-            <div className="space-y-4">
-              <p className="text-slate-500 text-xl font-bold leading-relaxed">
-                Panel de Control de EPP <span className="text-slate-950 underline decoration-femsa-red decoration-4 underline-offset-8">Coca-Cola FEMSA</span>.
-              </p>
-              <p className="text-slate-400 font-medium">
-                Monitoreo activo de <span className="text-slate-900 font-black">{stats.activeEmployees} colaboradores</span> con respaldo de <span className="text-red-600 font-black italic">ARIA IA</span>.
-              </p>
-            </div>
 
-            <div className="flex flex-wrap gap-4 pt-4">
-              <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 rounded-2xl shadow-xl shadow-slate-200 group transition-all hover:scale-105">
-                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-black text-white uppercase tracking-widest">Sistemas OK</span>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="flex flex-wrap gap-3"
+            >
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold" style={{background:'rgba(16,185,129,0.1)', border:'1px solid rgba(16,185,129,0.15)', color:'rgba(16,185,129,0.9)'}}>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                Sistemas Operativos
               </div>
-              <div className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm">
-                <Activity className="h-4 w-4 text-red-600" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}</span>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white/40" style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)'}}>
+                <Activity className="h-3.5 w-3.5" style={{color:'rgba(244,0,9,0.7)'}} />
+                {format(new Date(), "EEEE d 'de' MMMM", { locale: es })}
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Right: Compliance gauge */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.4, type: 'spring', stiffness: 150, damping: 20 }}
+            className="relative flex-shrink-0"
+          >
+            <div className="relative w-56 p-6 rounded-2xl" style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)'}}>
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] mb-4" style={{color:'rgba(212,160,23,0.8)'}}>Pulso Operativo</p>
+
+              <div className="relative flex items-center justify-center mb-4">
+                <GaugeCircle value={insights.complianceRate} size={110} />
+                <div className="absolute text-center">
+                  <span className="text-3xl font-black text-white" style={{textShadow:'0 0 20px rgba(16,185,129,0.4)'}}>
+                    {insights.complianceRate}%
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-center text-[11px] font-semibold text-white/40 uppercase tracking-widest">Cumplimiento EPP</p>
+
+              <div className="mt-4 pt-4 flex items-center justify-between" style={{borderTop:'1px solid rgba(255,255,255,0.06)'}}>
+                <div className="flex gap-1.5">
+                  {[1,2,3].map(i => (
+                    <div key={i} className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" style={{ animationDelay: `${i*200}ms` }} />
+                  ))}
+                </div>
+                <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">En vivo</span>
               </div>
             </div>
-          </div>
-          
-          <div className="relative z-10 flex flex-col items-center lg:items-end justify-center">
-             <div className="relative group">
-                <div className="absolute inset-0 bg-red-600 rounded-[2.5rem] blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-700" />
-                <Card className="relative bg-slate-950 border-none p-10 rounded-[2.5rem] w-full sm:w-80 overflow-hidden shadow-2xl">
-                   <div className="absolute top-0 right-0 p-6 opacity-20">
-                      <ShieldCheck className="h-20 w-20 text-white" />
-                   </div>
-                   <p className="text-[10px] font-black text-femsa-gold uppercase tracking-[0.3em] mb-4">Pulso Operativo</p>
-                   <div className="space-y-2">
-                      <p className="text-5xl font-black text-white tracking-tighter tabular-nums kpi-femsa-glow" style={{color: 'white'}}>
-                        {insights.complianceRate}%
-                      </p>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Cumplimiento EPP</p>
-                      {/* Mini bar chart visual */}
-                      <div className="flex items-end gap-1 pt-3">
-                        {[65,80,45,90,70,85,95].map((v,i) => (
-                          <div key={i} className="flex-1 rounded-sm bg-femsa-gold/20 overflow-hidden" style={{height: `${v * 0.3}px`}}>
-                            <div className="w-full bg-femsa-gold rounded-sm" style={{height: `${v}%`, transition: `height 1s ${i*0.1}s ease`}} />
-                          </div>
-                        ))}
-                      </div>
-                   </div>
-                   <div className="mt-8 pt-8 border-t border-white/10 flex items-center justify-between">
-                      <div className="flex gap-1.5">
-                         {[1,2,3].map(i => <div key={i} className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" style={{ animationDelay: `${i*200}ms` }} />)}
-                      </div>
-                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Estado Global: Activo</span>
-                   </div>
-                </Card>
-             </div>
-          </div>
+          </motion.div>
         </div>
       </motion.div>
 
-      {/* Corporate KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-        {statCards.map((card, idx) => (
+      {/* ── KPI Grid ──────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {kpiCards.map((card, idx) => (
           <motion.div
             key={card.title}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 + (idx * 0.1), duration: 0.8 }}
-            whileHover={{ y: -10, transition: { duration: 0.3 } }}
+            transition={{ delay: 0.4 + idx * 0.08, duration: 0.7 }}
+            className="kpi-card p-6"
           >
-            <Card className="group relative h-full bg-white border-none shadow-xl rounded-[2.5rem] overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-red-100">
-              <div className={`absolute top-0 left-0 w-2 h-full ${card.color.startsWith('border-l-[') ? 'bg-[#F40009]' : card.color.replace('border-l-', 'bg-')} opacity-10 group-hover:opacity-100 transition-opacity duration-500`} />
-              
-              <CardHeader className="flex flex-row items-center justify-between pb-4 pt-10 px-10">
-                <CardTitle className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{card.title}</CardTitle>
-                <div className={`h-14 w-14 rounded-2xl flex items-center justify-center ${card.iconBg} shadow-inner group-hover:rotate-12 transition-transform duration-500`}>
-                  {card.icon}
-                </div>
-              </CardHeader>
-              
-              <CardContent className="px-10 pb-12">
-                <div className="text-5xl font-black text-slate-950 tracking-tighter mb-4">
-                  {card.value}
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${card.subColor.replace('text-', 'bg-')} animate-pulse`} />
-                  <p className={`text-[10px] font-black uppercase tracking-widest ${card.subColor}`}>{card.sub}</p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Top row */}
+            <div className="flex items-start justify-between mb-4">
+              <div
+                className="h-10 w-10 rounded-xl flex items-center justify-center"
+                style={{ background: card.iconBg, border: `1px solid ${card.iconBorder}` }}
+              >
+                <span style={{ color: card.accentColor }}>{card.icon}</span>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg" style={{
+                color: card.positive ? 'rgba(16,185,129,0.8)' : 'rgba(245,158,11,0.8)',
+                background: card.positive ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
+              }}>
+                {card.positive ? <ArrowUpRight className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+              </div>
+            </div>
+
+            {/* Value */}
+            <div className="mb-3">
+              <div className="text-4xl font-black text-white tracking-tighter kpi-white-glow tabular-nums">
+                {card.value}
+              </div>
+              <div className="text-[11px] font-semibold text-white/35 uppercase tracking-widest mt-1">
+                {card.title}
+              </div>
+            </div>
+
+            {/* Sparkline */}
+            <SparkBars data={card.trend} color={card.accentColor} />
+
+            {/* Sub */}
+            <div className="flex items-center gap-2 mt-3">
+              <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: card.accentColor }} />
+              <p className="text-[10px] font-semibold text-white/35 uppercase tracking-wider">{card.sub}</p>
+            </div>
           </motion.div>
         ))}
       </div>
 
+      {/* ── Alert Banner ──────────────────────── */}
       <AnimatePresence>
         {upcomingAlerts.length > 0 && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="rounded-[3rem] border-4 border-red-50 bg-white p-12 shadow-2xl shadow-red-200/30 flex flex-col lg:flex-row items-center gap-10 relative overflow-hidden"
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="relative rounded-2xl p-6 overflow-hidden flex flex-col sm:flex-row items-center gap-6"
+            style={{
+              background: 'rgba(244,0,9,0.06)',
+              border: '1px solid rgba(244,0,9,0.2)',
+            }}
           >
-            <div className="absolute top-0 left-0 w-3 h-full bg-[#F40009]" />
-            <div className="h-24 w-24 rounded-[2rem] bg-[#F40009] flex items-center justify-center shrink-0 shadow-2xl shadow-red-300 group hover:rotate-12 transition-transform duration-500">
-              <AlertTriangle className="h-12 w-12 text-white animate-bounce" />
+            <div className="absolute inset-0 pointer-events-none" style={{background:'linear-gradient(90deg, rgba(244,0,9,0.08) 0%, transparent 60%)'}} />
+            <div className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-lg relative z-10" style={{background:'rgba(244,0,9,0.15)', border:'1px solid rgba(244,0,9,0.25)'}}>
+              <AlertTriangle className="h-7 w-7 animate-pulse" style={{color:'#F40009'}} />
             </div>
-            
-            <div className="flex-1 text-center lg:text-left space-y-3">
-              <h2 className="text-3xl font-black text-slate-950 uppercase tracking-tighter">
-                Alerta de Seguridad Corporativa
-              </h2>
-              <p className="text-slate-500 font-bold text-xl leading-tight">
-                Se detectaron <span className="text-[#F40009] underline decoration-red-200 decoration-8 underline-offset-4">{upcomingAlerts.length} casos críticos</span> de EPP por vencer en planta.
+            <div className="flex-1 text-center sm:text-left relative z-10">
+              <h2 className="text-lg font-black text-white mb-1">Alerta de Seguridad Corporativa</h2>
+              <p className="text-white/50 text-sm font-medium">
+                Se detectaron{' '}
+                <span className="font-black" style={{color:'#F40009'}}>{upcomingAlerts.length} casos críticos</span>
+                {' '}de EPP por vencer en planta.
               </p>
             </div>
-            
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              <div className="flex -space-x-5 overflow-hidden">
-                {upcomingAlerts.slice(0, 5).map((a) => (
-                  <div key={a.id} className="h-16 w-16 rounded-2xl border-4 border-white bg-slate-50 flex items-center justify-center shadow-lg transform hover:-translate-y-2 transition-transform cursor-help" title={a.sku}>
-                    <HardHat className="h-8 w-8 text-slate-300" />
-                  </div>
-                ))}
-              </div>
-              <Link href="/empleados">
-                <Button className="bg-slate-950 hover:bg-[#F40009] text-white rounded-[1.5rem] px-10 h-20 shadow-2xl transition-all font-black uppercase tracking-widest text-sm active:scale-95 group">
-                   Intervenir Ahora
-                   <ArrowRight className="ml-3 h-5 w-5 group-hover:translate-x-2 transition-transform" />
-                </Button>
-              </Link>
-            </div>
+            <Link href="/empleados" className="relative z-10 shrink-0">
+              <Button className="rounded-xl px-6 h-11 font-bold text-sm text-white transition-all group" style={{background:'rgba(244,0,9,0.9)'}}>
+                Intervenir
+                <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </Link>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
-        {/* Operations Board */}
-        <Card className="xl:col-span-2 bg-white rounded-[3.5rem] border-none shadow-2xl overflow-hidden group">
-          <CardHeader className="p-12 pb-6 border-b border-slate-50">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <CardTitle className="text-3xl font-black text-slate-950 tracking-tighter flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 shadow-inner">
-                    <Activity className="h-7 w-7" />
-                  </div>
-                  Bitácora de Seguridad
-                </CardTitle>
-                <p className="text-[11px] text-slate-400 font-black uppercase tracking-[0.3em] pl-1">Coca-Cola FEMSA Operaciones Industriales</p>
+      {/* ── Main Grid ─────────────────────────── */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+        {/* Activity Feed */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="xl:col-span-2 rounded-2xl overflow-hidden"
+          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-5" style={{borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{background:'rgba(244,0,9,0.12)', border:'1px solid rgba(244,0,9,0.2)'}}>
+                <Activity className="h-4.5 w-4.5" style={{color:'#F40009'}} />
               </div>
-              <Badge className="bg-[#F40009] text-white border-none px-5 py-2 font-black text-[10px] tracking-widest uppercase rounded-full">
-                Datos en Tiempo Real
-              </Badge>
+              <div>
+                <h2 className="text-base font-bold text-white">Bitácora de Seguridad</h2>
+                <p className="text-[10px] text-white/30 font-semibold uppercase tracking-widest">Coca-Cola FEMSA · Tiempo Real</p>
+              </div>
             </div>
-          </CardHeader>
-          
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="space-y-6 p-12">
-                {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-20 bg-slate-50 rounded-3xl animate-pulse" />)}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-left bg-slate-50/70">
-                      <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Colaborador</th>
-                      <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">EPP Asignado</th>
-                      <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Fecha Entrega</th>
-                      <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Estatus</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {recentAssignments.map((a, idx) => {
-                      const isOverdue = a.nextReplacementAt && isBefore(a.nextReplacementAt, new Date());
-                      return (
-                        <motion.tr 
-                          key={a.id} 
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.8 + (idx * 0.05) }}
-                          className="group hover:bg-slate-50/80 transition-all cursor-default"
-                        >
-                          <td className="px-12 py-8">
-                            <div className="flex items-center gap-5">
-                              <div className="h-14 w-14 rounded-2xl bg-white shadow-md ring-1 ring-slate-100 flex items-center justify-center text-slate-900 font-black text-sm group-hover:bg-[#F40009] group-hover:text-white group-hover:scale-110 transition-all duration-300">
-                                {a.employeeId.slice(-2)}
-                              </div>
-                              <span className="font-black text-slate-900 tracking-tight text-lg">#{a.employeeId}</span>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{background:'rgba(244,0,9,0.1)', border:'1px solid rgba(244,0,9,0.15)', color:'rgba(244,0,9,0.9)'}}>
+              <span className="h-1.5 w-1.5 rounded-full bg-[#F40009] animate-pulse inline-block" />
+              En Vivo
+            </div>
+          </div>
+
+          {/* Table */}
+          {loading ? (
+            <div className="space-y-3 p-6">
+              {[1,2,3,4,5].map(i => (
+                <div key={i} className="h-14 rounded-xl skeleton-pulse" />
+              ))}
+            </div>
+          ) : recentAssignments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-white/20">
+              <Package className="h-10 w-10 mb-3" />
+              <p className="text-sm font-semibold">Sin asignaciones registradas</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr style={{background:'rgba(255,255,255,0.02)'}}>
+                    {['Colaborador','EPP Asignado','Fecha Entrega','Estatus'].map((h, i) => (
+                      <th key={h} className={`px-6 py-4 text-[10px] font-black text-white/25 uppercase tracking-widest ${i === 3 ? 'text-right' : 'text-left'}`}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentAssignments.map((a, idx) => {
+                    const isOverdue = a.nextReplacementAt && isBefore(a.nextReplacementAt, new Date());
+                    return (
+                      <motion.tr
+                        key={a.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.8 + idx * 0.04 }}
+                        className="group transition-all cursor-default"
+                        style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.025)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="h-9 w-9 rounded-xl flex items-center justify-center text-xs font-black transition-all duration-300 group-hover:scale-105"
+                              style={{ background: 'rgba(244,0,9,0.1)', border: '1px solid rgba(244,0,9,0.15)', color: '#F40009' }}
+                            >
+                              {a.employeeId.slice(-2).toUpperCase()}
                             </div>
-                          </td>
-                          <td className="px-12 py-8">
-                            <span className="text-xs font-black bg-slate-900 text-white px-5 py-2 rounded-xl group-hover:bg-[#F40009] transition-colors shadow-lg">
-                              {a.sku}
-                            </span>
-                          </td>
-                          <td className="px-12 py-8">
-                            <p className="text-xs font-black text-slate-500 font-mono">
-                              {format(a.assignedAt, 'dd MMM, HH:mm', { locale: es })}
-                            </p>
-                          </td>
-                          <td className="px-12 py-8 text-right">
-                            <Badge className={`font-black text-[10px] tracking-widest px-4 py-1.5 border-none shadow-lg ${
-                              isOverdue 
-                                ? 'bg-[#F40009] text-white shadow-red-200' 
-                                : a.status === 'active' 
-                                  ? 'bg-emerald-500 text-white shadow-emerald-200' 
-                                  : 'bg-slate-300 text-white'
-                            }`}>
-                              {isOverdue ? 'VENCIDO' : a.status === 'active' ? 'ACTIVO' : 'CERRADO'}
-                            </Badge>
-                          </td>
-                        </motion.tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <div className="p-12 border-t border-slate-50 bg-slate-50/30 text-center">
-              <Link href="/empleados" className="inline-flex items-center gap-4 text-sm font-black text-[#F40009] hover:text-slate-900 transition-all group tracking-tighter">
-                EXPLORAR DIRECTORIO COMPLETO
-                <ArrowRight className="h-6 w-6 group-hover:translate-x-3 transition-transform" />
-              </Link>
+                            <span className="text-sm font-semibold text-white/70">#{a.employeeId.slice(-6)}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-bold px-3 py-1.5 rounded-lg text-white/60" style={{background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)'}}>
+                            {a.sku}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-mono text-white/35">
+                            {format(a.assignedAt, 'dd MMM · HH:mm', { locale: es })}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider ${
+                            isOverdue
+                              ? 'text-red-400'
+                              : a.status === 'active'
+                                ? 'text-emerald-400'
+                                : 'text-white/30'
+                          }`} style={{
+                            background: isOverdue ? 'rgba(244,0,9,0.1)' : a.status === 'active' ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${isOverdue ? 'rgba(244,0,9,0.2)' : a.status === 'active' ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                          }}>
+                            {isOverdue ? 'Vencido' : a.status === 'active' ? 'Activo' : 'Cerrado'}
+                          </span>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          </CardContent>
-        </Card>
+          )}
+
+          <div className="px-6 py-4 flex justify-center" style={{borderTop:'1px solid rgba(255,255,255,0.04)'}}>
+            <Link href="/empleados" className="flex items-center gap-2 text-xs font-semibold text-white/30 hover:text-white/60 transition-all group uppercase tracking-widest">
+              Ver directorio completo
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
+        </motion.div>
 
         {/* Sidebar Widgets */}
-        <div className="space-y-12">
-          <KioskRequestsPanel />
+        <div className="space-y-4">
 
+          {/* Kiosk Requests */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 16 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 1.2 }}
+            transition={{ delay: 0.75 }}
           >
-            <Card className="border-none shadow-2xl bg-slate-950 rounded-[3.5rem] p-12 text-white relative overflow-hidden group">
-              <div className="absolute inset-0 opacity-10 bg-gradient-to-br from-red-600 via-transparent to-transparent" />
-              <div className="absolute top-0 right-0 p-10 opacity-10">
-                 <ShieldCheck className="h-24 w-24" />
-              </div>
-              
-              <h3 className="text-2xl font-black mb-10 flex items-center gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-red-600 flex items-center justify-center shadow-2xl shadow-red-500/20">
-                  <Package className="h-6 w-6 text-white" />
-                </div>
-                Acciones Rápidas
-              </h3>
-              
-              <div className="space-y-5 relative z-10">
-                <AssignPpeDialog />
-                <Link href="/inventario" className="block w-full">
-                  <Button variant="outline" className="w-full h-20 bg-white/5 border-white/10 hover:bg-white/15 text-white rounded-[1.5rem] justify-between px-8 transition-all group">
-                    <div className="flex items-center gap-5">
-                      <Package className="h-6 w-6 text-red-500" />
-                      <span className="font-black uppercase tracking-[0.2em] text-xs">Inventario de Planta</span>
-                    </div>
-                    <ArrowRight className="h-5 w-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all" />
-                  </Button>
-                </Link>
-                <Link href="/portal" target="_blank" className="block w-full">
-                  <Button variant="outline" className="w-full h-20 bg-white/5 border-white/10 hover:bg-white/15 text-white rounded-[1.5rem] justify-between px-8 transition-all group">
-                    <div className="flex items-center gap-5">
-                      <ExternalLink className="h-6 w-6 text-emerald-500" />
-                      <span className="font-black uppercase tracking-[0.2em] text-xs">Portal del Colaborador</span>
-                    </div>
-                    <ArrowRight className="h-5 w-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all" />
-                  </Button>
-                </Link>
-                <Link href="/kiosko" target="_blank" className="block w-full">
-                  <Button variant="outline" className="w-full h-20 bg-white/5 border-white/10 hover:bg-white/15 text-white rounded-[1.5rem] justify-between px-8 transition-all group">
-                    <div className="flex items-center gap-5">
-                      <HardHat className="h-6 w-6 text-amber-400" />
-                      <span className="font-black uppercase tracking-[0.2em] text-xs">Kiosko de EPP</span>
-                    </div>
-                    <ArrowRight className="h-5 w-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all" />
-                  </Button>
-                </Link>
-              </div>
-            </Card>
+            <KioskRequestsPanel />
           </motion.div>
 
+          {/* Quick Actions */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 1.4 }}
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.85 }}
+            className="rounded-2xl p-5"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
           >
-            <Card className="relative bg-white rounded-[3.5rem] p-12 border-none shadow-2xl overflow-hidden group">
-              <div className="absolute top-0 right-0 p-10">
-                <div className="flex gap-2">
-                  {[1,2,3].map(i => <div key={i} className="h-2.5 w-2.5 rounded-full bg-red-600 animate-bounce" style={{ animationDelay: `${i*150}ms` }} />)}
-                </div>
-              </div>
-               <h3 className="text-2xl font-black text-slate-950 mb-10 flex items-center gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-red-600 flex items-center justify-center shadow-2xl shadow-red-200">
-                  <Bot className="h-7 w-7 text-white" />
-                </div>
-                ARIA IA
-              </h3>
-               
-              <div className="space-y-8 relative z-10">
-                <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 hover:bg-white transition-all shadow-sm group/item">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-10 w-10 rounded-xl bg-red-50 flex items-center justify-center text-[#F40009]">
-                      <TrendingUp className="h-5 w-5" />
-                    </div>
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Pronóstico de Stock</p>
+            <h3 className="text-sm font-bold text-white/70 mb-4 flex items-center gap-2">
+              <Zap className="h-4 w-4" style={{color:'#F40009'}} />
+              Acciones Rápidas
+            </h3>
+            <div className="space-y-2">
+              <AssignPpeDialog />
+              <Link href="/inventario" className="block w-full">
+                <button className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-white/50 hover:text-white/80 transition-all group" style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)'}}>
+                  <div className="flex items-center gap-3">
+                    <Package className="h-4 w-4" style={{color:'rgba(212,160,23,0.7)'}} />
+                    Inventario de Planta
                   </div>
-                  <p className="text-base text-slate-900 leading-snug font-bold">
-                    {insights.lowStockItem
-                      ? <>Se recomienda reabastecer <span className="text-red-600 underline underline-offset-4 decoration-red-200">{insights.lowStockItem.name}</span> — solo quedan <span className="text-red-600 font-black">{insights.lowStockItem.stock}</span> unidades.</>
-                      : <>Todos los artículos del catálogo tienen niveles de stock <span className="text-emerald-600 font-black">saludables</span>.</>
-                    }
-                  </p>
-                </div>
-                 
-                <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 hover:bg-white transition-all shadow-sm">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                      <CheckCircle2 className="h-5 w-5" />
-                    </div>
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Consumo por Área</p>
+                  <ArrowRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                </button>
+              </Link>
+              <Link href="/portal" target="_blank" className="block w-full">
+                <button className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-white/50 hover:text-white/80 transition-all group" style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)'}}>
+                  <div className="flex items-center gap-3">
+                    <ExternalLink className="h-4 w-4" style={{color:'rgba(59,130,246,0.7)'}} />
+                    Portal del Colaborador
                   </div>
-                  <p className="text-base text-slate-900 leading-snug font-bold">
-                    {insights.topArea
-                      ? <>El área de <span className="text-emerald-600 font-black">{insights.topArea.area}</span> lidera con <span className="font-black">{insights.topArea.count}</span> dotaciones registradas.</>
-                      : <>Aún no hay datos suficientes para analizar patrones de consumo.</>
-                    }
-                  </p>
+                  <ArrowRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                </button>
+              </Link>
+              <Link href="/kiosko" target="_blank" className="block w-full">
+                <button className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-white/50 hover:text-amber-400 transition-all group" style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)'}}>
+                  <div className="flex items-center gap-3">
+                    <HardHat className="h-4 w-4 text-amber-500/60 group-hover:text-amber-400 transition-colors" />
+                    Kiosko de EPP
+                  </div>
+                  <ArrowRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                </button>
+              </Link>
+            </div>
+          </motion.div>
+
+          {/* ARIA Insights */}
+          <motion.div
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.95 }}
+            className="rounded-2xl p-5"
+            style={{ background: 'rgba(212,160,23,0.04)', border: '1px solid rgba(212,160,23,0.12)' }}
+          >
+            <h3 className="text-sm font-bold mb-4 flex items-center gap-2" style={{color:'rgba(212,160,23,0.9)'}}>
+              <Bot className="h-4 w-4" />
+              ARIA · Análisis IA
+            </h3>
+
+            <div className="space-y-3">
+              <div className="p-4 rounded-xl" style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)'}}>
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="h-3.5 w-3.5 text-red-400" />
+                  <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Pronóstico de Stock</span>
                 </div>
+                <p className="text-sm text-white/60 leading-snug">
+                  {insights.lowStockItem
+                    ? <><span className="text-red-400 font-semibold">{insights.lowStockItem.name}</span> — solo quedan <span className="font-bold text-white/80">{insights.lowStockItem.stock}</span> unidades. Reabastece pronto.</>
+                    : <><span className="text-emerald-400 font-semibold">Todos los artículos</span> tienen stock saludable.</>
+                  }
+                </p>
               </div>
-            </Card>
+
+              <div className="p-4 rounded-xl" style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)'}}>
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                  <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Área Top</span>
+                </div>
+                <p className="text-sm text-white/60 leading-snug">
+                  {insights.topArea
+                    ? <>Área <span className="text-emerald-400 font-semibold">{insights.topArea.area}</span> lidera con <span className="font-bold text-white/80">{insights.topArea.count}</span> dotaciones.</>
+                    : <>Sin suficientes datos para análisis de área.</>
+                  }
+                </p>
+              </div>
+            </div>
           </motion.div>
         </div>
       </div>
     </div>
   );
-}
-
-function Loader2({ className }: { className?: string }) {
-  return <Activity className={className} />;
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { Button } from './ui/button';
-import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X, HardHat } from 'lucide-react';
+import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X, HardHat, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
@@ -29,9 +29,7 @@ export function NavBar() {
   }, []);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      setMobileOpen(false);
-    }, 0);
+    const timeout = window.setTimeout(() => setMobileOpen(false), 0);
     return () => window.clearTimeout(timeout);
   }, [pathname]);
 
@@ -41,29 +39,33 @@ export function NavBar() {
     <>
       <header className={`sticky top-0 z-40 transition-all duration-500 ${
         scrolled
-          ? 'bg-white/85 backdrop-blur-2xl border-b border-slate-100/80 shadow-lg shadow-slate-200/20'
-          : 'bg-white/60 backdrop-blur-xl border-b border-transparent'
+          ? 'navbar-glass shadow-2xl shadow-black/40'
+          : 'bg-transparent'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between gap-4">
+
+            {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group relative shrink-0" aria-label="Ir al dashboard de AssetGuard">
               <div className="relative">
-                <div className="absolute inset-0 bg-femsa-red rounded-2xl blur-md opacity-0 group-hover:opacity-30 transition-opacity duration-500" />
-                <div className="relative h-10 w-10 rounded-2xl bg-femsa-red flex items-center justify-center shadow-lg shadow-red-200 group-hover:shadow-red-300 transition-all group-hover:scale-110 active:scale-95 group-hover:rotate-3">
-                  <ShieldCheck className="h-6 w-6 text-white" />
+                <div className="absolute inset-0 bg-red-600 rounded-xl blur-lg opacity-0 group-hover:opacity-50 transition-opacity duration-500" />
+                <div className="relative h-9 w-9 rounded-xl bg-gradient-to-br from-[#F40009] to-[#8B0006] flex items-center justify-center shadow-lg shadow-red-900/50 group-hover:scale-110 active:scale-95 transition-all duration-300">
+                  <ShieldCheck className="h-5 w-5 text-white" />
                 </div>
               </div>
               <div className="hidden sm:block">
-                <span className="font-black text-slate-900 text-lg leading-none block tracking-tighter uppercase">AssetGuard</span>
-                <span className="text-[10px] text-femsa-red font-black tracking-[0.15em] uppercase leading-none mt-0.5 flex items-center gap-1.5">
+                <span className="font-black text-white text-base leading-none block tracking-tight">AssetGuard</span>
+                <span className="text-[9px] font-bold tracking-[0.15em] uppercase leading-none mt-0.5 flex items-center gap-1" style={{color: 'rgba(244,0,9,0.7)'}}>
                   Coca-Cola FEMSA
-                  <span className="text-[8px] text-slate-400 font-bold tracking-widest">· Corporativo</span>
+                  <span className="text-[8px] font-bold" style={{color:'rgba(255,255,255,0.25)'}}>· EPP</span>
                 </span>
               </div>
             </Link>
 
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-              <nav className="hidden lg:flex items-center bg-slate-50/80 rounded-2xl p-1 gap-1 backdrop-blur-sm border border-slate-100/50" aria-label="Navegación principal">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+
+              {/* Desktop Nav */}
+              <nav className="hidden lg:flex items-center gap-1 p-1 rounded-xl" style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)'}} aria-label="Navegación principal">
                 {NAV_LINKS.map(link => {
                   const isActive = pathname === link.href;
                   return (
@@ -71,20 +73,21 @@ export function NavBar() {
                       key={link.href}
                       href={link.href}
                       aria-current={isActive ? 'page' : undefined}
-                      className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all duration-300 ${
+                      className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
                         isActive
-                          ? 'bg-white text-[#F40009] shadow-md border border-slate-100 scale-105'
-                          : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+                          ? 'text-white shadow-lg'
+                          : 'text-white/40 hover:text-white/80 hover:bg-white/5'
                       }`}
+                      style={isActive ? {background: 'rgba(244,0,9,0.15)', border: '1px solid rgba(244,0,9,0.25)'} : {}}
                     >
-                      <span className={`transition-colors duration-300 ${isActive ? 'text-[#F40009]' : 'text-slate-400'}`}>
+                      <span className={`transition-colors duration-300 ${isActive ? 'text-[#F40009]' : ''}`}>
                         {link.icon}
                       </span>
                       {link.label}
                       {isActive && (
                         <motion.div
                           layoutId="nav-active-indicator"
-                          className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-[#F40009]"
+                          className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-[#F40009]"
                           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                         />
                       )}
@@ -93,70 +96,78 @@ export function NavBar() {
                 })}
               </nav>
 
+              {/* External links */}
               <Link href="/portal" target="_blank">
-                <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-2 text-gray-500 hover:text-[#F40009] hover:bg-red-50 rounded-xl font-bold transition-all duration-300">
+                <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-1.5 text-white/35 hover:text-white/70 hover:bg-white/5 rounded-lg font-semibold transition-all text-xs">
                   <ExternalLink className="h-3.5 w-3.5" />
                   Portal
                 </Button>
               </Link>
 
               <Link href="/kiosko" target="_blank">
-                <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-xl font-bold transition-all duration-300">
+                <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-1.5 text-white/35 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg font-semibold transition-all text-xs">
                   <HardHat className="h-3.5 w-3.5" />
                   Kiosko
                 </Button>
               </Link>
 
-              <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-femsa-red/10 border border-femsa-red/20">
-                <div className="w-2 h-2 rounded-full bg-femsa-red animate-pulse" />
-                <span className="text-femsa-red text-[9px] font-black uppercase tracking-widest">Coca-Cola FEMSA</span>
-              </div>
-
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-femsa-gold/10 border border-femsa-gold/20 rounded-xl group cursor-default hover:bg-femsa-gold/15 transition-colors duration-300">
+              {/* ARIA status */}
+              <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{background:'rgba(212,160,23,0.08)', border:'1px solid rgba(212,160,23,0.15)'}}>
                 <div className="relative">
-                  <Bot className="h-4 w-4 text-femsa-gold group-hover:rotate-12 transition-transform duration-300" />
-                  <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-green-500 rounded-full border border-white" />
+                  <Bot className="h-3.5 w-3.5" style={{color:'#D4A017'}} />
+                  <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-emerald-500 rounded-full border border-[#040813]" />
                 </div>
-                <span className="text-[10px] font-black text-femsa-gold uppercase tracking-tight">ARIA IA</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider" style={{color:'#D4A017'}}>ARIA</span>
               </div>
 
-              <div className="hidden sm:flex items-center gap-2 pl-2">
+              {/* Live indicator */}
+              <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-lg" style={{background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.12)'}}>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Live</span>
+              </div>
+
+              {/* User profile */}
+              <div className="hidden sm:flex items-center gap-2 pl-1">
                 <div className="hidden xl:flex flex-col items-end">
-                  <span className="text-xs font-bold text-gray-900 truncate max-w-[120px]">
-                    {authUser?.displayName || 'Administrador'}
+                  <span className="text-xs font-semibold text-white/70 truncate max-w-[100px]">
+                    {authUser?.displayName?.split(' ')[0] || 'Admin'}
                   </span>
-                  <span className="text-[9px] text-green-600 font-bold uppercase tracking-tighter">
-                    {isAdmin ? 'Modo Admin' : 'Editor'}
+                  <span className="text-[9px] font-bold uppercase tracking-wider" style={{color:'rgba(16,185,129,0.8)'}}>
+                    {isAdmin ? 'Admin' : 'Editor'}
                   </span>
                 </div>
                 {authUser?.photoURL ? (
                   <img
                     src={authUser.photoURL}
                     alt="Perfil"
-                    className="h-8 w-8 rounded-full border-2 border-white shadow-sm ring-1 ring-gray-100 hover:ring-red-200 transition-all"
+                    className="h-8 w-8 rounded-full ring-2 ring-white/10 hover:ring-red-500/40 transition-all"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="h-8 w-8 rounded-full bg-red-50 flex items-center justify-center text-red-600 text-xs font-bold border-2 border-white shadow-sm ring-1 ring-red-100">
+                  <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ring-2 ring-white/10" style={{background:'rgba(244,0,9,0.15)', color:'#F40009'}}>
                     {authUser?.email?.charAt(0).toUpperCase() || 'A'}
                   </div>
                 )}
-                <div className="h-8 w-px bg-slate-100 mx-2 hidden sm:block" />
+                <div className="h-6 w-px mx-1" style={{background:'rgba(255,255,255,0.08)'}} />
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={logOut}
                   aria-label="Cerrar sesión"
-                  className="h-10 w-10 text-slate-400 hover:text-[#F40009] hover:bg-red-50 rounded-xl transition-all"
+                  className="h-8 w-8 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                 >
-                  <LogOut className="h-5 w-5" />
+                  <LogOut className="h-4 w-4" />
                 </Button>
               </div>
 
+              {/* Mobile toggle */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden h-10 w-10 rounded-xl text-slate-600 hover:text-[#F40009] hover:bg-red-50"
+                className="lg:hidden h-9 w-9 rounded-lg text-white/40 hover:text-white hover:bg-white/5"
                 onClick={() => setMobileOpen(open => !open)}
                 aria-expanded={mobileOpen}
                 aria-controls="mobile-navigation"
@@ -169,25 +180,27 @@ export function NavBar() {
         </div>
       </header>
 
+      {/* Mobile menu */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
             onClick={() => setMobileOpen(false)}
           >
             <motion.div
               id="mobile-navigation"
-              initial={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0, y: -16 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              exit={{ opacity: 0, y: -16 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="absolute top-16 left-0 right-0 bg-white/95 backdrop-blur-2xl border-b border-slate-100 shadow-2xl shadow-slate-200/30 p-6"
+              className="absolute top-16 left-0 right-0 shadow-2xl shadow-black/60 p-4"
+              style={{background:'rgba(4,8,19,0.97)', backdropFilter:'blur(24px)', borderBottom:'1px solid rgba(255,255,255,0.06)'}}
               onClick={e => e.stopPropagation()}
             >
-              <nav className="space-y-2" aria-label="Navegación móvil">
+              <nav className="space-y-1" aria-label="Navegación móvil">
                 {NAV_LINKS.map(link => {
                   const isActive = pathname === link.href;
                   return (
@@ -195,56 +208,44 @@ export function NavBar() {
                       key={link.href}
                       href={link.href}
                       aria-current={isActive ? 'page' : undefined}
-                      className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-base font-black transition-all ${
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
                         isActive
-                          ? 'bg-red-50 text-[#F40009] border border-red-100'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          ? 'text-white'
+                          : 'text-white/40 hover:text-white/80 hover:bg-white/5'
                       }`}
+                      style={isActive ? {background:'rgba(244,0,9,0.12)', border:'1px solid rgba(244,0,9,0.2)'} : {}}
                     >
-                      <span className={isActive ? 'text-[#F40009]' : 'text-slate-400'}>{link.icon}</span>
+                      <span className={isActive ? 'text-[#F40009]' : 'text-white/30'}>{link.icon}</span>
                       {link.label}
                     </Link>
                   );
                 })}
-                <Link
-                  href="/portal"
-                  target="_blank"
-                  className="flex items-center gap-4 px-6 py-4 rounded-2xl text-base font-bold text-slate-500 hover:bg-slate-50 transition-all"
-                >
-                  <ExternalLink className="h-4 w-4 text-slate-400" />
+                <Link href="/portal" target="_blank" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-white/40 hover:text-white/70 hover:bg-white/5 transition-all">
+                  <ExternalLink className="h-4 w-4 text-white/25" />
                   Portal del Colaborador
                 </Link>
-                <Link
-                  href="/kiosko"
-                  target="_blank"
-                  className="flex items-center gap-4 px-6 py-4 rounded-2xl text-base font-bold text-slate-500 hover:bg-amber-50 hover:text-amber-700 transition-all"
-                >
-                  <HardHat className="h-4 w-4 text-amber-500" />
+                <Link href="/kiosko" target="_blank" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-white/40 hover:text-amber-400 hover:bg-amber-500/10 transition-all">
+                  <HardHat className="h-4 w-4 text-amber-500/50" />
                   Kiosko de EPP
                 </Link>
               </nav>
 
-              <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between gap-4">
+              <div className="mt-4 pt-4 flex items-center justify-between gap-4" style={{borderTop:'1px solid rgba(255,255,255,0.06)'}}>
                 <div className="flex items-center gap-3 min-w-0">
                   {authUser?.photoURL ? (
-                    <img src={authUser.photoURL} alt="Perfil" className="h-10 w-10 rounded-full border-2 border-white shadow-sm ring-1 ring-slate-100" referrerPolicy="no-referrer" />
+                    <img src={authUser.photoURL} alt="Perfil" className="h-9 w-9 rounded-full ring-2 ring-white/10" referrerPolicy="no-referrer" />
                   ) : (
-                    <div className="h-10 w-10 rounded-full bg-red-50 flex items-center justify-center text-red-600 font-bold border-2 border-white shadow-sm">
+                    <div className="h-9 w-9 rounded-full flex items-center justify-center font-bold ring-2 ring-white/10 text-sm" style={{background:'rgba(244,0,9,0.15)', color:'#F40009'}}>
                       {authUser?.email?.charAt(0).toUpperCase() || 'A'}
                     </div>
                   )}
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate">{authUser?.displayName || 'Admin'}</p>
-                    <p className="text-xs text-green-600 font-bold">{isAdmin ? 'Admin' : 'Editor'}</p>
+                    <p className="text-sm font-semibold text-white/80 truncate">{authUser?.displayName || 'Admin'}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider" style={{color:'rgba(16,185,129,0.7)'}}>{isAdmin ? 'Admin' : 'Editor'}</p>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={logOut}
-                  className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl shrink-0"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
+                <Button variant="ghost" size="sm" onClick={logOut} className="text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg shrink-0 text-xs">
+                  <LogOut className="h-4 w-4 mr-1.5" />
                   Salir
                 </Button>
               </div>

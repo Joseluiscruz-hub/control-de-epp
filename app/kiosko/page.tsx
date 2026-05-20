@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getEmployeeById } from "@/lib/kiosk-api";
-import { Loader2, HardHat } from "lucide-react";
+import { Loader2, HardHat, ShieldCheck } from "lucide-react";
 import { clearKioskSession } from "@/lib/kiosk-session";
 import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
 
@@ -17,14 +17,14 @@ function getKioskConnectionErrorMessage(error: unknown) {
       : "";
 
   if (code === "permission-denied") {
-    return "El kiosko no tiene permisos en Firebase. Despliega firestore.rules y sincroniza el empleado desde el panel de Empleados.";
+    return "El kiosko no tiene permisos. Sincroniza desde el panel de Empleados.";
   }
 
   if (code === "unavailable") {
-    return "No hay conexión con Firebase. Revisa internet o intenta de nuevo.";
+    return "No hay conexión con el servidor corporativo.";
   }
 
-  return "Error de conexión. Intenta de nuevo.";
+  return "Error de autenticación. Intenta de nuevo.";
 }
 
 export default function KioskoHomePage() {
@@ -57,7 +57,7 @@ export default function KioskoHomePage() {
         return;
       }
       if (!emp.active) {
-        setError("Este empleado está inactivo. Contacta a Recursos Humanos.");
+        setError("Colaborador inactivo. Contacta a Seguridad Industrial.");
         setLoading(false);
         return;
       }
@@ -68,13 +68,11 @@ export default function KioskoHomePage() {
       sessionStorage.setItem("kiosk_first_login", String(Boolean(emp.firstLogin)));
       sessionStorage.setItem("kiosk_terms_accepted", String(Boolean(emp.termsAccepted)));
 
-      // 1. Si es un empleado nuevo, lo mandamos a que lea los términos y cree su PIN
       if (emp.firstLogin || !emp.termsAccepted) {
         router.push("/kiosko/setup");
         return;
       }
 
-      // 2. Si ya es un empleado registrado, lo mandamos a la pantalla de LOGIN a que ponga su PIN
       router.push("/kiosko/login");
     } catch (error) {
       console.error("[Kiosko employee lookup error]", error);
@@ -84,32 +82,43 @@ export default function KioskoHomePage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-10 px-8 py-16">
-      <div className="flex flex-col items-center gap-4 text-center">
-        <div className="w-20 h-20 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center">
-          <HardHat size={44} className="text-amber-400" />
+    <div className="flex-1 flex flex-col items-center justify-center gap-10 px-8 py-16 relative overflow-hidden bg-[#040813]">
+      {/* ── Background Elements ──────────────── */}
+      <div className="absolute inset-0 pointer-events-none">
+         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-500/5 rounded-full blur-[120px]" />
+         <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,black_40%,transparent_100%)]" />
+      </div>
+
+      <div className="flex flex-col items-center gap-4 text-center relative z-10">
+        <div className="w-24 h-24 rounded-[2rem] bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shadow-[0_0_40px_rgba(245,158,11,0.2)] mb-2">
+          <HardHat size={48} className="text-amber-500" />
         </div>
-        <h1 className="text-3xl font-bold text-white">Solicitud de EPP</h1>
-        <p className="text-gray-400 max-w-sm text-lg">
-          Ingresa tu número de empleado para comenzar
+        <h1 className="text-4xl font-black text-white tracking-tight uppercase">Kiosko EPP</h1>
+        <div className="flex items-center gap-2 text-amber-500 font-bold text-[10px] tracking-widest uppercase">
+          <ShieldCheck className="h-4 w-4" /> Coca-Cola FEMSA
+        </div>
+        <p className="text-white/50 max-w-sm text-sm font-medium mt-2">
+          Ingresa tu número de nómina corporativa para acceder a tu dotación.
         </p>
       </div>
 
-      <div className="w-full max-w-sm flex flex-col gap-4">
-        <input
-          type="tel"
-          inputMode="numeric"
-          placeholder="Ej. 1881"
-          value={empId}
-          onChange={e => setEmpId(e.target.value.replace(/\D/g, ""))}
-          onKeyDown={e => e.key === "Enter" && handleContinue()}
-          className="w-full text-center text-3xl font-bold tracking-widest bg-gray-800 border-2 border-gray-600 focus:border-amber-400 rounded-2xl px-6 py-5 text-white outline-none transition-colors placeholder:text-gray-600"
-          maxLength={10}
-          autoFocus
-        />
+      <div className="w-full max-w-sm flex flex-col gap-5 relative z-10">
+        <div className="relative">
+          <input
+            type="tel"
+            inputMode="numeric"
+            placeholder="Ej. 1881"
+            value={empId}
+            onChange={e => setEmpId(e.target.value.replace(/\D/g, ""))}
+            onKeyDown={e => e.key === "Enter" && handleContinue()}
+            className="w-full text-center text-4xl font-black tracking-widest bg-white/5 border border-white/10 focus:border-amber-500 focus:bg-white/10 rounded-2xl px-6 py-6 text-white outline-none transition-all placeholder:text-white/20 shadow-inner"
+            maxLength={10}
+            autoFocus
+          />
+        </div>
 
         {error && (
-          <p className="text-red-400 text-center text-base bg-red-900/20 border border-red-500/30 rounded-xl px-4 py-3">
+          <p className="text-red-400 text-center text-sm font-bold bg-[#F40009]/10 border border-[#F40009]/20 rounded-xl px-4 py-4 uppercase tracking-wider">
             {error}
           </p>
         )}
@@ -117,14 +126,15 @@ export default function KioskoHomePage() {
         <button
           onClick={handleContinue}
           disabled={!empId.trim() || loading}
-          className="w-full py-5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-gray-900 font-bold text-xl transition-colors flex items-center justify-center gap-3"
+          className="w-full py-6 rounded-2xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-[#040813] font-black text-xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] flex items-center justify-center gap-3 uppercase tracking-widest"
         >
-          {loading ? <Loader2 size={24} className="animate-spin" /> : "Continuar →"}
+          {loading ? <Loader2 size={28} className="animate-spin" /> : "Validar Nómina"}
         </button>
       </div>
 
-      {/* Teclado numérico visual táctil */}
-      <NumPad value={empId} onChange={setEmpId} onConfirm={handleContinue} />
+      <div className="relative z-10 w-full max-w-sm flex justify-center mt-4">
+        <NumPad value={empId} onChange={setEmpId} onConfirm={handleContinue} />
+      </div>
     </div>
   );
 }
@@ -142,17 +152,17 @@ function NumPad({
   };
 
   return (
-    <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
+    <div className="grid grid-cols-3 gap-3 w-full">
       {keys.map(k => (
         <button
           key={k}
           onClick={() => press(k)}
-          className={`h-16 rounded-xl text-2xl font-bold transition-all active:scale-95 select-none
+          className={`h-16 rounded-2xl text-2xl font-black transition-all active:scale-95 select-none
             ${k === "✓"
-              ? "bg-amber-400 text-gray-900 hover:bg-amber-300"
+              ? "bg-amber-500 text-[#040813] hover:bg-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
               : k === "⌫"
-              ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
-              : "bg-gray-800 text-white hover:bg-gray-700 border border-gray-700"
+              ? "bg-[#F40009]/20 text-[#F40009] border border-[#F40009]/30 hover:bg-[#F40009]/30"
+              : "bg-white/5 text-white hover:bg-white/10 border border-white/10 hover:border-white/20"
             }`}
         >
           {k}

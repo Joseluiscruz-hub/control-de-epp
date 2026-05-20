@@ -8,7 +8,7 @@
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
     /* Coca-Cola FEMSA Brand Colors */
-    --color-femsa-red: #DA291C;
+    --color-femsa-red: #F40009;
     --color-femsa-red-dark: #B01E13;
     --color-coca-cola-red: #F40009;
     --color-femsa-black: #000000;
@@ -16,9 +16,12 @@
     --color-femsa-gold: #D4A017;
     --color-femsa-gold-light: #F5C842;
     /* Corporate Dark Theme */
-    --color-corporate-dark: #0F172A;
-    --color-corporate-slate: #1E293B;
-    --color-corporate-card: #1C2333;
+    --color-corporate-dark: #040813;
+    --color-corporate-slate: #0A1628;
+    --color-corporate-card: #0D1B2E;
+    --color-surface: rgba(255,255,255,0.04);
+    --color-surface-hover: rgba(255,255,255,0.07);
+    --color-border-subtle: rgba(255,255,255,0.08);
     /* Standard tokens */
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -61,118 +64,166 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-    --brand-red: #F40009;
-    --brand-dark: #0a0a0a;
-    /* Coca-Cola FEMSA Brand System */
-    --femsa-red: #DA291C;
+    /* Dark premium theme as default */
+    --background: #040813;
+    --foreground: #F8FAFC;
+    --card: rgba(255,255,255,0.04);
+    --card-foreground: #F8FAFC;
+    --popover: #0D1B2E;
+    --popover-foreground: #F8FAFC;
+    --primary: #F40009;
+    --primary-foreground: #FFFFFF;
+    --secondary: rgba(255,255,255,0.06);
+    --secondary-foreground: #F8FAFC;
+    --muted: rgba(255,255,255,0.05);
+    --muted-foreground: rgba(248,250,252,0.5);
+    --accent: rgba(244,0,9,0.1);
+    --accent-foreground: #F40009;
+    --destructive: #F40009;
+    --border: rgba(255,255,255,0.08);
+    --input: rgba(255,255,255,0.06);
+    --ring: rgba(244,0,9,0.4);
+    --chart-1: #F40009;
+    --chart-2: #D4A017;
+    --chart-3: #10B981;
+    --chart-4: #3B82F6;
+    --chart-5: #8B5CF6;
+    --radius: 0.75rem;
+    --sidebar: #0A1628;
+    --sidebar-foreground: #F8FAFC;
+    --sidebar-primary: #F40009;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: rgba(244,0,9,0.1);
+    --sidebar-accent-foreground: #F40009;
+    --sidebar-border: rgba(255,255,255,0.06);
+    --sidebar-ring: rgba(244,0,9,0.4);
+    /* FEMSA Brand System */
+    --femsa-red: #F40009;
     --femsa-red-dark: #B01E13;
     --femsa-gold: #D4A017;
     --femsa-gold-light: #F5C842;
-    --femsa-black: #000000;
+    --femsa-black: #040813;
     --brand-primary: var(--femsa-red);
     --brand-accent: var(--femsa-gold);
-    /* Glass Morphism Premium */
-    --glass-bg: rgba(255, 255, 255, 0.08);
-    --glass-border: rgba(218, 41, 28, 0.15);
-    --glass-glow: rgba(218, 41, 28, 0.08);
-}
-
-.dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    /* Glass System */
+    --glass-bg: rgba(255, 255, 255, 0.04);
+    --glass-bg-hover: rgba(255, 255, 255, 0.07);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-border-accent: rgba(244, 0, 9, 0.2);
+    --glass-glow: rgba(244, 0, 9, 0.08);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
-    @apply bg-background text-foreground;
-    }
+    background-color: #040813;
+    color: #F8FAFC;
+    @apply antialiased;
+  }
   html {
     @apply font-sans scroll-smooth;
-    }
+  }
 }
 
 @layer utilities {
-  .glass-card {
-    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
-  }
-  
-  .glass-card-dark {
-    @apply bg-slate-900/40 backdrop-blur-xl border border-white/10 shadow-2xl;
+
+  /* ── Dark Premium Background ─────────────── */
+  .mesh-bg {
+    background-color: #040813;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(244,0,9,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(212,160,23,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 10% 80%, rgba(244,0,9,0.06) 0%, transparent 50%);
+    position: relative;
+    min-height: 100vh;
   }
 
+  /* Dot grid pattern */
+  .mesh-bg::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+  }
+
+  /* Mouse glow overlay */
+  .mesh-bg::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(500px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(244,0,9,0.04), transparent 40%);
+    pointer-events: none;
+    z-index: 0;
+    transition: background 0.4s ease;
+  }
+
+  /* ── Premium Glass Cards ─────────────────── */
+  .glass-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+
+  .glass-card-accent {
+    background: rgba(244,0,9,0.05);
+    border: 1px solid rgba(244,0,9,0.15);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 4px 24px rgba(244,0,9,0.08), inset 0 1px 0 rgba(244,0,9,0.06);
+  }
+
+  .glass-card-gold {
+    background: rgba(212,160,23,0.05);
+    border: 1px solid rgba(212,160,23,0.15);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 4px 24px rgba(212,160,23,0.08), inset 0 1px 0 rgba(212,160,23,0.06);
+  }
+
+  /* ── KPI Cards ───────────────────────────── */
+  .kpi-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    backdrop-filter: blur(24px);
+    border-radius: 1.5rem;
+    transition: all 0.4s cubic-bezier(0.22,1,0.36,1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .kpi-card:hover {
+    background: rgba(255,255,255,0.055);
+    border-color: rgba(244,0,9,0.2);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(244,0,9,0.06);
+  }
+
+  /* ── Shimmer ─────────────────────────────── */
   .shimmer {
     background: linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0.2) 50%,
-      rgba(255, 255, 255, 0) 100%
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.04) 50%,
+      rgba(255,255,255,0) 100%
     );
     background-size: 200% 100%;
-    animation: shimmer 2s infinite linear;
+    animation: shimmer 2.5s infinite linear;
   }
 
   @keyframes shimmer {
@@ -180,119 +231,160 @@
     100% { background-position: 200% 0; }
   }
 
-  /* Premium animated mesh background */
-  .mesh-bg {
-    background-color: #f8f9fb;
-    background-image: 
-      radial-gradient(at 10% 20%, rgba(244,0,9,0.04) 0px, transparent 50%),
-      radial-gradient(at 90% 10%, rgba(15,23,42,0.04) 0px, transparent 50%),
-      radial-gradient(at 80% 90%, rgba(244,0,9,0.03) 0px, transparent 50%),
-      radial-gradient(at 10% 80%, rgba(15,23,42,0.03) 0px, transparent 50%);
-    position: relative;
+  /* ── Aurora animated background light ───── */
+  @keyframes aurora-1 {
+    0%, 100% { transform: translate(-20%, -20%) scale(1.2); opacity: 0.15; }
+    50% { transform: translate(20%, 10%) scale(0.9); opacity: 0.08; }
+  }
+  @keyframes aurora-2 {
+    0%, 100% { transform: translate(20%, 20%) scale(0.9); opacity: 0.1; }
+    50% { transform: translate(-10%, -20%) scale(1.3); opacity: 0.06; }
   }
 
-  .mesh-bg::before {
-    content: '';
+  .aurora-1 {
     position: fixed;
-    inset: 0;
-    background: 
-      radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(244,0,9,0.03), transparent 40%);
+    top: -20%;
+    left: -10%;
+    width: 60vw;
+    height: 60vh;
+    background: radial-gradient(ellipse, rgba(244,0,9,0.18) 0%, transparent 70%);
+    animation: aurora-1 15s ease-in-out infinite;
     pointer-events: none;
     z-index: 0;
-    transition: background 0.3s ease;
+    filter: blur(60px);
   }
 
-  /* Animated gradient border */
-  .gradient-border {
-    position: relative;
-    border-radius: 2rem;
-    overflow: hidden;
-  }
-
-  .gradient-border::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    padding: 2px;
-    border-radius: inherit;
-    background: linear-gradient(135deg, #F40009, #0f172a, #F40009);
-    background-size: 300% 300%;
-    animation: gradient-rotate 6s ease infinite;
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask-composite: exclude;
-    -webkit-mask-composite: xor;
+  .aurora-2 {
+    position: fixed;
+    bottom: -20%;
+    right: -10%;
+    width: 50vw;
+    height: 50vh;
+    background: radial-gradient(ellipse, rgba(212,160,23,0.1) 0%, transparent 70%);
+    animation: aurora-2 20s ease-in-out infinite;
     pointer-events: none;
+    z-index: 0;
+    filter: blur(80px);
   }
 
-  @keyframes gradient-rotate {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-  }
-
-  /* Floating particles */
-  .floating-particle {
-    position: absolute;
-    border-radius: 9999px;
-    pointer-events: none;
-    opacity: 0;
-    animation: float-up 8s infinite;
-  }
-
-  @keyframes float-up {
-    0% { transform: translateY(100vh) scale(0); opacity: 0; }
-    10% { opacity: 0.6; }
-    90% { opacity: 0.6; }
-    100% { transform: translateY(-10vh) scale(1); opacity: 0; }
-  }
-
-  /* Counter animation */
-  .counter-animate {
-    animation: count-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  }
-
-  @keyframes count-in {
-    from { transform: translateY(100%); opacity: 0; filter: blur(4px); }
-    to { transform: translateY(0); opacity: 1; filter: blur(0); }
-  }
-
-  /* Pulse ring effect */
-  .pulse-ring::after {
-    content: '';
-    position: absolute;
-    inset: -4px;
-    border-radius: inherit;
-    border: 2px solid currentColor;
-    opacity: 0;
-    animation: pulse-ring 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-  }
-
-  @keyframes pulse-ring {
-    0% { transform: scale(1); opacity: 0.4; }
-    100% { transform: scale(1.3); opacity: 0; }
-  }
-
-  /* Glow effect */
-  .glow-red {
-    box-shadow: 0 0 20px rgba(244, 0, 9, 0.15), 0 0 60px rgba(244, 0, 9, 0.05);
-  }
-
-  .glow-red-hover:hover {
-    box-shadow: 0 0 30px rgba(244, 0, 9, 0.25), 0 0 80px rgba(244, 0, 9, 0.1);
-  }
-
-  /* Text gradient */
+  /* ── Text Styles ─────────────────────────── */
   .text-gradient-red {
-    background: linear-gradient(135deg, #F40009, #dc2626);
+    background: linear-gradient(135deg, #F40009 0%, #FF4444 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
-  /* Skeleton loading */
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #D4A017 0%, #F5C842 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-white {
+    background: linear-gradient(135deg, #FFFFFF 0%, rgba(255,255,255,0.6) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ── Glow Effects ────────────────────────── */
+  .glow-red {
+    box-shadow: 0 0 30px rgba(244,0,9,0.2), 0 0 80px rgba(244,0,9,0.06);
+  }
+
+  .glow-red-hover:hover {
+    box-shadow: 0 0 40px rgba(244,0,9,0.3), 0 0 100px rgba(244,0,9,0.1);
+  }
+
+  .glow-gold {
+    box-shadow: 0 0 30px rgba(212,160,23,0.2), 0 0 80px rgba(212,160,23,0.06);
+  }
+
+  .kpi-femsa-glow {
+    text-shadow: 0 0 30px rgba(244,0,9,0.5);
+    color: #F40009;
+  }
+
+  .kpi-gold-glow {
+    text-shadow: 0 0 30px rgba(212,160,23,0.5);
+    color: #D4A017;
+  }
+
+  .kpi-white-glow {
+    text-shadow: 0 0 20px rgba(255,255,255,0.2);
+  }
+
+  /* ── Counter animation ───────────────────── */
+  .counter-animate {
+    animation: count-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @keyframes count-in {
+    from { transform: translateY(20px); opacity: 0; filter: blur(4px); }
+    to { transform: translateY(0); opacity: 1; filter: blur(0); }
+  }
+
+  /* ── Stagger entrance ────────────────────── */
+  .stagger-in > * {
+    animation: stagger-fade-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  .stagger-in > *:nth-child(1) { animation-delay: 0.05s; }
+  .stagger-in > *:nth-child(2) { animation-delay: 0.12s; }
+  .stagger-in > *:nth-child(3) { animation-delay: 0.19s; }
+  .stagger-in > *:nth-child(4) { animation-delay: 0.26s; }
+  .stagger-in > *:nth-child(5) { animation-delay: 0.33s; }
+  .stagger-in > *:nth-child(6) { animation-delay: 0.40s; }
+
+  @keyframes stagger-fade-in {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Progress / Stock bars ───────────────── */
+  .stock-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .stock-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* ── Pulse ring ──────────────────────────── */
+  .pulse-ring::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: inherit;
+    border: 1.5px solid currentColor;
+    opacity: 0;
+    animation: pulse-ring 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes pulse-ring {
+    0% { transform: scale(1); opacity: 0.4; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+
+  /* ── Skeleton dark ───────────────────────── */
   .skeleton-pulse {
-    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background: linear-gradient(90deg,
+      rgba(255,255,255,0.04) 25%,
+      rgba(255,255,255,0.08) 50%,
+      rgba(255,255,255,0.04) 75%
+    );
     background-size: 200% 100%;
-    animation: skeleton-loading 1.5s ease-in-out infinite;
+    animation: skeleton-loading 1.8s ease-in-out infinite;
+    border-radius: 0.75rem;
   }
 
   @keyframes skeleton-loading {
@@ -300,125 +392,100 @@
     100% { background-position: -200% 0; }
   }
 
-  /* Smooth entrance */
-  .stagger-in > * {
-    animation: stagger-fade-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    opacity: 0;
-    transform: translateY(10px);
-  }
-
-  .stagger-in > *:nth-child(1) { animation-delay: 0.05s; }
-  .stagger-in > *:nth-child(2) { animation-delay: 0.1s; }
-  .stagger-in > *:nth-child(3) { animation-delay: 0.15s; }
-  .stagger-in > *:nth-child(4) { animation-delay: 0.2s; }
-  .stagger-in > *:nth-child(5) { animation-delay: 0.25s; }
-  .stagger-in > *:nth-child(6) { animation-delay: 0.3s; }
-
-  @keyframes stagger-fade-in {
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* Premium stock bar */
-  .stock-bar {
-    height: 6px;
-    border-radius: 3px;
-    background: #e2e8f0;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .stock-bar-fill {
-    height: 100%;
-    border-radius: 3px;
-    transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  /* Nav active indicator */
-  .nav-indicator {
+  /* ── Floating particle ───────────────────── */
+  .floating-particle {
     position: absolute;
-    bottom: -1px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 20px;
-    height: 3px;
-    border-radius: 3px;
-    background: #F40009;
-    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    border-radius: 9999px;
+    pointer-events: none;
+    opacity: 0;
+    animation: float-up 10s infinite;
+  }
+
+  @keyframes float-up {
+    0% { transform: translateY(100vh) scale(0); opacity: 0; }
+    10% { opacity: 0.4; }
+    90% { opacity: 0.4; }
+    100% { transform: translateY(-10vh) scale(1); opacity: 0; }
   }
 }
 
-/* ── FEMSA Premium Card ─────────────────────────── */
-.femsa-premium-card {
-  background: linear-gradient(135deg, rgba(218,41,28,0.08) 0%, rgba(0,0,0,0.6) 100%);
-  border: 1px solid rgba(218, 41, 28, 0.25);
-  box-shadow: 0 0 20px rgba(218, 41, 28, 0.12), 0 8px 32px rgba(0,0,0,0.3);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
+/* ── FEMSA Premium Components ─────────────── */
 
 /* Badge Coca-Cola FEMSA */
 .badge-femsa {
-  background: linear-gradient(135deg, #DA291C, #B01E13);
+  background: linear-gradient(135deg, #F40009, #B01E13);
   color: white;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-size: 0.65rem;
-  padding: 3px 10px;
+  font-size: 0.6rem;
+  padding: 4px 12px;
   border-radius: 999px;
-  box-shadow: 0 2px 10px rgba(218,41,28,0.4);
-}
-
-/* Línea decorativa roja FEMSA */
-.femsa-divider {
-  height: 3px;
-  background: linear-gradient(90deg, #DA291C, #F40009, transparent);
-  border: none;
-}
-
-/* Glow rojo en KPIs críticos */
-.kpi-femsa-glow {
-  text-shadow: 0 0 20px rgba(218,41,28,0.6);
-  color: #DA291C;
-}
-
-/* Gold accent for premium KPIs */
-.kpi-gold-glow {
-  text-shadow: 0 0 20px rgba(212,160,23,0.5);
-  color: #D4A017;
+  box-shadow: 0 2px 16px rgba(244,0,9,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
 }
 
 .badge-femsa-gold {
   background: linear-gradient(135deg, #D4A017, #F5C842);
-  color: #0F172A;
+  color: #040813;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-size: 0.65rem;
-  padding: 3px 10px;
+  font-size: 0.6rem;
+  padding: 4px 12px;
   border-radius: 999px;
-  box-shadow: 0 2px 10px rgba(212,160,23,0.35);
+  box-shadow: 0 2px 16px rgba(212,160,23,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
 }
 
-/* Premium scrollbar */
-.custom-scroll::-webkit-scrollbar,
+/* Línea decorativa FEMSA */
+.femsa-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(244,0,9,0.4), rgba(212,160,23,0.2), transparent);
+  border: none;
+}
+
+/* Premium card border top accent */
+.card-accent-top {
+  position: relative;
+}
+
+.card-accent-top::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(244,0,9,0.5), transparent);
+  border-radius: inherit;
+}
+
+/* ── Navbar ─────────────────────────────── */
+.navbar-glass {
+  background: rgba(4,8,19,0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ── Premium scrollbar ───────────────────── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  @apply bg-transparent;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-200 rounded-full;
+  background: rgba(255,255,255,0.1);
+  border-radius: 999px;
   transition: background 0.2s;
 }
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-300;
+  background: rgba(244,0,9,0.4);
 }
 
-/* Print styles */
+/* ── Print ───────────────────────────────── */
 @media print {
   .no-print { display: none !important; }
-  body { background: white !important; }
+  body { background: white !important; color: black !important; }
 }

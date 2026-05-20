@@ -6,11 +6,9 @@ import {
   serverTimestamp, query, increment, writeBatch
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from '@/components/ui/dialog';
@@ -19,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import {
   Package, PackagePlus, Search, AlertTriangle, TrendingDown,
-  Loader2, PackageCheck, Plus, Minus, RefreshCw
+  Loader2, Plus, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -41,7 +39,6 @@ const CATEGORIES = [
 ];
 
 const LOW_STOCK_THRESHOLD = 20;
-const BRAND_RED = "#F40009";
 
 export default function InventarioPage() {
   const [items, setItems] = useState<PpeItem[]>([]);
@@ -49,14 +46,12 @@ export default function InventarioPage() {
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
 
-  // Add item dialog
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     sku: '', name: '', category: '', replacementDays: '', stock: ''
   });
 
-  // Stock adjust dialog
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjustItem, setAdjustItem] = useState<PpeItem | null>(null);
   const [adjustQty, setAdjustQty] = useState('');
@@ -189,9 +184,9 @@ export default function InventarioPage() {
   const outOfStock = items.filter(i => i.stock === 0);
 
   const stockColor = (stock: number) => {
-    if (stock === 0) return 'text-red-700 bg-red-50 border-red-200';
-    if (stock <= LOW_STOCK_THRESHOLD) return 'text-orange-700 bg-orange-50 border-orange-200';
-    return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+    if (stock === 0) return 'text-red-400 bg-red-400/10 border-red-400/20';
+    if (stock <= LOW_STOCK_THRESHOLD) return 'text-orange-400 bg-orange-400/10 border-orange-400/20';
+    return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
   };
 
   const uniqueCategories = Array.from(new Set(items.map(i => i.category)));
@@ -203,76 +198,80 @@ export default function InventarioPage() {
       transition={{ duration: 0.8 }}
       className="space-y-12 pb-20"
     >
-      {/* Header - Industrial Premium */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-white p-12 rounded-[3.5rem] border border-slate-100 shadow-2xl shadow-red-100/30 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-full bg-red-600/5 -mr-20 -skew-x-12" />
+      {/* ── Header ───────────────────────────────── */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 p-12 rounded-[3.5rem] relative overflow-hidden glass-card">
+        <div className="absolute top-0 right-0 w-64 h-full bg-red-600/10 -mr-20 -skew-x-12 blur-2xl" />
         
-        <div className="relative z-10 space-y-3">
-          <div className="flex items-center gap-3 mb-2">
-             <Badge className="bg-red-600 text-white border-none px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest">Catálogo Maestro</Badge>
+        <div className="relative z-10 space-y-4">
+          <div className="flex items-center gap-3">
+             <span className="badge-femsa">Catálogo Maestro</span>
           </div>
-          <h1 className="text-5xl lg:text-6xl font-black tracking-tighter text-slate-950">Inventario <span className="text-red-600">FEMSA</span></h1>
-          <p className="text-slate-400 font-bold text-lg max-w-xl">Control de activos críticos y gestión de suministros de seguridad industrial.</p>
+          <h1 className="text-5xl lg:text-6xl font-black tracking-tighter text-white">
+            Inventario <span className="text-gradient-red">FEMSA</span>
+          </h1>
+          <p className="text-white/50 font-medium text-lg max-w-xl">
+            Control de activos críticos y gestión de suministros de seguridad industrial.
+          </p>
         </div>
         
         <div className="relative z-10">
           <Button
             onClick={() => setAddOpen(true)}
-            className="h-20 px-10 rounded-[2rem] bg-slate-950 hover:bg-[#F40009] text-white shadow-2xl transition-all font-black uppercase tracking-widest text-xs gap-4 active:scale-95 group"
+            className="h-16 px-8 rounded-2xl bg-[#F40009] hover:bg-red-700 text-white shadow-[0_0_20px_rgba(244,0,9,0.3)] transition-all font-bold uppercase tracking-widest text-xs gap-3 group"
           >
-            <PackagePlus className="h-6 w-6 group-hover:rotate-12 transition-transform" />
+            <PackagePlus className="h-5 w-5 group-hover:rotate-12 transition-transform" />
             Añadir Material
           </Button>
         </div>
       </div>
 
-      {/* Corporate Mini Bento */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <Card className="bg-slate-950 p-10 rounded-[3rem] border-none shadow-2xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-8 opacity-10">
+      {/* ── Mini Bento ───────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="kpi-card p-8 group">
+          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
              <Package className="h-20 w-20 text-white" />
           </div>
-          <p className="text-[11px] font-black text-red-500 uppercase tracking-[0.3em] mb-3">Unidades Totales</p>
-          <p className="text-6xl font-black text-white tracking-tighter">{totalStock.toLocaleString()}</p>
-        </Card>
+          <p className="text-[11px] font-black text-white/40 uppercase tracking-[0.3em] mb-2">Unidades Totales</p>
+          <p className="text-5xl font-black text-white tracking-tighter">{totalStock.toLocaleString()}</p>
+        </div>
         
-        <Card className="bg-white p-10 rounded-[3rem] border-none shadow-xl relative overflow-hidden group border border-slate-100">
-          <div className="absolute top-0 right-0 p-8 opacity-10">
-             <TrendingDown className="h-20 w-20 text-red-600" />
+        <div className="kpi-card p-8 group" style={{borderColor: 'rgba(245,158,11,0.2)'}}>
+          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+             <TrendingDown className="h-20 w-20 text-orange-500" />
           </div>
-          <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">Stock Crítico</p>
-          <p className="text-6xl font-black text-red-600 tracking-tighter">{lowStockItems.length}</p>
-        </Card>
+          <p className="text-[11px] font-black text-orange-500/80 uppercase tracking-[0.3em] mb-2">Stock Crítico</p>
+          <p className="text-5xl font-black text-orange-400 tracking-tighter">{lowStockItems.length}</p>
+        </div>
 
-        <Card className="bg-white p-10 rounded-[3rem] border-none shadow-xl relative overflow-hidden group border border-slate-100">
-          <div className="absolute top-0 right-0 p-8 opacity-10">
-             <AlertTriangle className="h-20 w-20 text-slate-900" />
+        <div className="kpi-card p-8 group" style={{borderColor: 'rgba(244,0,9,0.2)'}}>
+          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+             <AlertTriangle className="h-20 w-20 text-red-500" />
           </div>
-          <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">Agotado Total</p>
-          <p className="text-6xl font-black text-slate-950 tracking-tighter">{outOfStock.length}</p>
-        </Card>
+          <p className="text-[11px] font-black text-red-500/80 uppercase tracking-[0.3em] mb-2">Agotado Total</p>
+          <p className="text-5xl font-black text-red-500 tracking-tighter">{outOfStock.length}</p>
+        </div>
       </div>
 
-      {/* Main Catalog View */}
-      <Card className="bg-white rounded-[3.5rem] border-none shadow-2xl overflow-hidden">
-        <div className="p-12 border-b border-slate-50 flex flex-col md:flex-row gap-8">
+      {/* ── Main Catalog View ────────────────────── */}
+      <div className="glass-card rounded-[2.5rem] overflow-hidden">
+        <div className="p-8 border-b border-white/5 flex flex-col md:flex-row gap-4">
             <div className="relative flex-1 group">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-400 group-focus-within:text-red-600 transition-colors" />
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40 group-focus-within:text-[#F40009] transition-colors" />
               <Input 
                 placeholder="Filtrar por nombre o SKU técnico..." 
-                className="pl-16 h-20 bg-slate-50 border-none rounded-[1.5rem] shadow-inner focus-visible:ring-2 focus-visible:ring-red-100 transition-all font-bold text-lg"
+                className="pl-14 h-14 bg-white/5 border-white/10 rounded-2xl focus-visible:ring-[#F40009] transition-all font-medium text-white placeholder:text-white/30"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
             
             <Select value={filterCategory} onValueChange={(v) => setFilterCategory(v || 'all')}>
-              <SelectTrigger className="w-full md:w-[320px] h-20 bg-slate-50 border-none rounded-[1.5rem] shadow-inner font-black text-slate-600 px-8">
+              <SelectTrigger className="w-full md:w-[320px] h-14 bg-white/5 border-white/10 rounded-2xl text-white font-medium px-6">
                 <SelectValue placeholder="Categoría" />
               </SelectTrigger>
-              <SelectContent className="rounded-[1.5rem] border-slate-50 shadow-2xl">
-                <SelectItem value="all" className="font-black">TODAS LAS CATEGORÍAS</SelectItem>
-                {uniqueCategories.map(c => <SelectItem key={c} value={c} className="font-bold">{c.toUpperCase()}</SelectItem>)}
+              <SelectContent className="rounded-2xl bg-[#0A1628] border-white/10 text-white">
+                <SelectItem value="all" className="font-bold text-white/70">TODAS LAS CATEGORÍAS</SelectItem>
+                {uniqueCategories.map(c => <SelectItem key={c} value={c} className="font-medium">{c.toUpperCase()}</SelectItem>)}
               </SelectContent>
             </Select>
         </div>
@@ -280,15 +279,15 @@ export default function InventarioPage() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50/70 text-left">
-                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Especificación</th>
-                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Clasificación</th>
-                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Ciclo Vida</th>
-                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Stock</th>
-                <th className="px-12 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Acciones</th>
+              <tr className="bg-white/5 text-left border-b border-white/10">
+                <th className="px-8 py-6 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Especificación</th>
+                <th className="px-8 py-6 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Clasificación</th>
+                <th className="px-8 py-6 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Ciclo Vida</th>
+                <th className="px-8 py-6 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Stock</th>
+                <th className="px-8 py-6 text-[10px] font-black text-white/40 uppercase tracking-[0.2em] text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-white/5">
               <AnimatePresence mode="popLayout">
                 {filtered.map((item, idx) => (
                   <motion.tr 
@@ -298,51 +297,53 @@ export default function InventarioPage() {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ delay: idx * 0.05 }}
-                    className="group hover:bg-red-50/30 transition-all cursor-default"
+                    className="group hover:bg-white/[0.02] transition-colors cursor-default"
                   >
-                    <td className="px-12 py-10">
-                      <div className="flex items-center gap-6">
-                        <div className="h-16 w-16 rounded-2xl bg-white shadow-md ring-1 ring-slate-100 flex items-center justify-center text-slate-900 font-black text-sm group-hover:bg-[#F40009] group-hover:text-white transition-all duration-500">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/70 font-black text-xs group-hover:bg-[#F40009]/20 group-hover:text-[#F40009] transition-all">
                           {item.sku.slice(0, 3)}
                         </div>
                         <div>
-                          <p className="font-black text-slate-900 text-xl tracking-tight leading-tight">{item.name}</p>
-                          <p className="text-[10px] text-red-600 font-black uppercase tracking-[0.2em] mt-1">ID: {item.sku}</p>
+                          <p className="font-bold text-white text-lg tracking-tight">{item.name}</p>
+                          <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">ID: {item.sku}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-12 py-10">
-                      <Badge className="bg-slate-900 text-white border-none px-4 py-1.5 rounded-xl font-black text-[9px] tracking-widest uppercase">
+                    <td className="px-8 py-6">
+                      <span className="px-3 py-1.5 rounded-lg bg-white/10 text-white font-bold text-[9px] tracking-widest uppercase">
                         {item.category}
-                      </Badge>
+                      </span>
                     </td>
-                    <td className="px-12 py-10">
-                      <div className="flex items-center gap-3 text-slate-500">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-2 text-white/50">
                         <RefreshCw className="h-4 w-4" />
-                        <span className="text-sm font-black">{item.replacementDays} días</span>
+                        <span className="text-sm font-bold">{item.replacementDays} días</span>
                       </div>
                     </td>
-                    <td className="px-12 py-10">
+                    <td className="px-8 py-6">
                       <div className="space-y-2">
-                        <div className={`inline-flex items-center gap-3 px-6 py-2.5 rounded-2xl border-2 font-black text-sm shadow-sm ${stockColor(item.stock)}`}>
-                          {item.stock} <span className="text-[9px] opacity-60 tracking-widest">UNIDADES</span>
+                        <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg border font-bold text-[10px] tracking-widest uppercase ${stockColor(item.stock)}`}>
+                          {item.stock} <span className="opacity-60">UNIDADES</span>
                         </div>
-                        <div className="stock-bar w-32">
+                        <div className="stock-bar w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
                           <div
-                            className={`stock-bar-fill ${item.stock === 0 ? 'bg-red-500' : item.stock <= LOW_STOCK_THRESHOLD ? 'bg-gradient-to-r from-orange-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-emerald-500'}`}
+                            className={`h-full rounded-full transition-all duration-1000 ${
+                              item.stock === 0 ? 'bg-red-500' : item.stock <= LOW_STOCK_THRESHOLD ? 'bg-orange-400' : 'bg-emerald-400'
+                            }`}
                             style={{ width: `${Math.min((item.stock / 100) * 100, 100)}%` }}
                           />
                         </div>
                       </div>
                     </td>
-                    <td className="px-12 py-10 text-right">
+                    <td className="px-8 py-6 text-right">
                       <Button 
                         variant="ghost" 
                         size="icon" 
                         onClick={() => openAdjust(item)}
-                        className="h-14 w-14 rounded-2xl bg-white shadow-md ring-1 ring-slate-100 hover:bg-[#F40009] hover:text-white transition-all group-hover:scale-110"
+                        className="h-10 w-10 rounded-xl bg-white/5 hover:bg-[#F40009] text-white/70 hover:text-white transition-all group-hover:scale-110"
                       >
-                        <Plus className="h-6 w-6" />
+                        <Plus className="h-5 w-5" />
                       </Button>
                     </td>
                   </motion.tr>
@@ -351,74 +352,74 @@ export default function InventarioPage() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
-      {/* Add Item Dialog */}
+      {/* ── Add Item Dialog ──────────────────────── */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-[600px] rounded-[3rem] border-none p-0 overflow-hidden shadow-2xl">
-          <div className="bg-slate-950 p-10 text-white relative">
-             <div className="absolute top-0 right-0 p-8 opacity-20">
-                <PackagePlus className="h-20 w-20" />
+        <DialogContent className="sm:max-w-[600px] rounded-[2rem] border border-white/10 p-0 overflow-hidden bg-[#040813]">
+          <div className="bg-white/5 p-8 relative border-b border-white/10">
+             <div className="absolute top-0 right-0 p-8 opacity-10">
+                <PackagePlus className="h-20 w-20 text-white" />
              </div>
              <DialogHeader>
-                <DialogTitle className="text-3xl font-black tracking-tight uppercase">Alta de Material</DialogTitle>
-                <p className="text-slate-400 font-bold mt-2">Registrar nueva especificación en el catálogo corporativo.</p>
+                <DialogTitle className="text-2xl font-black tracking-tight uppercase text-white">Alta de Material</DialogTitle>
+                <p className="text-white/50 font-medium mt-1">Registrar nueva especificación en el catálogo corporativo.</p>
              </DialogHeader>
           </div>
-          <form onSubmit={handleAdd} className="p-10 space-y-8 bg-white">
+          <form onSubmit={handleAdd} className="p-8 space-y-6">
             <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Código SKU</Label>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Código SKU</Label>
                 <Input 
-                  className="h-14 rounded-2xl bg-slate-50 border-none shadow-inner font-bold" 
+                  className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-bold focus-visible:ring-[#F40009]" 
                   value={form.sku} 
                   onChange={e => setForm({...form, sku: e.target.value.toUpperCase()})}
                   placeholder="Ej: CAS-001"
                 />
               </div>
-              <div className="space-y-3">
-                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Categoría</Label>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Categoría</Label>
                 <Select value={form.category} onValueChange={v => setForm({...form, category: v || ''})}>
-                  <SelectTrigger className="h-14 rounded-2xl bg-slate-50 border-none shadow-inner font-bold">
+                  <SelectTrigger className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-medium">
                     <SelectValue placeholder="Seleccionar..." />
                   </SelectTrigger>
-                  <SelectContent className="rounded-2xl">
+                  <SelectContent className="bg-[#0A1628] border-white/10 text-white rounded-xl">
                     {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="space-y-3">
-              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Nombre Descriptivo</Label>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Nombre Descriptivo</Label>
               <Input 
-                className="h-14 rounded-2xl bg-slate-50 border-none shadow-inner font-bold" 
+                className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-bold focus-visible:ring-[#F40009]" 
                 value={form.name} 
                 onChange={e => setForm({...form, name: e.target.value})}
                 placeholder="Ej: Casco Pro-Vent Red"
               />
             </div>
             <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Vida Útil (Días)</Label>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Vida Útil (Días)</Label>
                 <Input 
                   type="number" 
-                  className="h-14 rounded-2xl bg-slate-50 border-none shadow-inner font-bold" 
+                  className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-bold focus-visible:ring-[#F40009]" 
                   value={form.replacementDays} 
                   onChange={e => setForm({...form, replacementDays: e.target.value})}
                 />
               </div>
-              <div className="space-y-3">
-                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Stock Inicial</Label>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Stock Inicial</Label>
                 <Input 
                   type="number" 
-                  className="h-14 rounded-2xl bg-slate-50 border-none shadow-inner font-bold" 
+                  className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-bold focus-visible:ring-[#F40009]" 
                   value={form.stock} 
                   onChange={e => setForm({...form, stock: e.target.value})}
                 />
               </div>
             </div>
-            <DialogFooter className="pt-6">
-              <Button type="submit" disabled={saving} className="w-full h-16 rounded-[1.5rem] bg-[#F40009] hover:bg-slate-900 text-white font-black uppercase tracking-widest shadow-2xl">
+            <DialogFooter className="pt-4">
+              <Button type="submit" disabled={saving} className="w-full h-14 rounded-xl bg-[#F40009] hover:bg-red-700 text-white font-bold uppercase tracking-widest transition-all">
                 {saving ? <Loader2 className="h-6 w-6 animate-spin" /> : "Confirmar Registro"}
               </Button>
             </DialogFooter>
@@ -426,27 +427,27 @@ export default function InventarioPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Adjust Stock Dialog */}
+      {/* ── Adjust Stock Dialog ──────────────────── */}
       <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
-        <DialogContent className="sm:max-w-[500px] rounded-[3rem] border-none p-0 overflow-hidden shadow-2xl">
-          <div className="bg-[#F40009] p-10 text-white">
+        <DialogContent className="sm:max-w-[450px] rounded-[2rem] border border-white/10 p-0 overflow-hidden bg-[#040813]">
+          <div className="bg-[#F40009] p-8 text-white">
              <DialogHeader>
-                <DialogTitle className="text-2xl font-black uppercase tracking-tight">Ajuste de Existencias</DialogTitle>
-                <p className="text-white/70 font-bold mt-1">{adjustItem?.name}</p>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Ajuste de Existencias</DialogTitle>
+                <p className="text-white/80 font-medium mt-1">{adjustItem?.name}</p>
              </DialogHeader>
           </div>
-          <form onSubmit={handleAdjust} className="p-10 space-y-8 bg-white">
-            <div className="flex bg-slate-100 p-2 rounded-2xl">
-               <Button type="button" variant={adjustType === 'add' ? 'default' : 'ghost'} onClick={() => setAdjustType('add')} className={`flex-1 h-14 rounded-xl font-black ${adjustType === 'add' ? 'bg-slate-950 text-white shadow-xl' : 'text-slate-400'}`}>+ AÑADIR</Button>
-               <Button type="button" variant={adjustType === 'subtract' ? 'default' : 'ghost'} onClick={() => setAdjustType('subtract')} className={`flex-1 h-14 rounded-xl font-black ${adjustType === 'subtract' ? 'bg-slate-950 text-white shadow-xl' : 'text-slate-400'}`}>- QUITAR</Button>
-               <Button type="button" variant={adjustType === 'set' ? 'default' : 'ghost'} onClick={() => setAdjustType('set')} className={`flex-1 h-14 rounded-xl font-black ${adjustType === 'set' ? 'bg-slate-950 text-white shadow-xl' : 'text-slate-400'}`}>= SET</Button>
+          <form onSubmit={handleAdjust} className="p-8 space-y-6">
+            <div className="flex bg-white/5 p-1.5 rounded-xl border border-white/10">
+               <Button type="button" variant="ghost" onClick={() => setAdjustType('add')} className={`flex-1 h-10 rounded-lg font-bold text-[10px] tracking-widest ${adjustType === 'add' ? 'bg-white/15 text-white' : 'text-white/40'}`}>+ AÑADIR</Button>
+               <Button type="button" variant="ghost" onClick={() => setAdjustType('subtract')} className={`flex-1 h-10 rounded-lg font-bold text-[10px] tracking-widest ${adjustType === 'subtract' ? 'bg-white/15 text-white' : 'text-white/40'}`}>- QUITAR</Button>
+               <Button type="button" variant="ghost" onClick={() => setAdjustType('set')} className={`flex-1 h-10 rounded-lg font-bold text-[10px] tracking-widest ${adjustType === 'set' ? 'bg-white/15 text-white' : 'text-white/40'}`}>= SET</Button>
             </div>
             
-            <div className="space-y-3">
-              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Cantidad a procesar</Label>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Cantidad a procesar</Label>
               <Input 
                 type="number" 
-                className="h-20 text-center text-4xl font-black rounded-3xl bg-slate-50 border-none shadow-inner" 
+                className="h-20 text-center text-4xl font-black rounded-2xl bg-white/5 border-white/10 text-white focus-visible:ring-[#F40009]" 
                 value={adjustQty} 
                 onChange={e => setAdjustQty(e.target.value)}
                 autoFocus
@@ -454,7 +455,7 @@ export default function InventarioPage() {
             </div>
             
             <DialogFooter>
-               <Button type="submit" disabled={adjustSaving} className="w-full h-16 rounded-[1.5rem] bg-slate-950 hover:bg-[#F40009] text-white font-black uppercase tracking-widest shadow-2xl transition-all">
+               <Button type="submit" disabled={adjustSaving} className="w-full h-14 rounded-xl bg-[#F40009] hover:bg-red-700 text-white font-bold uppercase tracking-widest transition-all">
                   {adjustSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : "Aplicar Movimiento"}
                </Button>
             </DialogFooter>

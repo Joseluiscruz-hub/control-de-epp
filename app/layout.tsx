@@ -1,6 +1,6 @@
 import type {Metadata} from 'next';
 import './globals.css';
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 
 import { AuthProvider, AuthGuard } from '@/components/auth-provider';
@@ -9,7 +9,11 @@ import { Toaster } from '@/components/ui/sonner';
 import { AiChatPanel } from '@/components/ai-chat-panel';
 import { MouseTracker } from '@/components/mouse-tracker';
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'AssetGuard EPP — Control de Seguridad Industrial | Coca-Cola FEMSA',
@@ -28,14 +32,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="es" className={cn("font-sans", geist.variable)}>
+    <html lang="es" className={cn("font-sans", inter.variable)}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <meta name="theme-color" content="#F40009" />
+        <meta name="theme-color" content="#040813" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body suppressHydrationWarning className="min-h-screen mesh-bg text-gray-900 antialiased selection:bg-red-100 selection:text-red-900">
+      <body suppressHydrationWarning className="min-h-screen mesh-bg text-foreground antialiased selection:bg-red-900/40 selection:text-red-200">
+        {/* Aurora animated background lights */}
+        <div className="aurora-1" aria-hidden="true" />
+        <div className="aurora-2" aria-hidden="true" />
+
         <AuthProvider>
           <AuthGuard>
             <MouseTracker />
@@ -47,10 +53,10 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
             <footer className="relative z-10 no-print mt-auto">
               <div className="femsa-divider mx-8" />
               <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-2">
-                <span className="text-slate-400 text-[10px] uppercase tracking-[0.2em] font-bold">
+                <span className="text-[rgba(248,250,252,0.3)] text-[10px] uppercase tracking-[0.2em] font-bold">
                   AssetGuard Corporate v4.0
                 </span>
-                <span className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'rgba(218,41,28,0.4)' }}>
+                <span className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'rgba(244,0,9,0.4)' }}>
                   Coca-Cola FEMSA · Impulsado por Gemini IA
                 </span>
               </div>
