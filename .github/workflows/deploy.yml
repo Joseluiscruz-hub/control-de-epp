@@ -1,0 +1,33 @@
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy control-de-epp \
+            --source . \
+            --region=us-central1 \
+            --allow-unauthenticated \
+            --memory=1Gi \
+            --port=8080 \
+            --set-env-vars="NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyAwNfsHHwiAPRHhQalKDqP89PNCdNRdyw0,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=gen-lang-client-0970386796.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=gen-lang-client-0970386796,NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=gen-lang-client-0970386796.firebasestorage.app,NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=659644890317,NEXT_PUBLIC_FIREBASE_APP_ID=1:659644890317:web:80f1ac637b54e9afc17d84,NEXT_PUBLIC_FIREBASE_DATABASE_ID=ai-studio-43de38b5-a9c6-4b31-be67-595584a513fc" \
+            --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest"
