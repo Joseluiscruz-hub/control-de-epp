@@ -84,8 +84,14 @@ service cloud.firestore {
     // ── Funciones helper ───────────────────────────────────────────────────
 
     function isAdmin() {
-      // En producción verificar custom claim: request.auth.token.role == "admin"
-      return request.auth != null;
+      // Lista de administradores autorizados
+      // Para agregar admins: añade el email de Google del usuario a esta lista
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          '141293124+joseluiscruz-hub@users.noreply.github.com'
+          // Agrega más emails separados por comas
+        ];
     }
 
     function isValidEmployee(data) {
