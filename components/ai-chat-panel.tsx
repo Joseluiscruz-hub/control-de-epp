@@ -34,7 +34,7 @@ export function AiChatPanel() {
     {
       id: '0',
       role: 'assistant',
-      content: '¡Hola! Soy **ARIA**, tu asistente de Seguridad Industrial. 🦺\n\nPuedo analizar el inventario, detectar anomalías de consumo y hacer predicciones de stock en tiempo real.\n\n¿En qué puedo ayudarte hoy?',
+      content: 'Hola. Soy **ARIA**, tu asistente de Seguridad Industrial.\n\nPuedo analizar inventario, detectar anomalías de consumo y preparar resúmenes ejecutivos del estado operativo.\n\n¿En qué puedo ayudarte hoy?',
       timestamp: new Date(),
     }
   ]);
@@ -128,7 +128,7 @@ export function AiChatPanel() {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: '❌ No pude conectar con el servidor de IA. Verifica tu `GEMINI_API_KEY` en `.env.local`.',
+        content: 'No pude conectar con el servidor de IA. Verifica tu `GEMINI_API_KEY` en `.env.local`.',
         timestamp: new Date(),
       }]);
     } finally {
@@ -145,7 +145,7 @@ export function AiChatPanel() {
     setMessages([{
       id: Date.now().toString(),
       role: 'assistant',
-      content: '¡Chat reiniciado! ¿En qué puedo ayudarte? 🦺',
+      content: 'Chat reiniciado. ¿En qué puedo ayudarte?',
       timestamp: new Date(),
     }]);
   };
@@ -161,11 +161,11 @@ export function AiChatPanel() {
             exit={{ scale: 0, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
             onClick={() => setOpen(true)}
-            className="fixed bottom-6 right-6 z-50 group flex items-center gap-2.5 bg-slate-950 text-white px-5 py-4 rounded-2xl shadow-2xl shadow-slate-900/30 hover:shadow-red-500/20 transition-all duration-500 hover:scale-105 active:scale-95 border border-slate-800"
+            className="fixed bottom-6 right-6 z-50 group flex items-center gap-2.5 bg-[#10151d] text-white px-5 py-4 rounded-xl shadow-2xl shadow-black/30 hover:shadow-red-950/20 transition-all duration-500 hover:scale-105 active:scale-95 border border-white/10"
             title="Abrir ARIA - Asistente IA"
           >
             <div className="relative">
-              <div className="h-9 w-9 rounded-xl bg-[#F40009] flex items-center justify-center shadow-lg shadow-red-500/20 group-hover:shadow-red-500/40 transition-shadow">
+              <div className="h-9 w-9 rounded-lg bg-[#F40009] flex items-center justify-center shadow-lg shadow-red-950/20 group-hover:shadow-red-950/40 transition-shadow">
                 <Bot className="h-5 w-5 text-white" />
               </div>
               <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-green-400 rounded-full border-2 border-slate-950 animate-pulse" />
@@ -187,17 +187,17 @@ export function AiChatPanel() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className={`fixed right-6 z-50 bg-white rounded-[2rem] shadow-2xl shadow-black/10 border border-slate-100 flex flex-col overflow-hidden ${
+            className={`fixed right-6 z-50 bg-[#f8fafc] rounded-xl shadow-2xl shadow-black/25 border border-white/20 flex flex-col overflow-hidden ${
               minimized
                 ? 'bottom-6 h-16 w-72'
                 : 'bottom-6 w-[420px] h-[640px] max-h-[85vh]'
             }`}
           >
             {/* Header - FEMSA branded */}
-            <div className="flex items-center justify-between px-5 py-3.5 bg-slate-950 flex-shrink-0">
+            <div className="flex items-center justify-between px-5 py-3.5 bg-[#0d1117] flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className="h-9 w-9 rounded-xl bg-[#F40009] flex items-center justify-center shadow-lg shadow-red-500/20">
+                  <div className="h-9 w-9 rounded-lg bg-[#F40009] flex items-center justify-center shadow-lg shadow-red-950/20">
                     <Bot className="h-5 w-5 text-white" />
                   </div>
                   <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-green-400 rounded-full border-2 border-slate-950" />
@@ -210,20 +210,20 @@ export function AiChatPanel() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={clearChat}
-                  className="p-2 rounded-xl hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
+                  className="p-2 rounded-lg hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
                   title="Limpiar chat"
                 >
                   <RefreshCw className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setMinimized(!minimized)}
-                  className="p-2 rounded-xl hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
+                  className="p-2 rounded-lg hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
                 >
                   {minimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
                 </button>
                 <button
                   onClick={() => setOpen(false)}
-                  className="p-2 rounded-xl hover:bg-red-500/20 transition-colors text-slate-400 hover:text-red-400"
+                  className="p-2 rounded-lg hover:bg-red-500/20 transition-colors text-slate-400 hover:text-red-400"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -249,8 +249,8 @@ export function AiChatPanel() {
                       <div
                         className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                           msg.role === 'user'
-                            ? 'bg-slate-950 text-white rounded-tr-sm shadow-lg'
-                            : 'bg-slate-50 border border-slate-100 text-gray-800 rounded-tl-sm shadow-sm'
+                            ? 'bg-[#0d1117] text-white rounded-tr-sm shadow-lg'
+                            : 'bg-white border border-slate-200 text-gray-800 rounded-tl-sm shadow-sm'
                         }`}
                       >
                         {msg.role === 'assistant' ? (
@@ -290,7 +290,7 @@ export function AiChatPanel() {
                           key={i}
                           onClick={() => sendMessage(p.text)}
                           disabled={loading}
-                          className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-red-50 text-left transition-all group border border-slate-100 hover:border-red-100"
+                        className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-white hover:bg-red-50 text-left transition-all group border border-slate-200 hover:border-red-100"
                         >
                           <span className="text-[#F40009] flex-shrink-0">{p.icon}</span>
                           <span className="text-xs text-slate-700 font-bold flex-1">{p.text}</span>
@@ -302,20 +302,20 @@ export function AiChatPanel() {
                 )}
 
                 {/* Input */}
-                <form onSubmit={handleSubmit} className="p-4 border-t border-slate-100 flex gap-2 flex-shrink-0 bg-slate-50/50">
+                <form onSubmit={handleSubmit} className="p-4 border-t border-slate-200 flex gap-2 flex-shrink-0 bg-slate-50/80">
                   <Input
                     ref={inputRef}
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     placeholder="Pregunta sobre inventario o EPP..."
                     disabled={loading}
-                    className="flex-1 text-sm h-11 rounded-xl border-slate-200 bg-white focus:border-red-300 focus:ring-red-100 font-medium"
+                    className="flex-1 text-sm h-11 rounded-lg border-slate-200 bg-white focus:border-red-300 focus:ring-red-100 font-medium"
                   />
                   <Button
                     type="submit"
                     size="sm"
                     disabled={loading || !input.trim()}
-                    className="h-11 w-11 p-0 rounded-xl bg-slate-950 hover:bg-[#F40009] shadow-lg transition-all duration-300"
+                    className="h-11 w-11 p-0 rounded-lg bg-[#0d1117] hover:bg-[#F40009] shadow-lg transition-all duration-300"
                   >
                     {loading
                       ? <Loader2 className="h-4 w-4 animate-spin" />

@@ -37,9 +37,9 @@ export function NavBar() {
 
   return (
     <>
-      <header className={`sticky top-0 z-40 transition-all duration-500 ${
+      <header className={`sticky top-0 z-40 transition-all duration-300 ${
         scrolled
-          ? 'navbar-glass shadow-2xl shadow-black/40'
+          ? 'navbar-glass shadow-xl shadow-black/30'
           : 'bg-transparent'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -48,8 +48,7 @@ export function NavBar() {
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group relative shrink-0" aria-label="Ir al dashboard de AssetGuard">
               <div className="relative">
-                <div className="absolute inset-0 bg-red-600 rounded-xl blur-lg opacity-0 group-hover:opacity-50 transition-opacity duration-500" />
-                <div className="relative h-9 w-9 rounded-xl bg-gradient-to-br from-[#F40009] to-[#8B0006] flex items-center justify-center shadow-lg shadow-red-900/50 group-hover:scale-110 active:scale-95 transition-all duration-300">
+                <div className="relative h-9 w-9 rounded-lg bg-[#F40009] flex items-center justify-center shadow-lg shadow-red-950/30 group-hover:scale-105 active:scale-95 transition-all duration-300">
                   <ShieldCheck className="h-5 w-5 text-white" />
                 </div>
               </div>
@@ -65,7 +64,7 @@ export function NavBar() {
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
 
               {/* Desktop Nav */}
-              <nav className="hidden lg:flex items-center gap-1 p-1 rounded-xl" style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)'}} aria-label="Navegación principal">
+              <nav className="hidden lg:flex items-center gap-1 p-1 rounded-lg" style={{background:'rgba(255,255,255,0.055)', border:'1px solid rgba(255,255,255,0.1)'}} aria-label="Navegación principal">
                 {NAV_LINKS.map(link => {
                   const isActive = pathname === link.href;
                   return (
@@ -73,12 +72,12 @@ export function NavBar() {
                       key={link.href}
                       href={link.href}
                       aria-current={isActive ? 'page' : undefined}
-                      className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
+                      className={`relative flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all duration-300 ${
                         isActive
                           ? 'text-white shadow-lg'
                           : 'text-white/40 hover:text-white/80 hover:bg-white/5'
                       }`}
-                      style={isActive ? {background: 'rgba(244,0,9,0.15)', border: '1px solid rgba(244,0,9,0.25)'} : {}}
+                      style={isActive ? {background: 'rgba(244,0,9,0.16)', border: '1px solid rgba(244,0,9,0.28)'} : {}}
                     >
                       <span className={`transition-colors duration-300 ${isActive ? 'text-[#F40009]' : ''}`}>
                         {link.icon}
@@ -98,21 +97,21 @@ export function NavBar() {
 
               {/* External links */}
               <Link href="/portal" target="_blank">
-                <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-1.5 text-white/35 hover:text-white/70 hover:bg-white/5 rounded-lg font-semibold transition-all text-xs">
+                <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-1.5 text-white/40 hover:text-white/75 hover:bg-white/5 rounded-lg font-semibold transition-all text-xs">
                   <ExternalLink className="h-3.5 w-3.5" />
                   Portal
                 </Button>
               </Link>
 
               <Link href="/kiosko" target="_blank">
-                <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-1.5 text-white/35 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg font-semibold transition-all text-xs">
+                <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-1.5 text-white/40 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg font-semibold transition-all text-xs">
                   <HardHat className="h-3.5 w-3.5" />
                   Kiosko
                 </Button>
               </Link>
 
               {/* ARIA status */}
-              <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{background:'rgba(212,160,23,0.08)', border:'1px solid rgba(212,160,23,0.15)'}}>
+              <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{background:'rgba(212,160,23,0.09)', border:'1px solid rgba(212,160,23,0.18)'}}>
                 <div className="relative">
                   <Bot className="h-3.5 w-3.5" style={{color:'#D4A017'}} />
                   <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-emerald-500 rounded-full border border-[#040813]" />
@@ -157,7 +156,7 @@ export function NavBar() {
                   size="icon"
                   onClick={logOut}
                   aria-label="Cerrar sesión"
-                  className="h-8 w-8 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                  className="h-8 w-8 text-white/35 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                 >
                   <LogOut className="h-4 w-4" />
                 </Button>
@@ -167,7 +166,7 @@ export function NavBar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden h-9 w-9 rounded-lg text-white/40 hover:text-white hover:bg-white/5"
+                className="lg:hidden h-9 w-9 rounded-lg text-white/45 hover:text-white hover:bg-white/5"
                 onClick={() => setMobileOpen(open => !open)}
                 aria-expanded={mobileOpen}
                 aria-controls="mobile-navigation"
@@ -197,7 +196,7 @@ export function NavBar() {
               exit={{ opacity: 0, y: -16 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               className="absolute top-16 left-0 right-0 shadow-2xl shadow-black/60 p-4"
-              style={{background:'rgba(4,8,19,0.97)', backdropFilter:'blur(24px)', borderBottom:'1px solid rgba(255,255,255,0.06)'}}
+              style={{background:'rgba(7,9,13,0.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.1)'}}
               onClick={e => e.stopPropagation()}
             >
               <nav className="space-y-1" aria-label="Navegación móvil">

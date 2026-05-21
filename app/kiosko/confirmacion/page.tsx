@@ -57,17 +57,17 @@ export default function KioskoConfirmacionPage() {
 
   const REASON_MSGS: Record<string, { title: string; body: string; color: string }> = {
     vida_util: {
-      title: "✅ Reposición aprobada",
+      title: "Reposición aprobada",
       body: "Tu EPP cumplió su vida útil. La entrega es sin costo.",
       color: "text-green-400",
     },
     desgaste: {
-      title: "⏳ Solicitud en revisión",
+      title: "Solicitud en revisión",
       body: "Tu solicitud fue registrada. Un supervisor la revisará y recibirás tu EPP una vez aprobado.",
       color: "text-amber-400",
     },
     extravio: {
-      title: solicitud?.chargeAmount > 0 ? "💳 Extravío — Cargo aplicado" : "✅ Sin cargo",
+      title: solicitud?.chargeAmount > 0 ? "Extravío — cargo aplicado" : "Sin cargo",
       body: solicitud?.chargeAmount > 0
         ? `Se aplicará un cargo de $${Number(solicitud?.chargeAmount).toFixed(2)} MXN en tu nómina. Revisa tu recibo.`
         : "Tu EPP ya había cumplido su vida útil. Sin cargo.",
@@ -95,7 +95,7 @@ export default function KioskoConfirmacionPage() {
       <AlertTriangle size={56} className="text-red-400" />
       <h2 className="text-2xl font-bold text-red-300">Ocurrió un error</h2>
       <p className="text-gray-400">{errorMsg}</p>
-      <button onClick={() => router.push("/kiosko")} className="px-8 py-4 bg-gray-700 rounded-xl text-white font-semibold">Ir al inicio</button>
+      <button onClick={() => router.push("/kiosko")} className="px-8 py-4 bg-white/10 rounded-lg text-white font-semibold">Ir al inicio</button>
     </div>
   );
 
@@ -111,7 +111,7 @@ export default function KioskoConfirmacionPage() {
         <h2 className={`text-2xl font-bold ${msg?.color ?? "text-white"}`}>{msg?.title}</h2>
         <p className="text-gray-400 mt-2 max-w-sm">{msg?.body}</p>
       </div>
-      <div className="bg-gray-800 rounded-2xl px-6 py-4 border border-gray-700 text-sm text-gray-300">
+      <div className="bg-white/5 rounded-lg px-6 py-4 border border-white/10 text-sm text-gray-300">
         <p>Empleado: <strong className="text-white">{employeeName}</strong></p>
         <p>SKU: <span className="font-mono text-amber-400">{solicitud.sku}</span></p>
         {solicitud.size !== "N/A" && <p>Talla: <strong className="text-white">{solicitud.size}</strong></p>}
@@ -122,7 +122,7 @@ export default function KioskoConfirmacionPage() {
       </div>
       <button
         onClick={() => { sessionStorage.clear(); router.push("/kiosko"); }}
-        className="px-8 py-4 bg-gray-700 hover:bg-gray-600 rounded-xl text-white font-semibold transition-colors"
+        className="px-8 py-4 bg-white/10 hover:bg-white/15 rounded-lg text-white font-semibold transition-colors"
       >
         Finalizar ahora
       </button>
@@ -135,7 +135,7 @@ export default function KioskoConfirmacionPage() {
       <HardHat size={48} className="text-amber-400" />
       <h2 className="text-2xl font-bold text-center">Confirma tu solicitud</h2>
 
-      <div className="w-full bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+      <div className="w-full bg-white/5 rounded-lg border border-white/10 overflow-hidden">
         {[
           ["Empleado", employeeName],
           ["SKU", solicitud.sku],
@@ -143,7 +143,7 @@ export default function KioskoConfirmacionPage() {
           ["Motivo", { vida_util: "Vida útil cumplida", desgaste: "Desgaste / Daño", extravio: "Extravío" }[solicitud.reason as string]],
           ...(solicitud.chargeAmount > 0 ? [["Cargo a nómina", `$${Number(solicitud.chargeAmount).toFixed(2)} MXN`]] : []),
         ].map(([label, value], i, arr) => (
-          <div key={label} className={`flex justify-between px-5 py-3 text-sm ${i < arr.length - 1 ? "border-b border-gray-700" : ""}`}>
+          <div key={label} className={`flex justify-between px-5 py-3 text-sm ${i < arr.length - 1 ? "border-b border-white/10" : ""}`}>
             <span className="text-gray-400">{label}</span>
             <span className={`font-semibold ${label === "Cargo a nómina" ? "text-red-400" : "text-white"}`}>{value}</span>
           </div>
@@ -151,21 +151,21 @@ export default function KioskoConfirmacionPage() {
       </div>
 
       {solicitud.reason === "desgaste" && (
-        <p className="text-amber-300 text-sm text-center bg-amber-900/20 border border-amber-500/30 rounded-xl px-4 py-3">
-          ⚠️ Tu solicitud quedará en estado <strong>pendiente de revisión</strong> hasta que el supervisor la apruebe.
+        <p className="text-amber-300 text-sm text-center bg-amber-900/20 border border-amber-500/30 rounded-lg px-4 py-3">
+          Tu solicitud quedará en estado <strong>pendiente de revisión</strong> hasta que el supervisor la apruebe.
         </p>
       )}
 
       <div className="flex flex-col gap-3 w-full">
         <button
           onClick={handleConfirm}
-          className="w-full py-5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-gray-900 font-bold text-xl transition-colors"
+          className="w-full py-5 rounded-lg bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-gray-900 font-bold text-xl transition-colors"
         >
-          Confirmar y Solicitar →
+          Confirmar y Solicitar
         </button>
         <button
           onClick={() => router.push("/kiosko/solicitud")}
-          className="w-full py-4 rounded-2xl border border-gray-700 text-gray-400 hover:text-white font-medium transition-colors"
+          className="w-full py-4 rounded-lg border border-white/10 text-gray-400 hover:text-white font-medium transition-colors"
         >
           Regresar
         </button>

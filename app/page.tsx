@@ -270,32 +270,24 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-6 pb-20">
 
       {/* ── Hero Section ──────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className="relative rounded-3xl overflow-hidden"
-        style={{
-          background: 'linear-gradient(135deg, rgba(244,0,9,0.08) 0%, rgba(255,255,255,0.02) 50%, rgba(212,160,23,0.04) 100%)',
-          border: '1px solid rgba(255,255,255,0.07)',
-        }}
+        className="executive-hero"
       >
-        {/* Glow orb */}
-        <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full opacity-20 pointer-events-none" style={{background:'radial-gradient(circle, #F40009 0%, transparent 70%)', filter:'blur(60px)'}} />
-        <div className="absolute -bottom-10 -right-10 w-60 h-60 rounded-full opacity-10 pointer-events-none" style={{background:'radial-gradient(circle, #D4A017 0%, transparent 70%)', filter:'blur(50px)'}} />
-
-        <div className="relative z-10 p-8 lg:p-12 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+        <div className="relative z-10 p-6 lg:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
           {/* Left: Welcome text */}
-          <div className="space-y-5 max-w-xl">
+          <div className="space-y-5 max-w-3xl">
             <motion.div
               initial={{ opacity: 0, x: -16 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <span className="badge-femsa">Seguridad Industrial · Coca-Cola FEMSA</span>
+              <span className="badge-femsa">Centro de mando EPP</span>
             </motion.div>
 
             <motion.div
@@ -303,18 +295,16 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <h1 className="text-5xl lg:text-7xl font-black tracking-tighter text-white leading-[0.9]">
-                Hola,{' '}
+              <h1 className="text-4xl lg:text-6xl font-black tracking-tight text-white leading-[0.95]">
+                Operación segura,{' '}
                 <span className="text-gradient-red">
-                  {authUser?.displayName?.split(' ')[0] || 'Admin'}
-                </span>{' '}
-                <span className="inline-block animate-bounce" style={{animationDuration:'2s'}}>👋</span>
+                  visible y bajo control
+                </span>
               </h1>
-              <p className="text-white/40 text-base font-medium mt-3 leading-relaxed">
-                Panel de Control EPP · Monitoreo activo de{' '}
+              <p className="text-white/55 text-base font-medium mt-4 leading-relaxed max-w-2xl">
+                Hola {authUser?.displayName?.split(' ')[0] || 'Admin'}. Monitoreo activo de{' '}
                 <span className="text-white/70 font-semibold">{stats.activeEmployees} colaboradores</span>
-                {' '}con respaldo de{' '}
-                <span className="font-bold" style={{color:'#D4A017'}}>ARIA IA</span>.
+                {' '}con inventario, solicitudes de kiosko y análisis ARIA en una sola consola ejecutiva.
               </p>
             </motion.div>
 
@@ -324,17 +314,21 @@ export default function DashboardPage() {
               transition={{ delay: 0.5 }}
               className="flex flex-wrap gap-3"
             >
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold" style={{background:'rgba(16,185,129,0.1)', border:'1px solid rgba(16,185,129,0.15)', color:'rgba(16,185,129,0.9)'}}>
+              <div className="command-strip flex items-center gap-2 px-4 py-2 text-xs font-semibold" style={{color:'rgba(16,185,129,0.9)'}}>
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
                 Sistemas Operativos
               </div>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white/40" style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)'}}>
+              <div className="command-strip flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white/50">
                 <Activity className="h-3.5 w-3.5" style={{color:'rgba(244,0,9,0.7)'}} />
                 {format(new Date(), "EEEE d 'de' MMMM", { locale: es })}
               </div>
+              <Link href="/kiosko" target="_blank" className="command-strip flex items-center gap-2 px-4 py-2 text-xs font-semibold text-amber-300 hover:text-amber-200 transition-colors">
+                <HardHat className="h-3.5 w-3.5" />
+                Kiosko activo
+              </Link>
             </motion.div>
           </div>
 
@@ -345,8 +339,8 @@ export default function DashboardPage() {
             transition={{ delay: 0.4, type: 'spring', stiffness: 150, damping: 20 }}
             className="relative flex-shrink-0"
           >
-            <div className="relative w-56 p-6 rounded-2xl" style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)'}}>
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] mb-4" style={{color:'rgba(212,160,23,0.8)'}}>Pulso Operativo</p>
+            <div className="relative w-56 p-5 command-strip">
+              <p className="section-eyebrow mb-4" style={{color:'rgba(212,160,23,0.8)'}}>Pulso Operativo</p>
 
               <div className="relative flex items-center justify-center mb-4">
                 <GaugeCircle value={insights.complianceRate} size={110} />
@@ -357,7 +351,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <p className="text-center text-[11px] font-semibold text-white/40 uppercase tracking-widest">Cumplimiento EPP</p>
+              <p className="text-center text-[11px] font-semibold text-white/45 uppercase tracking-widest">Cumplimiento EPP</p>
 
               <div className="mt-4 pt-4 flex items-center justify-between" style={{borderTop:'1px solid rgba(255,255,255,0.06)'}}>
                 <div className="flex gap-1.5">
@@ -427,14 +421,13 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: -8, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="relative rounded-2xl p-6 overflow-hidden flex flex-col sm:flex-row items-center gap-6"
+            className="enterprise-panel relative p-5 flex flex-col sm:flex-row items-center gap-5"
             style={{
               background: 'rgba(244,0,9,0.06)',
               border: '1px solid rgba(244,0,9,0.2)',
             }}
           >
-            <div className="absolute inset-0 pointer-events-none" style={{background:'linear-gradient(90deg, rgba(244,0,9,0.08) 0%, transparent 60%)'}} />
-            <div className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-lg relative z-10" style={{background:'rgba(244,0,9,0.15)', border:'1px solid rgba(244,0,9,0.25)'}}>
+            <div className="h-12 w-12 rounded-lg flex items-center justify-center shrink-0 shadow-lg relative z-10" style={{background:'rgba(244,0,9,0.15)', border:'1px solid rgba(244,0,9,0.25)'}}>
               <AlertTriangle className="h-7 w-7 animate-pulse" style={{color:'#F40009'}} />
             </div>
             <div className="flex-1 text-center sm:text-left relative z-10">
@@ -446,7 +439,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <Link href="/empleados" className="relative z-10 shrink-0">
-              <Button className="rounded-xl px-6 h-11 font-bold text-sm text-white transition-all group" style={{background:'rgba(244,0,9,0.9)'}}>
+              <Button className="rounded-lg px-5 h-10 font-bold text-sm text-white transition-all group" style={{background:'rgba(244,0,9,0.9)'}}>
                 Intervenir
                 <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </Button>
@@ -463,21 +456,20 @@ export default function DashboardPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="xl:col-span-2 rounded-2xl overflow-hidden"
-          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+          className="xl:col-span-2 enterprise-panel"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5" style={{borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{background:'rgba(244,0,9,0.12)', border:'1px solid rgba(244,0,9,0.2)'}}>
+              <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{background:'rgba(244,0,9,0.12)', border:'1px solid rgba(244,0,9,0.2)'}}>
                 <Activity className="h-4.5 w-4.5" style={{color:'#F40009'}} />
               </div>
               <div>
                 <h2 className="text-base font-bold text-white">Bitácora de Seguridad</h2>
-                <p className="text-[10px] text-white/30 font-semibold uppercase tracking-widest">Coca-Cola FEMSA · Tiempo Real</p>
+                <p className="section-eyebrow">Coca-Cola FEMSA · Tiempo Real</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{background:'rgba(244,0,9,0.1)', border:'1px solid rgba(244,0,9,0.15)', color:'rgba(244,0,9,0.9)'}}>
+            <div className="command-strip flex items-center gap-2 px-3 py-1.5 text-[10px] font-bold" style={{color:'rgba(244,0,9,0.9)'}}>
               <span className="h-1.5 w-1.5 rounded-full bg-[#F40009] animate-pulse inline-block" />
               En Vivo
             </div>
@@ -497,7 +489,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full premium-table">
                 <thead>
                   <tr style={{background:'rgba(255,255,255,0.02)'}}>
                     {['Colaborador','EPP Asignado','Fecha Entrega','Estatus'].map((h, i) => (
@@ -522,7 +514,7 @@ export default function DashboardPage() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div
-                              className="h-9 w-9 rounded-xl flex items-center justify-center text-xs font-black transition-all duration-300 group-hover:scale-105"
+                            className="h-9 w-9 rounded-lg flex items-center justify-center text-xs font-black transition-all duration-300 group-hover:scale-105"
                               style={{ background: 'rgba(244,0,9,0.1)', border: '1px solid rgba(244,0,9,0.15)', color: '#F40009' }}
                             >
                               {a.employeeId.slice(-2).toUpperCase()}
@@ -531,7 +523,7 @@ export default function DashboardPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-xs font-bold px-3 py-1.5 rounded-lg text-white/60" style={{background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)'}}>
+                          <span className="text-xs font-bold px-3 py-1.5 rounded-md text-white/60" style={{background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)'}}>
                             {a.sku}
                           </span>
                         </td>
@@ -587,8 +579,7 @@ export default function DashboardPage() {
             initial={{ opacity: 0, x: 16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.85 }}
-            className="rounded-2xl p-5"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+            className="enterprise-panel p-5"
           >
             <h3 className="text-sm font-bold text-white/70 mb-4 flex items-center gap-2">
               <Zap className="h-4 w-4" style={{color:'#F40009'}} />
@@ -597,7 +588,7 @@ export default function DashboardPage() {
             <div className="space-y-2">
               <AssignPpeDialog />
               <Link href="/inventario" className="block w-full">
-                <button className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-white/50 hover:text-white/80 transition-all group" style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)'}}>
+                <button className="surface-action w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-white/55 hover:text-white/85 group">
                   <div className="flex items-center gap-3">
                     <Package className="h-4 w-4" style={{color:'rgba(212,160,23,0.7)'}} />
                     Inventario de Planta
@@ -606,7 +597,7 @@ export default function DashboardPage() {
                 </button>
               </Link>
               <Link href="/portal" target="_blank" className="block w-full">
-                <button className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-white/50 hover:text-white/80 transition-all group" style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)'}}>
+                <button className="surface-action w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-white/55 hover:text-white/85 group">
                   <div className="flex items-center gap-3">
                     <ExternalLink className="h-4 w-4" style={{color:'rgba(59,130,246,0.7)'}} />
                     Portal del Colaborador
@@ -615,7 +606,7 @@ export default function DashboardPage() {
                 </button>
               </Link>
               <Link href="/kiosko" target="_blank" className="block w-full">
-                <button className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-white/50 hover:text-amber-400 transition-all group" style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)'}}>
+                <button className="surface-action w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-white/55 hover:text-amber-400 group">
                   <div className="flex items-center gap-3">
                     <HardHat className="h-4 w-4 text-amber-500/60 group-hover:text-amber-400 transition-colors" />
                     Kiosko de EPP
@@ -631,7 +622,7 @@ export default function DashboardPage() {
             initial={{ opacity: 0, x: 16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.95 }}
-            className="rounded-2xl p-5"
+            className="enterprise-panel p-5"
             style={{ background: 'rgba(212,160,23,0.04)', border: '1px solid rgba(212,160,23,0.12)' }}
           >
             <h3 className="text-sm font-bold mb-4 flex items-center gap-2" style={{color:'rgba(212,160,23,0.9)'}}>
@@ -640,7 +631,7 @@ export default function DashboardPage() {
             </h3>
 
             <div className="space-y-3">
-              <div className="p-4 rounded-xl" style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)'}}>
+              <div className="p-4 rounded-lg" style={{background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.07)'}}>
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingUp className="h-3.5 w-3.5 text-red-400" />
                   <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Pronóstico de Stock</span>
@@ -653,7 +644,7 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl" style={{background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)'}}>
+              <div className="p-4 rounded-lg" style={{background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.07)'}}>
                 <div className="flex items-center gap-2 mb-2">
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                   <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Área Top</span>

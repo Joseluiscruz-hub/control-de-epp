@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { type ReactNode, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getActiveAssignment } from "@/lib/kiosk-api";
 import { PPECatalogItem, ReplacementReason } from "@/lib/kiosk-types";
@@ -8,9 +8,10 @@ import { evaluateReplacement, getStockStatus } from "@/lib/replacement-logic";
 import {
   ArrowLeft, AlertTriangle, CheckCircle2, Camera,
   PenLine, DollarSign, RotateCcw, Loader2,
+  HardHat,
 } from "lucide-react";
 
-const REASON_LABELS: Record<ReplacementReason, { label: string; icon: React.ReactNode; desc: string }> = {
+const REASON_LABELS: Record<ReplacementReason, { label: string; icon: ReactNode; desc: string }> = {
   vida_util: { label: "Vida Útil Cumplida", icon: <CheckCircle2 size={22} />, desc: "Mi EPP ya completó su período de uso establecido." },
   desgaste:  { label: "Desgaste / Daño",    icon: <AlertTriangle size={22} />, desc: "Mi EPP presenta daño o desgaste visible antes de completar su vida útil." },
   extravio:  { label: "Extravío / Pérdida", icon: <DollarSign size={22} />,   desc: "He extraviado mi EPP y necesito reposición." },
@@ -147,8 +148,10 @@ export default function KioskoSolicitudPage() {
       </button>
 
       {/* Item header */}
-      <div className="flex items-center gap-4 bg-gray-800 rounded-2xl p-4 border border-gray-700">
-        <span className="text-5xl">🦺</span>
+      <div className="flex items-center gap-4 bg-white/5 rounded-lg p-4 border border-white/10">
+        <span className="h-14 w-14 rounded-lg border border-amber-400/20 bg-amber-400/10 text-amber-300 flex items-center justify-center">
+          <HardHat className="h-7 w-7" />
+        </span>
         <div>
           <h2 className="text-xl font-bold">{item.name}</h2>
           <p className="text-sm text-gray-400">{item.category} · Vida útil: {item.replacementDays} días</p>
@@ -176,7 +179,7 @@ export default function KioskoSolicitudPage() {
                    key={size}
                    disabled={isDisabled}
                    onClick={() => handleSizeSelect(size, variant.sku)}
-                   className={`relative flex flex-col items-center gap-1 px-5 py-3 rounded-xl border-2 text-sm font-bold transition-all active:scale-95
+                   className={`relative flex flex-col items-center gap-1 px-5 py-3 rounded-lg border-2 text-sm font-bold transition-all active:scale-95
                      ${selectedSize === size ? "border-amber-400 bg-amber-400/10 text-amber-400"
                     : isDisabled ? "border-gray-700 text-gray-600 opacity-40 cursor-not-allowed"
                     : "border-gray-700 text-white hover:border-gray-500"}`}
@@ -210,7 +213,7 @@ export default function KioskoSolicitudPage() {
                 <button
                   key={key}
                   onClick={() => setReason(key)}
-                  className={`flex items-start gap-4 p-4 rounded-xl border-2 text-left transition-all
+                  className={`flex items-start gap-4 p-4 rounded-lg border-2 text-left transition-all
                     ${reason === key
                       ? key === "extravio" ? "border-red-500 bg-red-900/20"
                       : key === "desgaste" ? "border-amber-500 bg-amber-900/20"
@@ -233,7 +236,7 @@ export default function KioskoSolicitudPage() {
 
       {/* Evaluación resultado */}
       {evaluation && reason && (
-        <div className={`rounded-xl p-4 border text-sm
+        <div className={`rounded-lg p-4 border text-sm
           ${reason === "vida_util" ? "border-green-500/30 bg-green-900/10"
           : reason === "desgaste" ? "border-amber-500/30 bg-amber-900/10"
           : "border-red-500/30 bg-red-900/10"}`}>
@@ -264,9 +267,9 @@ export default function KioskoSolicitudPage() {
       {reason === "desgaste" && (
         <section>
           <h3 className="text-base font-semibold mb-3 text-gray-300">Evidencia fotográfica</h3>
-          <label className="flex flex-col items-center gap-3 border-2 border-dashed border-gray-600 rounded-xl p-6 cursor-pointer hover:border-amber-400/60 transition-colors">
+          <label className="flex flex-col items-center gap-3 border-2 border-dashed border-gray-600 rounded-lg p-6 cursor-pointer hover:border-amber-400/60 transition-colors">
             <Camera size={28} className="text-gray-500" />
-            <span className="text-sm text-gray-400">{photoFile ? "✅ Foto adjunta" : "Toca para tomar foto o seleccionar"}</span>
+            <span className="text-sm text-gray-400">{photoFile ? "Foto adjunta" : "Toca para tomar foto o seleccionar"}</span>
             <input type="file" accept="image/*" capture="environment" className="hidden"
               onChange={e => {
                 const f = e.target.files?.[0];
@@ -287,7 +290,7 @@ export default function KioskoSolicitudPage() {
           <p className="text-xs text-gray-500 mb-3">
             Al firmar autorizas el descuento de <strong>${evaluation!.chargeAmount.toFixed(2)} MXN</strong> en tu próxima nómina.
           </p>
-          <div className="relative border-2 border-gray-600 rounded-xl overflow-hidden bg-gray-900">
+          <div className="relative border-2 border-gray-600 rounded-lg overflow-hidden bg-gray-900">
             <canvas
               ref={canvasRef}
               width={480}
@@ -317,9 +320,9 @@ export default function KioskoSolicitudPage() {
       <button
         onClick={handleProceed}
         disabled={!canProceed()}
-        className="w-full py-5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:bg-amber-500 disabled:opacity-30 text-gray-900 font-bold text-xl transition-colors mt-auto"
+        className="w-full py-5 rounded-lg bg-amber-400 hover:bg-amber-300 active:bg-amber-500 disabled:opacity-30 text-gray-900 font-bold text-xl transition-colors mt-auto"
       >
-        Confirmar Solicitud →
+        Confirmar Solicitud
       </button>
     </div>
   );

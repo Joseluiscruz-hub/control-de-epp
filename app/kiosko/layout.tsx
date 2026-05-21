@@ -11,9 +11,9 @@ export const metadata: Metadata = {
 // El kiosko tiene su propio flujo de autenticación por PIN de empleado.
 export default function KioskoLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="kiosko-root min-h-screen bg-gray-900 text-white flex flex-col select-none">
+    <div className="kiosko-root min-h-screen bg-[#07090d] text-white flex flex-col select-none">
       {/* Header mínimo */}
-      <header className="flex items-center gap-3 px-8 py-5 border-b border-gray-700/60">
+      <header className="flex items-center gap-3 px-8 py-5 border-b border-white/10 bg-white/[0.035]">
         <div className="flex items-center gap-2">
           {/* Logo inline SVG */}
           <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-label="EPP Logo">

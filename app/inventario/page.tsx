@@ -196,20 +196,20 @@ export default function InventarioPage() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8 }}
-      className="space-y-12 pb-20"
+      className="space-y-6 pb-20"
     >
       {/* ── Header ───────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 p-12 rounded-[3.5rem] relative overflow-hidden glass-card">
-        <div className="absolute top-0 right-0 w-64 h-full bg-red-600/10 -mr-20 -skew-x-12 blur-2xl" />
+      <div className="executive-hero flex flex-col lg:flex-row lg:items-center justify-between gap-8 p-8">
+        <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-red-600/10 to-transparent pointer-events-none" />
         
         <div className="relative z-10 space-y-4">
           <div className="flex items-center gap-3">
              <span className="badge-femsa">Catálogo Maestro</span>
           </div>
-          <h1 className="text-5xl lg:text-6xl font-black tracking-tighter text-white">
+          <h1 className="text-4xl lg:text-5xl font-black tracking-tight text-white">
             Inventario <span className="text-gradient-red">FEMSA</span>
           </h1>
-          <p className="text-white/50 font-medium text-lg max-w-xl">
+          <p className="text-white/55 font-medium text-base max-w-xl">
             Control de activos críticos y gestión de suministros de seguridad industrial.
           </p>
         </div>
@@ -217,7 +217,7 @@ export default function InventarioPage() {
         <div className="relative z-10">
           <Button
             onClick={() => setAddOpen(true)}
-            className="h-16 px-8 rounded-2xl bg-[#F40009] hover:bg-red-700 text-white shadow-[0_0_20px_rgba(244,0,9,0.3)] transition-all font-bold uppercase tracking-widest text-xs gap-3 group"
+            className="h-12 px-5 rounded-lg bg-[#F40009] hover:bg-red-700 text-white shadow-lg shadow-red-950/30 transition-all font-bold uppercase tracking-widest text-xs gap-3 group"
           >
             <PackagePlus className="h-5 w-5 group-hover:rotate-12 transition-transform" />
             Añadir Material
@@ -227,49 +227,49 @@ export default function InventarioPage() {
 
       {/* ── Mini Bento ───────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="kpi-card p-8 group">
+        <div className="kpi-card p-6 group">
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
              <Package className="h-20 w-20 text-white" />
           </div>
-          <p className="text-[11px] font-black text-white/40 uppercase tracking-[0.3em] mb-2">Unidades Totales</p>
-          <p className="text-5xl font-black text-white tracking-tighter">{totalStock.toLocaleString()}</p>
+          <p className="section-eyebrow mb-2">Unidades Totales</p>
+          <p className="text-4xl font-black text-white tracking-tight">{totalStock.toLocaleString()}</p>
         </div>
         
-        <div className="kpi-card p-8 group" style={{borderColor: 'rgba(245,158,11,0.2)'}}>
+        <div className="kpi-card p-6 group" style={{borderColor: 'rgba(245,158,11,0.2)'}}>
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
              <TrendingDown className="h-20 w-20 text-orange-500" />
           </div>
-          <p className="text-[11px] font-black text-orange-500/80 uppercase tracking-[0.3em] mb-2">Stock Crítico</p>
-          <p className="text-5xl font-black text-orange-400 tracking-tighter">{lowStockItems.length}</p>
+          <p className="section-eyebrow mb-2" style={{color:'rgba(251,146,60,0.82)'}}>Stock Crítico</p>
+          <p className="text-4xl font-black text-orange-400 tracking-tight">{lowStockItems.length}</p>
         </div>
 
-        <div className="kpi-card p-8 group" style={{borderColor: 'rgba(244,0,9,0.2)'}}>
+        <div className="kpi-card p-6 group" style={{borderColor: 'rgba(244,0,9,0.2)'}}>
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
              <AlertTriangle className="h-20 w-20 text-red-500" />
           </div>
-          <p className="text-[11px] font-black text-red-500/80 uppercase tracking-[0.3em] mb-2">Agotado Total</p>
-          <p className="text-5xl font-black text-red-500 tracking-tighter">{outOfStock.length}</p>
+          <p className="section-eyebrow mb-2" style={{color:'rgba(248,113,113,0.82)'}}>Agotado Total</p>
+          <p className="text-4xl font-black text-red-500 tracking-tight">{outOfStock.length}</p>
         </div>
       </div>
 
       {/* ── Main Catalog View ────────────────────── */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden">
-        <div className="p-8 border-b border-white/5 flex flex-col md:flex-row gap-4">
+      <div className="enterprise-panel">
+        <div className="p-5 border-b border-white/10 flex flex-col md:flex-row gap-4">
             <div className="relative flex-1 group">
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40 group-focus-within:text-[#F40009] transition-colors" />
               <Input 
                 placeholder="Filtrar por nombre o SKU técnico..." 
-                className="pl-14 h-14 bg-white/5 border-white/10 rounded-2xl focus-visible:ring-[#F40009] transition-all font-medium text-white placeholder:text-white/30"
+                className="pl-14 h-12 bg-white/5 border-white/10 rounded-lg focus-visible:ring-[#F40009] transition-all font-medium text-white placeholder:text-white/30"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
             
             <Select value={filterCategory} onValueChange={(v) => setFilterCategory(v || 'all')}>
-              <SelectTrigger className="w-full md:w-[320px] h-14 bg-white/5 border-white/10 rounded-2xl text-white font-medium px-6">
+              <SelectTrigger className="w-full md:w-[320px] h-12 bg-white/5 border-white/10 rounded-lg text-white font-medium px-5">
                 <SelectValue placeholder="Categoría" />
               </SelectTrigger>
-              <SelectContent className="rounded-2xl bg-[#0A1628] border-white/10 text-white">
+              <SelectContent className="rounded-lg bg-[#10151d] border-white/10 text-white">
                 <SelectItem value="all" className="font-bold text-white/70">TODAS LAS CATEGORÍAS</SelectItem>
                 {uniqueCategories.map(c => <SelectItem key={c} value={c} className="font-medium">{c.toUpperCase()}</SelectItem>)}
               </SelectContent>
@@ -277,7 +277,7 @@ export default function InventarioPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full premium-table">
             <thead>
               <tr className="bg-white/5 text-left border-b border-white/10">
                 <th className="px-8 py-6 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Especificación</th>
