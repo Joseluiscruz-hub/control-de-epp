@@ -2,11 +2,17 @@ export interface KioskEmployee {
   id: string;
   name: string;
   area?: string;
+  personnelArea?: string;
+  plantArea?: string;
+  position?: string;
+  jobFunction?: string;
   active: boolean;
   pin?: string;
   termsAccepted: boolean;
   termsAcceptedAt?: string;
   firstLogin: boolean;
+  source?: string;
+  schemaVersion?: number;
 }
 
 export interface PPESizeVariant {

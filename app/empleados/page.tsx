@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import {
-  collection, onSnapshot, doc, setDoc,
+  collection, onSnapshot, doc,
   serverTimestamp, query, where, getDocs, getDoc, writeBatch
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -18,19 +18,31 @@ import {
 } from '@/components/ui/select';
 import {
   Users, UserPlus, Search, UserX, UserCheck,
-  HardHat, Loader2, Eye, ShieldCheck, Activity
+  HardHat, Loader2, Eye, ShieldCheck, Activity,
+  Database, Upload, FileWarning, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
 import { syncLocalKioskEmployees } from '@/lib/kiosk-local-store';
+import {
+  buildEmployeeImportPayload,
+  buildKioskEmployeeImportPayload,
+  hasBlockingPersonnelIssues,
+  parsePersonnelTsv,
+  type ParsedPersonnelImport,
+} from '@/lib/personnel-import';
 
 interface Employee {
   docId: string;
   id: string;
   name: string;
   area: string;
+  personnelArea?: string;
+  plantArea?: string;
+  position?: string;
+  jobFunction?: string;
   active: boolean;
   createdAt?: Date;
 }
@@ -48,6 +60,18 @@ const AREAS = [
   'Calidad', 'Almacén', 'Administración', 'Seguridad Industrial', 'Producción'
 ];
 
+async function readExistingDocumentIds(collectionName: 'employees' | 'kiosk_employees', ids: string[]) {
+  const existing = new Set<string>();
+  for (let index = 0; index < ids.length; index += 60) {
+    const chunk = ids.slice(index, index + 60);
+    const snapshots = await Promise.all(chunk.map(id => getDoc(doc(db, collectionName, id))));
+    snapshots.forEach((snapshot, offset) => {
+      if (snapshot.exists()) existing.add(chunk[offset]);
+    });
+  }
+  return existing;
+}
+
 export default function EmpleadosPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,8 +79,12 @@ export default function EmpleadosPage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('active');
 
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFileName, setImportFileName] = useState('');
+  const [importPreview, setImportPreview] = useState<ParsedPersonnelImport | null>(null);
   const [saving, setSaving] = useState(false);
   const [syncingKiosk, setSyncingKiosk] = useState(false);
+  const [importingPersonnel, setImportingPersonnel] = useState(false);
   const [form, setForm] = useState({ id: '', name: '', area: '' });
 
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -69,14 +97,21 @@ export default function EmpleadosPage() {
   useEffect(() => {
     const q = query(collection(db, 'employees'));
     const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(d => ({
-        docId: d.id,
-        id: d.data().id,
-        name: d.data().name,
-        area: d.data().area,
-        active: d.data().active,
-        createdAt: d.data().createdAt?.toDate(),
-      }));
+      const data = snap.docs.map(d => {
+        const employee = d.data();
+        return {
+          docId: d.id,
+          id: employee.id,
+          name: employee.name,
+          area: employee.area,
+          personnelArea: employee.personnelArea,
+          plantArea: employee.plantArea,
+          position: employee.position,
+          jobFunction: employee.jobFunction,
+          active: employee.active,
+          createdAt: employee.createdAt?.toDate(),
+        };
+      });
       setEmployees(data);
       setLoading(false);
     }, () => setLoading(false));
@@ -101,6 +136,7 @@ export default function EmpleadosPage() {
       });
       batch.set(doc(db, 'kiosk_employees', form.id), {
         name: form.name,
+        area: form.area,
         active: true,
         firstLogin: true,
         termsAccepted: false,
@@ -117,6 +153,117 @@ export default function EmpleadosPage() {
     }
   };
 
+  const handlePersonnelFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const parsed = parsePersonnelTsv(text);
+      setImportFileName(file.name);
+      setImportPreview(parsed);
+
+      if (hasBlockingPersonnelIssues(parsed)) {
+        toast.error('La base tiene errores de formato. Revisa la vista previa.');
+      } else {
+        toast.success(`Base validada: ${parsed.summary.validRows} colaboradores listos.`);
+      }
+    } catch (error) {
+      console.error('[Personnel import parse error]', error);
+      toast.error('No se pudo leer la base de personal');
+    }
+  };
+
+  const resetPersonnelImport = () => {
+    setImportFileName('');
+    setImportPreview(null);
+  };
+
+  const importPersonnelBase = async () => {
+    if (!importPreview || hasBlockingPersonnelIssues(importPreview) || importPreview.records.length === 0) return;
+
+    setImportingPersonnel(true);
+    try {
+      const employeeIds = importPreview.records.map(record => record.id);
+      const [existingEmployees, existingKioskEmployees] = await Promise.all([
+        readExistingDocumentIds('employees', employeeIds),
+        readExistingDocumentIds('kiosk_employees', employeeIds),
+      ]);
+
+      let batch = writeBatch(db);
+      let writes = 0;
+      let createdEmployees = 0;
+      let updatedEmployees = 0;
+
+      const commitIfNeeded = async (force = false) => {
+        if (writes === 0 || (!force && writes < 440)) return;
+        await batch.commit();
+        batch = writeBatch(db);
+        writes = 0;
+      };
+
+      for (const record of importPreview.records) {
+        const employeeExists = existingEmployees.has(record.id);
+        const kioskEmployeeExists = existingKioskEmployees.has(record.id);
+        const employeePayload = buildEmployeeImportPayload(record);
+        const kioskPayload = buildKioskEmployeeImportPayload(record);
+
+        batch.set(
+          doc(db, 'employees', record.id),
+          {
+            ...employeePayload,
+            ...(employeeExists ? {} : { firstLogin: true, termsAccepted: false, createdAt: serverTimestamp() }),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        batch.set(
+          doc(db, 'kiosk_employees', record.id),
+          {
+            ...kioskPayload,
+            ...(kioskEmployeeExists ? {} : { firstLogin: true, termsAccepted: false }),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        if (employeeExists) updatedEmployees++;
+        else createdEmployees++;
+
+        writes += 2;
+        await commitIfNeeded();
+      }
+
+      await commitIfNeeded(true);
+
+      const localSync = syncLocalKioskEmployees(
+        importPreview.records.map(record => ({
+          id: record.id,
+          name: record.name,
+          area: record.area,
+          personnelArea: record.personnelArea,
+          plantArea: record.plantArea,
+          position: record.position,
+          jobFunction: record.jobFunction,
+          active: true,
+        }))
+      );
+
+      toast.success(
+        `Base cargada: ${createdEmployees} nuevos, ${updatedEmployees} actualizados. Kiosko local: ${localSync.total}.`
+      );
+      setImportOpen(false);
+      resetPersonnelImport();
+    } catch (error) {
+      console.error('[Personnel import write error]', error);
+      toast.error('No se pudo cargar la base. Verifica permisos de admin y reglas de Firebase.');
+    } finally {
+      setImportingPersonnel(false);
+    }
+  };
+
   const toggleStatus = async (emp: Employee) => {
     try {
       const nextActive = !emp.active;
@@ -129,6 +276,11 @@ export default function EmpleadosPage() {
         doc(db, 'kiosk_employees', emp.docId),
         {
           name: emp.name,
+          area: emp.area,
+          personnelArea: emp.personnelArea ?? '',
+          plantArea: emp.plantArea ?? emp.area,
+          position: emp.position ?? '',
+          jobFunction: emp.jobFunction ?? '',
           active: nextActive,
           updatedAt: serverTimestamp(),
         },
@@ -149,6 +301,10 @@ export default function EmpleadosPage() {
         id: emp.id,
         name: emp.name,
         area: emp.area,
+        personnelArea: emp.personnelArea,
+        plantArea: emp.plantArea,
+        position: emp.position,
+        jobFunction: emp.jobFunction,
         active: emp.active,
       }))
     );
@@ -167,6 +323,11 @@ export default function EmpleadosPage() {
         const kioskRef = doc(db, 'kiosk_employees', emp.docId);
         const baseData = {
           name: emp.name,
+          area: emp.area,
+          personnelArea: emp.personnelArea ?? '',
+          plantArea: emp.plantArea ?? emp.area,
+          position: emp.position ?? '',
+          jobFunction: emp.jobFunction ?? '',
           active: emp.active,
           updatedAt: serverTimestamp(),
         };
@@ -238,9 +399,16 @@ export default function EmpleadosPage() {
   }, []);
 
   const filtered = employees.filter(emp => {
-    const matchSearch = emp.name.toLowerCase().includes(search.toLowerCase()) ||
-      emp.id.toLowerCase().includes(search.toLowerCase()) ||
-      emp.area.toLowerCase().includes(search.toLowerCase());
+    const searchable = [
+      emp.name,
+      emp.id,
+      emp.area,
+      emp.personnelArea,
+      emp.plantArea,
+      emp.position,
+      emp.jobFunction,
+    ].filter(Boolean).join(' ').toLowerCase();
+    const matchSearch = searchable.includes(search.toLowerCase());
     const matchStatus = filterStatus === 'all' ? true :
       filterStatus === 'active' ? emp.active : !emp.active;
     return matchSearch && matchStatus;
@@ -248,6 +416,7 @@ export default function EmpleadosPage() {
 
   const activeCount = employees.filter(e => e.active).length;
   const inactiveCount = employees.filter(e => !e.active).length;
+  const importHasBlockingIssues = importPreview ? hasBlockingPersonnelIssues(importPreview) : false;
 
   return (
     <motion.div 
@@ -273,6 +442,13 @@ export default function EmpleadosPage() {
         </div>
         
         <div className="relative z-10 flex flex-col sm:flex-row gap-4">
+          <Button
+            onClick={() => setImportOpen(true)}
+            className="h-12 px-5 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-all font-bold uppercase tracking-widest text-xs gap-3 group"
+          >
+            <Database className="h-5 w-5 group-hover:scale-110 transition-transform text-sky-400" />
+            Cargar Base Planta
+          </Button>
           <Button
             onClick={syncKioskEmployees}
             disabled={syncingKiosk || employees.length === 0}
@@ -375,12 +551,21 @@ export default function EmpleadosPage() {
                     <td className="px-8 py-6 font-bold text-white/90 font-mono tracking-tight text-lg">#{emp.id}</td>
                     <td className="px-8 py-6">
                        <p className="font-bold text-white text-lg tracking-tight">{emp.name}</p>
-                       <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">Colaborador FEMSA</p>
+                       <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">
+                         {emp.position || emp.jobFunction || 'Colaborador FEMSA'}
+                       </p>
                     </td>
                     <td className="px-8 py-6">
-                      <span className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 font-bold text-[10px] tracking-widest uppercase text-white/70">
-                        {emp.area}
-                      </span>
+                      <div className="flex flex-col items-start gap-2">
+                        <span className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 font-bold text-[10px] tracking-widest uppercase text-white/70">
+                          {emp.area}
+                        </span>
+                        {emp.personnelArea && (
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">
+                            {emp.personnelArea}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-8 py-6">
                       <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-xl border font-bold text-[10px] uppercase tracking-widest ${
@@ -424,6 +609,143 @@ export default function EmpleadosPage() {
           </table>
         </div>
       </div>
+
+      {/* ── Personnel Import Dialog ─────────────── */}
+      <Dialog
+        open={importOpen}
+        onOpenChange={(open) => {
+          setImportOpen(open);
+          if (!open && !importingPersonnel) resetPersonnelImport();
+        }}
+      >
+        <DialogContent className="sm:max-w-4xl rounded-[2rem] border border-white/10 p-0 overflow-hidden shadow-2xl bg-[#040813]">
+          <div className="bg-white/5 p-8 relative border-b border-white/10">
+            <div className="absolute top-0 right-0 p-8 opacity-10">
+              <Database className="h-20 w-20 text-white" />
+            </div>
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black tracking-tight text-white uppercase">Base Operativa de Planta</DialogTitle>
+              <p className="text-white/50 font-medium mt-1">Carga controlada de colaboradores autorizados para portal y kiosko.</p>
+            </DialogHeader>
+          </div>
+
+          <div className="p-8 space-y-6 max-h-[72vh] overflow-y-auto">
+            <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-6">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Archivo TSV / TXT de personal</Label>
+              <Input
+                type="file"
+                accept=".txt,.tsv,text/plain,text/tab-separated-values"
+                onChange={handlePersonnelFile}
+                disabled={importingPersonnel}
+                className="mt-3 h-14 rounded-xl bg-white/5 border-white/10 text-white file:mr-4 file:rounded-lg file:border-0 file:bg-[#F40009] file:px-4 file:py-2 file:text-xs file:font-black file:uppercase file:tracking-widest file:text-white hover:file:bg-red-700"
+              />
+              {importFileName && (
+                <div className="mt-4 flex items-center gap-3 text-sm font-bold text-white/70">
+                  <Upload className="h-4 w-4 text-sky-400" />
+                  {importFileName}
+                </div>
+              )}
+            </div>
+
+            {importPreview && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                    <p className="section-eyebrow mb-2">Registros</p>
+                    <p className="text-3xl font-black text-white">{importPreview.summary.validRows}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                    <p className="section-eyebrow mb-2">Columnas</p>
+                    <p className="text-3xl font-black text-white">{importPreview.summary.columnCount}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                    <p className="section-eyebrow mb-2">Duplicados</p>
+                    <p className={`text-3xl font-black ${importPreview.summary.duplicateIds.length ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {importPreview.summary.duplicateIds.length}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                    <p className="section-eyebrow mb-2">Estado</p>
+                    <p className={`text-sm font-black uppercase tracking-widest ${importHasBlockingIssues ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {importHasBlockingIssues ? 'Bloqueado' : 'Listo'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                    <h3 className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] mb-4">AREA PLANTA</h3>
+                    <div className="space-y-3">
+                      {Object.entries(importPreview.summary.byPlantArea).map(([area, total]) => (
+                        <div key={area} className="flex items-center justify-between gap-4">
+                          <span className="text-xs font-bold uppercase tracking-widest text-white/65">{area}</span>
+                          <span className="rounded-lg bg-white/10 px-3 py-1 text-[10px] font-black text-white">{total}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                    <h3 className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] mb-4">Validación</h3>
+                    {importPreview.issues.length === 0 ? (
+                      <div className="flex items-center gap-3 text-emerald-400 font-bold text-sm">
+                        <CheckCircle2 className="h-5 w-5" />
+                        Formato validado sin incidencias.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {importPreview.issues.slice(0, 6).map((issue, index) => (
+                          <div key={`${issue.row}-${index}`} className="flex items-start gap-3 rounded-xl border border-white/10 bg-black/20 p-3">
+                            <FileWarning className={`mt-0.5 h-4 w-4 ${issue.severity === 'error' ? 'text-red-400' : 'text-amber-400'}`} />
+                            <div>
+                              <p className={`text-[10px] font-black uppercase tracking-widest ${issue.severity === 'error' ? 'text-red-400' : 'text-amber-400'}`}>
+                                Fila {issue.row} · {issue.severity === 'error' ? 'Error' : 'Aviso'}
+                              </p>
+                              <p className="text-xs font-medium text-white/65 mt-1">{issue.message}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {importPreview.issues.length > 6 && (
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-white/35">
+                            +{importPreview.issues.length - 6} incidencias adicionales
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-amber-300/20 bg-amber-500/10 p-5">
+                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-300 mb-2">Datos privados omitidos</p>
+                  <p className="text-sm font-medium leading-relaxed text-white/60">
+                    RFC, IMSS, CURP y fecha de nacimiento no se escriben en el snapshot del kiosko ni en la carga operativa inicial.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="border-t border-white/10 p-6">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setImportOpen(false)}
+              disabled={importingPersonnel}
+              className="h-12 rounded-xl font-bold uppercase tracking-widest text-[10px] text-white/50 hover:text-white hover:bg-white/10"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={importPersonnelBase}
+              disabled={!importPreview || importHasBlockingIssues || importingPersonnel || importPreview.records.length === 0}
+              className="h-12 rounded-xl bg-[#F40009] hover:bg-red-700 text-white font-bold uppercase tracking-widest text-xs px-6"
+            >
+              {importingPersonnel ? <Loader2 className="h-5 w-5 animate-spin" /> : `Cargar ${importPreview?.summary.validRows ?? 0} colaboradores`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Add Employee Dialog ──────────────────── */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
