@@ -85,7 +85,7 @@ service cloud.firestore {
       return request.auth != null
         && request.auth.token.email_verified == true
         && request.auth.token.email in [
-          'mimonkb222@gmail.com'
+          'mimonkb222@gmail.com',       'malvamora23@gmail.com'
           // Agrega más emails separados por comas
         ];
     }
