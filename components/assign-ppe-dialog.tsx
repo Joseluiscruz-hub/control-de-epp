@@ -97,45 +97,45 @@ export function AssignPpeDialog() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-between p-6 bg-white hover:bg-red-50 rounded-[1.5rem] transition-all border border-slate-100 shadow-xl shadow-red-100/20 group text-left"
+        className="surface-action w-full flex items-center justify-between p-4 group text-left"
       >
-        <div className="flex items-center gap-5">
-          <div className="h-14 w-14 rounded-2xl bg-[#F40009] flex items-center justify-center shadow-xl shadow-red-200 group-hover:scale-110 transition-transform">
-            <ShieldCheck className="h-7 w-7 text-white" />
+        <div className="flex items-center gap-4">
+          <div className="h-11 w-11 rounded-lg bg-[#F40009] flex items-center justify-center shadow-lg shadow-red-950/20 group-hover:scale-105 transition-transform">
+            <ShieldCheck className="h-5 w-5 text-white" />
           </div>
           <div>
-            <p className="text-lg font-black text-slate-950 leading-tight uppercase tracking-tighter">Nueva Dotación</p>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Asignar material a nómina</p>
+            <p className="text-sm font-black text-white leading-tight uppercase tracking-wide">Nueva Dotación</p>
+            <p className="section-eyebrow mt-1">Asignar material a nómina</p>
           </div>
         </div>
-        <div className="h-10 w-10 rounded-full flex items-center justify-center bg-slate-50 group-hover:bg-[#F40009] transition-colors">
-          <ArrowRight className="h-5 w-5 text-slate-300 group-hover:text-white transition-colors" />
+        <div className="h-9 w-9 rounded-lg flex items-center justify-center bg-white/5 group-hover:bg-[#F40009] transition-colors">
+          <ArrowRight className="h-4 w-4 text-white/35 group-hover:text-white transition-colors" />
         </div>
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[500px] rounded-[3rem] border-none p-0 overflow-hidden shadow-2xl">
-          <div className="bg-slate-950 p-10 text-white relative">
-             <div className="absolute top-0 right-0 p-8 opacity-10">
+        <DialogContent className="sm:max-w-[500px] rounded-xl border border-white/10 p-0 overflow-hidden shadow-2xl bg-[#07090d]">
+          <div className="bg-white/[0.055] p-7 text-white relative border-b border-white/10">
+             <div className="absolute top-0 right-0 p-8 opacity-5">
                 <HardHat className="h-20 w-20" />
              </div>
              <DialogHeader>
-                <DialogTitle className="text-3xl font-black uppercase tracking-tight">Registro de Entrega</DialogTitle>
-                <p className="text-slate-400 font-bold mt-1">Vincular EPP a un colaborador en planta.</p>
+                <DialogTitle className="text-2xl font-black uppercase tracking-tight">Registro de Entrega</DialogTitle>
+                <p className="text-white/50 font-bold mt-1">Vincular EPP a un colaborador en planta.</p>
              </DialogHeader>
           </div>
           
-          <form onSubmit={handleSubmit} className="p-10 space-y-8 bg-white">
+          <form onSubmit={handleSubmit} className="p-7 space-y-6">
             <div className="space-y-4">
-              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Seleccionar Colaborador</Label>
+              <Label className="section-eyebrow ml-1">Seleccionar Colaborador</Label>
               <Select value={selectedEmployee} onValueChange={v => setSelectedEmployee(v || '')} disabled={loading}>
-                <SelectTrigger className="h-16 rounded-2xl bg-slate-50 border-none shadow-inner font-bold text-lg px-6">
+                <SelectTrigger className="h-14 rounded-lg bg-white/5 border-white/10 font-bold text-white px-5">
                   <div className="flex items-center gap-3">
                     <UserCheck className="h-5 w-5 text-red-600" />
                     <SelectValue placeholder="Buscar por nombre..." />
                   </div>
                 </SelectTrigger>
-                <SelectContent className="rounded-2xl border-none shadow-2xl">
+                <SelectContent className="rounded-lg border-white/10 bg-[#10151d] text-white shadow-2xl">
                   {employees.map(emp => (
                     <SelectItem key={emp.id} value={emp.id} className="font-bold py-3 px-4">{emp.name}</SelectItem>
                   ))}
@@ -144,20 +144,20 @@ export function AssignPpeDialog() {
             </div>
 
             <div className="space-y-4">
-              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Especificación de Equipo (SKU)</Label>
+              <Label className="section-eyebrow ml-1">Especificación de Equipo (SKU)</Label>
               <Select value={selectedItem} onValueChange={v => setSelectedItem(v || '')} disabled={loading}>
-                <SelectTrigger className="h-16 rounded-2xl bg-slate-50 border-none shadow-inner font-bold text-lg px-6">
+                <SelectTrigger className="h-14 rounded-lg bg-white/5 border-white/10 font-bold text-white px-5">
                   <div className="flex items-center gap-3">
                     <HardHat className="h-5 w-5 text-red-600" />
                     <SelectValue placeholder="Seleccionar material..." />
                   </div>
                 </SelectTrigger>
-                <SelectContent className="rounded-2xl border-none shadow-2xl">
+                <SelectContent className="rounded-lg border-white/10 bg-[#10151d] text-white shadow-2xl">
                   {items.map(it => (
                     <SelectItem key={it.id} value={it.id} className="font-bold py-3 px-4">
                        <div className="flex justify-between items-center w-full gap-10">
                           <span>{it.name}</span>
-                          <Badge className="bg-slate-100 text-slate-500 border-none font-black text-[9px]">STOCK: {it.stock}</Badge>
+                          <Badge className="rounded-md bg-white/10 text-white/60 border-none font-black text-[9px]">STOCK: {it.stock}</Badge>
                        </div>
                     </SelectItem>
                   ))}
@@ -167,7 +167,7 @@ export function AssignPpeDialog() {
 
             <Button 
               type="submit" 
-              className="w-full h-20 rounded-[1.5rem] bg-[#F40009] hover:bg-slate-950 text-white font-black uppercase tracking-widest shadow-2xl transition-all text-sm active:scale-95" 
+              className="w-full h-14 rounded-lg bg-[#F40009] hover:bg-red-700 text-white font-black uppercase tracking-widest shadow-xl transition-all text-sm active:scale-95"
               disabled={loading || !selectedEmployee || !selectedItem}
             >
               {loading ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : "Confirmar Dotación Técnica"}

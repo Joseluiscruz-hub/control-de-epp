@@ -254,20 +254,20 @@ export default function EmpleadosPage() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8 }}
-      className="space-y-12 pb-20"
+      className="space-y-6 pb-20"
     >
       {/* ── Header ───────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 p-12 rounded-[3.5rem] relative overflow-hidden glass-card">
-        <div className="absolute top-0 right-0 w-64 h-full bg-red-600/10 -mr-20 -skew-x-12 blur-2xl" />
+      <div className="executive-hero flex flex-col lg:flex-row lg:items-center justify-between gap-8 p-8">
+        <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-red-600/10 to-transparent pointer-events-none" />
         
         <div className="relative z-10 space-y-4">
           <div className="flex items-center gap-3">
              <span className="badge-femsa">Capital Humano · Seguridad</span>
           </div>
-          <h1 className="text-5xl lg:text-6xl font-black tracking-tighter text-white">
+          <h1 className="text-4xl lg:text-5xl font-black tracking-tight text-white">
             Directorio de <span className="text-gradient-red">Talento</span>
           </h1>
-          <p className="text-white/50 font-medium text-lg max-w-xl">
+          <p className="text-white/55 font-medium text-base max-w-xl">
             Gestión integral del personal y trazabilidad de su equipamiento de seguridad.
           </p>
         </div>
@@ -276,14 +276,14 @@ export default function EmpleadosPage() {
           <Button
             onClick={syncKioskEmployees}
             disabled={syncingKiosk || employees.length === 0}
-            className="h-16 px-8 rounded-2xl bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-all font-bold uppercase tracking-widest text-xs gap-3 group"
+            className="h-12 px-5 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-all font-bold uppercase tracking-widest text-xs gap-3 group"
           >
             {syncingKiosk ? <Loader2 className="h-5 w-5 animate-spin" /> : <HardHat className="h-5 w-5 group-hover:scale-110 transition-transform text-amber-500" />}
             Sincronizar Kiosko
           </Button>
           <Button
             onClick={() => setAddOpen(true)}
-            className="h-16 px-8 rounded-2xl bg-[#F40009] hover:bg-red-700 text-white shadow-[0_0_20px_rgba(244,0,9,0.3)] transition-all font-bold uppercase tracking-widest text-xs gap-3 group"
+            className="h-12 px-5 rounded-lg bg-[#F40009] hover:bg-red-700 text-white shadow-lg shadow-red-950/30 transition-all font-bold uppercase tracking-widest text-xs gap-3 group"
           >
             <UserPlus className="h-5 w-5 group-hover:scale-110 transition-transform" />
             Vincular Nuevo
@@ -293,49 +293,49 @@ export default function EmpleadosPage() {
 
       {/* ── Mini Stats Grid ──────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="kpi-card p-8 group">
+        <div className="kpi-card p-6 group">
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
              <Users className="h-20 w-20 text-white" />
           </div>
-          <p className="text-[11px] font-black text-white/40 uppercase tracking-[0.3em] mb-2">Plantilla Total</p>
-          <p className="text-5xl font-black text-white tracking-tighter">{employees.length}</p>
+          <p className="section-eyebrow mb-2">Plantilla Total</p>
+          <p className="text-4xl font-black text-white tracking-tight">{employees.length}</p>
         </div>
         
-        <div className="kpi-card p-8 group" style={{borderColor: 'rgba(16,185,129,0.2)'}}>
+        <div className="kpi-card p-6 group" style={{borderColor: 'rgba(16,185,129,0.2)'}}>
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
              <UserCheck className="h-20 w-20 text-emerald-500" />
           </div>
-          <p className="text-[11px] font-black text-emerald-500/80 uppercase tracking-[0.3em] mb-2">Colaboradores Activos</p>
-          <p className="text-5xl font-black text-emerald-400 tracking-tighter">{activeCount}</p>
+          <p className="section-eyebrow mb-2" style={{color:'rgba(16,185,129,0.8)'}}>Colaboradores Activos</p>
+          <p className="text-4xl font-black text-emerald-400 tracking-tight">{activeCount}</p>
         </div>
 
-        <div className="kpi-card p-8 group" style={{borderColor: 'rgba(244,0,9,0.2)'}}>
+        <div className="kpi-card p-6 group" style={{borderColor: 'rgba(244,0,9,0.2)'}}>
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
              <UserX className="h-20 w-20 text-red-500" />
           </div>
-          <p className="text-[11px] font-black text-red-500/80 uppercase tracking-[0.3em] mb-2">En Baja / Inactivos</p>
-          <p className="text-5xl font-black text-red-500 tracking-tighter">{inactiveCount}</p>
+          <p className="section-eyebrow mb-2" style={{color:'rgba(248,113,113,0.82)'}}>En Baja / Inactivos</p>
+          <p className="text-4xl font-black text-red-500 tracking-tight">{inactiveCount}</p>
         </div>
       </div>
 
       {/* ── Filter and Search Bar ────────────────── */}
-      <div className="flex flex-col md:flex-row gap-4 p-4 rounded-3xl glass-card">
+      <div className="enterprise-panel flex flex-col md:flex-row gap-4 p-4">
         <div className="relative flex-1 group">
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40 group-focus-within:text-[#F40009] transition-colors" />
           <Input
             placeholder="Filtrar por nombre, nómina o departamento..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-14 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/30 focus-visible:ring-[#F40009] font-medium"
+            className="pl-14 h-12 bg-white/5 border-white/10 rounded-lg text-white placeholder:text-white/30 focus-visible:ring-[#F40009] font-medium"
           />
         </div>
-        <div className="flex p-1 bg-white/5 rounded-2xl gap-1 border border-white/5">
+        <div className="flex p-1 bg-white/5 rounded-lg gap-1 border border-white/5">
           {(['all', 'active', 'inactive'] as const).map(s => (
             <Button
               key={s}
               variant="ghost"
               onClick={() => setFilterStatus(s)}
-              className={`h-12 px-6 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all ${
+              className={`h-10 px-5 rounded-md font-bold text-[10px] uppercase tracking-widest transition-all ${
                 filterStatus === s 
                   ? 'bg-white/15 text-white shadow-lg' 
                   : 'text-white/40 hover:text-white hover:bg-white/5'
@@ -348,9 +348,9 @@ export default function EmpleadosPage() {
       </div>
 
       {/* ── Corporate Table View ─────────────────── */}
-      <div className="glass-card rounded-[2.5rem] overflow-hidden">
+      <div className="enterprise-panel">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full premium-table">
             <thead>
               <tr className="bg-white/5 text-left border-b border-white/10">
                 <th className="px-8 py-6 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Identificación</th>

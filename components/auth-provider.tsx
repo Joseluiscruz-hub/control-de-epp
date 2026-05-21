@@ -112,14 +112,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6 relative overflow-hidden">
-        {/* Background Effects - FEMSA Premium */}
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#07090d] p-6 relative overflow-hidden">
+        {/* Executive background */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-femsa-red/20 via-transparent to-femsa-black/80" />
-          <div className="absolute -top-40 -left-40 w-96 h-96 bg-femsa-red/15 rounded-full blur-[120px]" />
-          <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-femsa-red-dark/20 rounded-full blur-[120px]" />
-          {/* Grid pattern */}
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:3rem_3rem]" />
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(244,0,9,0.16),transparent_36%,rgba(212,160,23,0.06))]" />
         </div>
 
         <motion.div
@@ -136,8 +133,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
               transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 15 }}
               className="inline-flex relative mb-6"
             >
-              <div className="absolute inset-0 bg-red-600 rounded-3xl blur-2xl opacity-30" />
-              <div className="relative h-24 w-24 rounded-3xl bg-[#F40009] flex items-center justify-center shadow-2xl shadow-red-500/40">
+              <div className="relative h-20 w-20 rounded-xl bg-[#F40009] flex items-center justify-center shadow-2xl shadow-red-950/40">
                 <ShieldCheck className="h-12 w-12 text-white" />
               </div>
             </motion.div>
@@ -146,46 +142,46 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Login Card */}
-          <div className="bg-white rounded-[3rem] shadow-2xl shadow-red-900/10 overflow-hidden">
+          <div className="enterprise-panel">
             {/* FEMSA gradient stripe */}
             <div className="h-1.5 bg-gradient-to-r from-femsa-red via-coca-cola-red to-femsa-gold" />
             
-            <div className="p-12 text-center space-y-8">
+            <div className="p-10 text-center space-y-8">
               <div className="space-y-3">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-slate-50 rounded-full border border-slate-100">
-                  <Lock className="h-3.5 w-3.5 text-slate-400" />
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Acceso Restringido</span>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg border border-white/10 bg-white/5">
+                  <Lock className="h-3.5 w-3.5 text-white/45" />
+                  <span className="section-eyebrow">Acceso Restringido</span>
                 </div>
-                <h2 className="text-3xl font-black text-slate-950 tracking-tight">Panel Administrativo</h2>
-                <p className="text-slate-400 font-medium leading-relaxed max-w-sm mx-auto">
+                <h2 className="text-3xl font-black text-white tracking-tight">Panel Administrativo</h2>
+                <p className="text-white/50 font-medium leading-relaxed max-w-sm mx-auto">
                   Inicia sesión con tu cuenta corporativa para acceder a la gestión de inventario y personal.
                 </p>
               </div>
 
               <Button 
                 onClick={signIn} 
-                className="w-full h-20 rounded-[2rem] bg-slate-950 hover:bg-[#F40009] shadow-2xl shadow-slate-200 transition-all duration-500 text-white font-black uppercase tracking-widest text-xs gap-4 group active:scale-[0.98]"
+                className="w-full h-16 rounded-lg bg-[#F40009] hover:bg-red-700 shadow-xl shadow-red-950/30 transition-all duration-300 text-white font-black uppercase tracking-widest text-xs gap-4 group active:scale-[0.98]"
               >
-                <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
                   <Fingerprint className="h-5 w-5" />
                 </div>
                 Continuar con Google
                 <ArrowRight className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
               </Button>
               
-              <div className="pt-6 border-t border-slate-100 space-y-3">
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">¿Eres colaborador?</p>
+              <div className="pt-6 border-t border-white/10 space-y-3">
+                <p className="section-eyebrow">¿Eres colaborador?</p>
                 <div className="flex flex-col gap-3">
                   <a
                     href="/portal"
-                    className="inline-flex items-center justify-center gap-2 text-sm font-black text-[#F40009] hover:text-red-700 transition-colors uppercase tracking-wider group"
+                    className="inline-flex items-center justify-center gap-2 text-sm font-black text-[#F40009] hover:text-red-300 transition-colors uppercase tracking-wider group"
                   >
                     Ir al Portal de Seguridad
                     <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </a>
                   <a
                     href="/kiosko"
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-5 py-3 text-xs font-black text-slate-700 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 transition-colors uppercase tracking-wider group"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-5 py-3 text-xs font-black text-white/70 hover:border-amber-300/40 hover:bg-amber-500/10 hover:text-amber-300 transition-colors uppercase tracking-wider group"
                   >
                     <HardHat className="h-4 w-4" />
                     Solicitar EPP en Kiosko
@@ -212,7 +208,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
           <div className="badge-femsa inline-block">
             Coca-Cola FEMSA · Plataforma Corporativa Oficial
           </div>
-          <p className="text-[9px] text-slate-600 uppercase tracking-[0.4em]">AssetGuard v4.0 · Seguridad Industrial</p>
+          <p className="text-[9px] text-white/25 uppercase tracking-[0.4em]">AssetGuard v4.0 · Seguridad Industrial</p>
         </motion.div>
       </div>
     );

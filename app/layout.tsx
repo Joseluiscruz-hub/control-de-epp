@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 import { AuthProvider, AuthGuard } from '@/components/auth-provider';
 import { NavBar } from '@/components/navbar';
 import { Toaster } from '@/components/ui/sonner';
-import { AiChatPanel } from '@/components/ai-chat-panel';
 import { MouseTracker } from '@/components/mouse-tracker';
+import { AppExtras, AppMain } from '@/components/app-extras';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -38,30 +38,14 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body suppressHydrationWarning className="min-h-screen mesh-bg text-foreground antialiased selection:bg-red-900/40 selection:text-red-200">
-        {/* Aurora animated background lights */}
-        <div className="aurora-1" aria-hidden="true" />
-        <div className="aurora-2" aria-hidden="true" />
-
         <AuthProvider>
           <AuthGuard>
             <MouseTracker />
             <NavBar />
-            <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <AppMain>
               {children}
-            </main>
-            {/* FEMSA Corporate Footer */}
-            <footer className="relative z-10 no-print mt-auto">
-              <div className="femsa-divider mx-8" />
-              <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-2">
-                <span className="text-[rgba(248,250,252,0.3)] text-[10px] uppercase tracking-[0.2em] font-bold">
-                  AssetGuard Corporate v4.0
-                </span>
-                <span className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: 'rgba(244,0,9,0.4)' }}>
-                  Coca-Cola FEMSA · Impulsado por Gemini IA
-                </span>
-              </div>
-            </footer>
-            <AiChatPanel />
+            </AppMain>
+            <AppExtras />
           </AuthGuard>
         </AuthProvider>
         <Toaster />

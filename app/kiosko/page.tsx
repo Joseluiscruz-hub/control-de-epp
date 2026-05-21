@@ -82,15 +82,15 @@ export default function KioskoHomePage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-10 px-8 py-16 relative overflow-hidden bg-[#040813]">
+    <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8 py-14 relative overflow-hidden bg-[#07090d]">
       {/* ── Background Elements ──────────────── */}
       <div className="absolute inset-0 pointer-events-none">
-         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-500/5 rounded-full blur-[120px]" />
-         <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,black_40%,transparent_100%)]" />
+         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:48px_48px]" />
+         <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(245,158,11,0.14),transparent_40%,rgba(244,0,9,0.05))]" />
       </div>
 
       <div className="flex flex-col items-center gap-4 text-center relative z-10">
-        <div className="w-24 h-24 rounded-[2rem] bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shadow-[0_0_40px_rgba(245,158,11,0.2)] mb-2">
+        <div className="w-20 h-20 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shadow-xl shadow-black/30 mb-2">
           <HardHat size={48} className="text-amber-500" />
         </div>
         <h1 className="text-4xl font-black text-white tracking-tight uppercase">Kiosko EPP</h1>
@@ -111,14 +111,14 @@ export default function KioskoHomePage() {
             value={empId}
             onChange={e => setEmpId(e.target.value.replace(/\D/g, ""))}
             onKeyDown={e => e.key === "Enter" && handleContinue()}
-            className="w-full text-center text-4xl font-black tracking-widest bg-white/5 border border-white/10 focus:border-amber-500 focus:bg-white/10 rounded-2xl px-6 py-6 text-white outline-none transition-all placeholder:text-white/20 shadow-inner"
+            className="w-full text-center text-4xl font-black tracking-widest bg-white/5 border border-white/10 focus:border-amber-500 focus:bg-white/10 rounded-lg px-6 py-6 text-white outline-none transition-all placeholder:text-white/20 shadow-inner"
             maxLength={10}
             autoFocus
           />
         </div>
 
         {error && (
-          <p className="text-red-400 text-center text-sm font-bold bg-[#F40009]/10 border border-[#F40009]/20 rounded-xl px-4 py-4 uppercase tracking-wider">
+          <p className="text-red-400 text-center text-sm font-bold bg-[#F40009]/10 border border-[#F40009]/20 rounded-lg px-4 py-4 uppercase tracking-wider">
             {error}
           </p>
         )}
@@ -126,7 +126,7 @@ export default function KioskoHomePage() {
         <button
           onClick={handleContinue}
           disabled={!empId.trim() || loading}
-          className="w-full py-6 rounded-2xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-[#040813] font-black text-xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] flex items-center justify-center gap-3 uppercase tracking-widest"
+          className="w-full py-6 rounded-lg bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-[#07090d] font-black text-xl transition-all shadow-lg shadow-black/30 flex items-center justify-center gap-3 uppercase tracking-widest"
         >
           {loading ? <Loader2 size={28} className="animate-spin" /> : "Validar Nómina"}
         </button>
@@ -157,9 +157,9 @@ function NumPad({
         <button
           key={k}
           onClick={() => press(k)}
-          className={`h-16 rounded-2xl text-2xl font-black transition-all active:scale-95 select-none
+          className={`h-16 rounded-lg text-2xl font-black transition-all active:scale-95 select-none
             ${k === "✓"
-              ? "bg-amber-500 text-[#040813] hover:bg-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+              ? "bg-amber-500 text-[#07090d] hover:bg-amber-400 shadow-lg shadow-black/20"
               : k === "⌫"
               ? "bg-[#F40009]/20 text-[#F40009] border border-[#F40009]/30 hover:bg-[#F40009]/30"
               : "bg-white/5 text-white hover:bg-white/10 border border-white/10 hover:border-white/20"

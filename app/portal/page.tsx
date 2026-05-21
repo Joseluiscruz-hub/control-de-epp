@@ -78,13 +78,11 @@ export default function UserPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-[#040813] flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-[#07090d] flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
       {/* ── Dynamic Background ───────────────────── */}
       <div className="absolute inset-0 pointer-events-none">
-         <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-red-600/10 via-transparent to-transparent" />
-         <div className="absolute -top-40 -left-40 w-96 h-96 bg-red-600/10 rounded-full blur-[100px]" />
-         <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-red-900/10 rounded-full blur-[100px]" />
-         <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,black_40%,transparent_100%)]" />
+         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:48px_48px]" />
+         <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(244,0,9,0.14),transparent_38%,rgba(212,160,23,0.06))]" />
       </div>
 
       <div className="w-full max-w-2xl relative z-10">
@@ -95,7 +93,7 @@ export default function UserPortal() {
           transition={{ duration: 0.8 }}
           className="text-center mb-12"
         >
-          <div className="inline-flex h-20 w-20 rounded-2xl bg-white/5 border border-white/10 items-center justify-center shadow-[0_0_40px_rgba(244,0,9,0.15)] mb-8">
+          <div className="inline-flex h-16 w-16 rounded-xl bg-white/5 border border-white/10 items-center justify-center shadow-xl shadow-black/30 mb-8">
             <ShieldCheck className="h-10 w-10 text-[#F40009]" />
           </div>
           <h1 className="text-4xl font-black text-white tracking-tighter uppercase mb-2">Portal de Seguridad</h1>
@@ -111,19 +109,19 @@ export default function UserPortal() {
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.5, type: "spring", damping: 20 }}
             >
-              <div className="rounded-[2.5rem] bg-white/5 backdrop-blur-2xl border border-white/10 shadow-2xl overflow-hidden relative">
+              <div className="enterprise-panel relative">
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#F40009] to-transparent opacity-50" />
-                <div className="p-10 pb-6 text-center">
+                <div className="p-8 pb-5 text-center">
                   <h2 className="text-2xl font-black text-white tracking-tight">Bienvenido, Colaborador</h2>
                   <p className="text-sm text-white/50 font-medium mt-2">Consulta el estado de tu Equipo de Protección Personal.</p>
                 </div>
-                <div className="p-10 pt-6">
+                <div className="p-8 pt-5">
                   <form onSubmit={handleSearch} className="space-y-6">
                     <div className="relative group">
                       <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-white/40 group-focus-within:text-[#F40009] transition-colors" />
                       <Input
                         placeholder="Número de Nómina"
-                        className="pl-16 py-8 text-xl rounded-2xl border-white/10 bg-white/5 focus-visible:ring-[#F40009] text-white placeholder:text-white/30 transition-all font-black text-center"
+                        className="pl-16 py-7 text-xl rounded-lg border-white/10 bg-white/5 focus-visible:ring-[#F40009] text-white placeholder:text-white/30 transition-all font-black text-center"
                         value={employeeId}
                         onChange={(e) => setEmployeeId(e.target.value)}
                         autoFocus
@@ -131,7 +129,7 @@ export default function UserPortal() {
                     </div>
                     <Button 
                       type="submit" 
-                      className="w-full h-16 text-lg font-black bg-[#F40009] hover:bg-red-700 text-white transition-all active:scale-[0.98] rounded-xl uppercase tracking-widest group shadow-[0_0_20px_rgba(244,0,9,0.3)]"
+                      className="w-full h-14 text-sm font-black bg-[#F40009] hover:bg-red-700 text-white transition-all active:scale-[0.98] rounded-lg uppercase tracking-widest group shadow-lg shadow-red-950/30"
                       disabled={loading || !employeeId}
                     >
                       {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
@@ -143,7 +141,7 @@ export default function UserPortal() {
                     </Button>
                     <Link
                       href="/kiosko"
-                      className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 h-16 text-[11px] font-bold uppercase tracking-widest text-white/70 transition-all hover:border-[#F40009]/50 hover:text-white"
+                      className="flex w-full items-center justify-center gap-3 rounded-lg border border-white/10 bg-white/5 h-14 text-[11px] font-bold uppercase tracking-widest text-white/70 transition-all hover:border-[#F40009]/50 hover:text-white"
                     >
                       <HardHat className="h-4 w-4 text-amber-500" />
                       Solicitar EPP en Kiosko
@@ -161,10 +159,10 @@ export default function UserPortal() {
               className="space-y-6"
             >
             {/* ── Corporate Profile Card ───────────────── */}
-            <div className="border border-white/10 shadow-2xl bg-white/5 backdrop-blur-2xl rounded-[2.5rem] overflow-hidden">
+            <div className="enterprise-panel">
               <div className="bg-[#0A1628]/50 p-8 flex flex-col sm:flex-row items-center justify-between gap-6 border-b border-white/10">
                 <div className="flex items-center gap-6 text-center sm:text-left">
-                  <div className="h-16 w-16 rounded-2xl bg-[#F40009]/20 border border-[#F40009]/30 flex items-center justify-center text-[#F40009] shadow-lg">
+                  <div className="h-14 w-14 rounded-lg bg-[#F40009]/20 border border-[#F40009]/30 flex items-center justify-center text-[#F40009] shadow-lg">
                     <HardHat className="h-8 w-8" />
                   </div>
                   <div>
@@ -175,7 +173,7 @@ export default function UserPortal() {
                     </div>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setEmployee(null)} className="text-white/40 hover:text-white hover:bg-white/10 rounded-xl px-4 py-5 font-bold uppercase tracking-widest text-[10px]">
+                <Button variant="ghost" size="sm" onClick={() => setEmployee(null)} className="text-white/40 hover:text-white hover:bg-white/10 rounded-lg px-4 py-5 font-bold uppercase tracking-widest text-[10px]">
                   <ArrowLeft className="h-4 w-4 mr-2" /> Salir
                 </Button>
               </div>
@@ -185,8 +183,8 @@ export default function UserPortal() {
                   <h3 className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] pl-1 mb-4">Inventario Asignado</h3>
                   
                   {assignments.length === 0 ? (
-                    <div className="py-16 text-center space-y-4 rounded-2xl border border-white/5 bg-white/[0.02]">
-                       <div className="h-16 w-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto">
+                    <div className="py-16 text-center space-y-4 rounded-lg border border-white/5 bg-white/[0.02]">
+                       <div className="h-16 w-16 bg-white/5 rounded-lg flex items-center justify-center mx-auto">
                           <Activity className="h-8 w-8 text-white/20" />
                        </div>
                        <p className="text-white/50 font-bold text-sm">No se registran equipos asignados a esta nómina.</p>
@@ -202,7 +200,7 @@ export default function UserPortal() {
                             key={ass.id}
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className={`bg-white/5 rounded-2xl p-5 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 transition-all hover:bg-white/10 ${!isActive ? 'opacity-50 grayscale' : ''}`}
+                            className={`surface-action p-5 flex flex-col sm:flex-row items-center justify-between gap-4 ${!isActive ? 'opacity-50 grayscale' : ''}`}
                           >
                             <div className="flex items-center gap-4 w-full sm:w-auto">
                               <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${isActive ? (isOverdue ? 'bg-[#F40009]/20 text-[#F40009]' : 'bg-emerald-500/20 text-emerald-400') : 'bg-white/10 text-white/40'}`}>
@@ -248,10 +246,10 @@ export default function UserPortal() {
               </div>
             </div>
             
-            <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-6 border border-white/10 text-center">
+            <div className="enterprise-panel p-6 text-center">
               <Link
                 href="/kiosko"
-                className="mb-4 flex w-full items-center justify-center gap-3 rounded-xl bg-[#F40009] px-6 py-4 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-red-700 shadow-[0_0_20px_rgba(244,0,9,0.2)]"
+                className="mb-4 flex w-full items-center justify-center gap-3 rounded-lg bg-[#F40009] px-6 py-4 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-red-700 shadow-lg shadow-red-950/30"
               >
                 <HardHat className="h-4 w-4" />
                 Abrir Kiosko para solicitar EPP
