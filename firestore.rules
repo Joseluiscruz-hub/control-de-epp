@@ -94,7 +94,7 @@ service cloud.firestore {
       return data.keys().hasOnly([
           "id", "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt",
           "createdAt", "updatedAt", "division", "personnelArea", "plantArea", "costCenter",
-          "positionId", "position", "jobFunction", "hireDate", "sex", "source", "schemaVersion"
+          "positionId", "position", "jobFunction", "hireDate", "sex", "source", "schemaVersion", "rfc", "imss", "curp"
         ])
         && data.keys().hasAll(["id", "name", "area", "active", "createdAt", "updatedAt"])
         && data.id is string && data.id.size() > 0
