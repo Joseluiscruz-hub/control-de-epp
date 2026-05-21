@@ -28,7 +28,7 @@ export async function getEmployeeById(employeeId: string): Promise<KioskEmployee
     if (snap.exists()) return { id: snap.id, ...snap.data() } as KioskEmployee;
   } catch (error) {
     console.warn("[Kiosko] Usando empleado local por error de Firebase.", error);
-    return getLocalKioskEmployee(employeeId, true);
+    return getLocalKioskEmployee(employeeId, isLocalRuntime());
   }
   return getLocalKioskEmployee(employeeId, isLocalRuntime());
 }

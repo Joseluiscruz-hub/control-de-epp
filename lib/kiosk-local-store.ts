@@ -159,6 +159,10 @@ export function syncLocalKioskEmployees(input: Array<{
   id: string;
   name: string;
   area?: string;
+  personnelArea?: string;
+  plantArea?: string;
+  position?: string;
+  jobFunction?: string;
   active: boolean;
 }>) {
   ensureLocalKioskSeed();
@@ -179,6 +183,10 @@ export function syncLocalKioskEmployees(input: Array<{
       id: employee.id,
       name: employee.name,
       area: employee.area ?? current?.area ?? "Local",
+      personnelArea: employee.personnelArea ?? current?.personnelArea,
+      plantArea: employee.plantArea ?? current?.plantArea,
+      position: employee.position ?? current?.position,
+      jobFunction: employee.jobFunction ?? current?.jobFunction,
       active: employee.active,
       firstLogin: current?.firstLogin ?? true,
       termsAccepted: current?.termsAccepted ?? false,

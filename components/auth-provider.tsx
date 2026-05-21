@@ -5,7 +5,7 @@ import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut 
 import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
-import { ShieldCheck, LogIn, Fingerprint, Lock, ArrowRight, HardHat } from 'lucide-react';
+import { ShieldCheck, Fingerprint, Lock, ArrowRight, HardHat } from 'lucide-react';
 import { motion } from 'motion/react';
 
 // Lista de administradores — configurable por variable de entorno
@@ -46,7 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    const authTimeout = window.setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
     const unsubscribe = onAuthStateChanged(auth, (u) => {
+      window.clearTimeout(authTimeout);
       setUser(u);
       // Validar admin contra la lista de emails autorizados
       if (u?.email) {
@@ -56,8 +61,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsAdmin(false);
       }
       setLoading(false);
+    }, (error) => {
+      window.clearTimeout(authTimeout);
+      console.error('[Auth state error]', error);
+      setUser(null);
+      setIsAdmin(false);
+      setLoading(false);
     });
-    return () => unsubscribe();
+    return () => {
+      window.clearTimeout(authTimeout);
+      unsubscribe();
+    };
   }, []);
 
 
@@ -78,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading, signIn } = useAuth();
+  const { user, loading, signIn, isAdmin, logOut } = useAuth();
   const pathname = usePathname();
 
   // Permitir acceso total al portal público y kiosko
@@ -209,6 +223,41 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             Coca-Cola FEMSA · Plataforma Corporativa Oficial
           </div>
           <p className="text-[9px] text-white/25 uppercase tracking-[0.4em]">AssetGuard v4.0 · Seguridad Industrial</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#07090d] p-6 relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:3rem_3rem]" />
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(244,0,9,0.16),transparent_36%,rgba(212,160,23,0.06))]" />
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55 }}
+          className="relative z-10 w-full max-w-lg enterprise-panel p-10 text-center space-y-8"
+        >
+          <div className="mx-auto h-16 w-16 rounded-xl bg-[#F40009]/20 border border-[#F40009]/30 flex items-center justify-center">
+            <Lock className="h-8 w-8 text-[#F40009]" />
+          </div>
+          <div className="space-y-3">
+            <p className="section-eyebrow">Acceso Administrativo</p>
+            <h1 className="text-3xl font-black text-white tracking-tight">Cuenta no autorizada</h1>
+            <p className="text-white/50 font-medium leading-relaxed">
+              {user.email} no está en la lista de administradores globales de AssetGuard.
+            </p>
+          </div>
+          <Button
+            onClick={logOut}
+            className="w-full h-14 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black uppercase tracking-widest text-xs"
+          >
+            Cambiar cuenta
+          </Button>
         </motion.div>
       </div>
     );

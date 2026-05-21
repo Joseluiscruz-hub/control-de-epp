@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,37 +38,42 @@ export default function UserPortal() {
 
     setLoading(true);
     try {
-      const empQuery = query(collection(db, 'employees'), where('id', '==', employeeId.trim()));
-      const empSnap = await getDocs(empQuery);
+      const normalizedEmployeeId = employeeId.trim();
+      const empDoc = await getDoc(doc(db, 'kiosk_employees', normalizedEmployeeId));
 
-      if (empSnap.empty) {
+      if (!empDoc.exists() || empDoc.data().active !== true) {
         setEmployee(null);
         setAssignments([]);
         toast.error('Número de empleado no válido');
         return;
       }
 
-      const empDoc = empSnap.docs[0];
+      const empData = empDoc.data();
       setEmployee({
-        id: empDoc.data().id,
-        name: empDoc.data().name,
-        area: empDoc.data().area,
+        id: empDoc.id,
+        name: empData.name,
+        area: empData.area ?? empData.plantArea ?? 'SIN ÁREA',
       });
 
-      const assQuery = query(collection(db, 'assignments'), where('employeeId', '==', empDoc.id));
-      const assSnap = await getDocs(assQuery);
-      
-      const assData = assSnap.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          sku: data.sku,
-          assignedAt: data.assignedAt instanceof Timestamp ? data.assignedAt.toDate() : new Date(),
-          nextReplacementAt: data.nextReplacementAt instanceof Timestamp ? data.nextReplacementAt.toDate() : undefined,
-          status: data.status,
-        };
-      }).sort((a, b) => b.assignedAt.getTime() - a.assignedAt.getTime());
-      setAssignments(assData);
+      try {
+        const assQuery = query(collection(db, 'assignments'), where('employeeId', '==', empDoc.id));
+        const assSnap = await getDocs(assQuery);
+
+        const assData = assSnap.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            sku: data.sku,
+            assignedAt: data.assignedAt instanceof Timestamp ? data.assignedAt.toDate() : new Date(),
+            nextReplacementAt: data.nextReplacementAt instanceof Timestamp ? data.nextReplacementAt.toDate() : undefined,
+            status: data.status,
+          };
+        }).sort((a, b) => b.assignedAt.getTime() - a.assignedAt.getTime());
+        setAssignments(assData);
+      } catch (historyError) {
+        console.warn('[Portal assignments unavailable]', historyError);
+        setAssignments([]);
+      }
     } catch (error) {
       console.error(error);
       toast.error('Error de conexión con el servidor corporativo');
