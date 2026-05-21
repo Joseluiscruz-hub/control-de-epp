@@ -10,9 +10,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      PROJECT_ID: gen-lang-client-0970386796
-      REGION: us-central1
-      SERVICE_NAME: control-de-epp
+      # ── Todas las variables se configuran en:
+      # ── GitHub → Settings → Secrets and Variables → Actions
+      # ── Pestaña "Variables" para las vars.*, pestaña "Secrets" para secrets.*
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+      SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE || 'control-de-epp' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,7 +43,15 @@ jobs:
             --allow-unauthenticated \
             --memory=1Gi \
             --port=8080 \
-            --set-env-vars="NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyAwNfsHHwiAPRHhQalKDqP89PNCdNRdyw0,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=gen-lang-client-0970386796.firebaseapp.com,NEXT_PUBLIC_FIREBASE_PROJECT_ID=gen-lang-client-0970386796,NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=gen-lang-client-0970386796.firebasestorage.app,NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=659644890317,NEXT_PUBLIC_FIREBASE_APP_ID=1:659644890317:web:80f1ac637b54e9afc17d84,NEXT_PUBLIC_FIREBASE_DATABASE_ID=ai-studio-43de38b5-a9c6-4b31-be67-595584a513fc" \
+            --set-env-vars="\
+          NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.FIREBASE_API_KEY }},\
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ vars.FIREBASE_AUTH_DOMAIN }},\
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ vars.FIREBASE_PROJECT_ID }},\
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }},\
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ vars.FIREBASE_MESSAGING_SENDER_ID }},\
+          NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.FIREBASE_APP_ID }},\
+          NEXT_PUBLIC_FIREBASE_DATABASE_ID=${{ vars.FIREBASE_DATABASE_ID }},\
+          NEXT_PUBLIC_ADMIN_EMAILS=${{ vars.ADMIN_EMAILS }}" \
             --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" 2>&1 | tee "${DEPLOY_LOG}"
 
           DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
@@ -59,6 +70,12 @@ jobs:
           echo "➡️  Habilítala aquí:"
           echo "https://console.developers.google.com/apis/api/run.googleapis.com/overview?project=${PROJECT_ID}"
           echo "🔁 Cuando se termine de habilitar, vuelve a ejecutar este workflow."
+
+      - name: Deploy Firestore Rules
+        if: steps.deploy.outputs.deploy_exit_code == '0'
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --only firestore:rules --project="${PROJECT_ID}" --token="${{ secrets.FIREBASE_TOKEN }}" --non-interactive
 
       - name: Fallar workflow si el deploy no fue exitoso
         if: steps.deploy.outputs.deploy_exit_code != '0'

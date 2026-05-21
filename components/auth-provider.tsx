@@ -8,11 +8,19 @@ import { usePathname } from 'next/navigation';
 import { ShieldCheck, LogIn, Fingerprint, Lock, ArrowRight, HardHat } from 'lucide-react';
 import { motion } from 'motion/react';
 
-// Lista de administradores (en un app real esto vendría de una base de datos o custom claims)
-const ADMIN_EMAILS = [
-  'admin@example.com',
-  'joseluis@example.com', // Ejemplo
-];
+// Lista de administradores — configurable por variable de entorno
+// En GitHub Variables → ADMIN_EMAILS (separados por comas)
+// En .env.local → NEXT_PUBLIC_ADMIN_EMAILS=email1@gmail.com,email2@gmail.com
+const ADMIN_EMAILS: string[] = (() => {
+  const envEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS;
+  if (envEmails) {
+    return envEmails.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  }
+  // Fallback para desarrollo local — REEMPLAZA con tu(s) email(s) real(es)
+  return [
+    '141293124+joseluiscruz-hub@users.noreply.github.com',
+  ];
+})();
 
 interface AuthContextType {
   user: User | null;
@@ -40,11 +48,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      // Check if user is admin
+      // Validar admin contra la lista de emails autorizados
       if (u?.email) {
-        // Para propósitos de esta demo, cualquier usuario logueado es admin si no restringimos
-        // Pero podemos añadir lógica aquí para filtrar
-        setIsAdmin(true); 
+        const userEmail = u.email.toLowerCase();
+        setIsAdmin(ADMIN_EMAILS.includes(userEmail));
       } else {
         setIsAdmin(false);
       }
@@ -52,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     return () => unsubscribe();
   }, []);
+
 
   const signIn = async () => {
     const provider = new GoogleAuthProvider();
