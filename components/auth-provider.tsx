@@ -18,7 +18,7 @@ const ADMIN_EMAILS: string[] = (() => {
   }
   // Fallback para desarrollo local — REEMPLAZA con tu(s) email(s) real(es)
   return [
-    '141293124+joseluiscruz-hub@users.noreply.github.com',
+    'mimonkb222@gmail.com',
   ];
 })();
 
