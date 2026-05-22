@@ -29,20 +29,14 @@ Los datos personales del empleado serán tratados conforme a la Ley Federal de P
 Al aceptar estos términos, el empleado reconoce haber leído, entendido y aceptado todas las condiciones aquí descritas.
 `.trim();
 
-function hashPin(pin: string): string {
-  // Simulación de hash — en producción usar API Route con bcrypt
-  let hash = 0;
-  for (let i = 0; i < pin.length; i++) {
-    hash = (hash << 5) - hash + pin.charCodeAt(i);
-    hash |= 0;
-  }
-  return "pin_" + Math.abs(hash).toString(36) + "_" + pin.length;
-}
-
 export default function KioskoSetupPage() {
   const router = useRouter();
-  const [employeeName, setEmployeeName] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
+  const [employeeName] = useState(() =>
+    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_name") ?? ""
+  );
+  const [employeeId] = useState(() =>
+    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_id") ?? ""
+  );
   const [step, setStep] = useState<"terms" | "pin">("terms");
   const [termsScrolled, setTermsScrolled] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -53,12 +47,10 @@ export default function KioskoSetupPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const name = sessionStorage.getItem("kiosk_employee_name") ?? "";
-    const id = sessionStorage.getItem("kiosk_employee_id") ?? "";
-    if (!id) { router.push("/kiosko"); return; }
-    setEmployeeName(name);
-    setEmployeeId(id);
-  }, []);
+    if (!employeeId) {
+      router.push("/kiosko");
+    }
+  }, [employeeId, router]);
 
   const handleTermsScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -89,8 +81,7 @@ export default function KioskoSetupPage() {
   const handleSave = async () => {
     setLoading(true);
     try {
-      const hash = hashPin(pin);
-      await saveEmployeePin(employeeId, hash);
+      await saveEmployeePin(employeeId, pin);
       sessionStorage.setItem("kiosk_pin_verified", "true");
       router.push("/kiosko/catalogo");
     } catch (e) {

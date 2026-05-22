@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowRight, Loader2, HardHat, UserCheck, ShieldCheck } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "./auth-provider";
-import { collection, query, getDocs, doc, setDoc, serverTimestamp, increment, updateDoc } from "firebase/firestore";
+import { collection, query, getDocs, doc, serverTimestamp, runTransaction, Timestamp } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-error";
 import { toast } from "sonner";
 import { addDays } from "date-fns";
@@ -32,21 +32,26 @@ export function AssignPpeDialog() {
       setEmployees(empSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
 
       const itemSnap = await getDocs(query(collection(db, 'ppe_catalog')));
-      setItems(itemSnap.docs.map(d => ({ 
+      setItems(itemSnap.docs.map(d => {
+        const data = d.data();
+        return {
         id: d.id, 
-        name: d.data().name, 
-        stock: d.data().stock,
-        replacementDays: d.data().replacementDays
-      })));
+        name: data.name,
+        stock: Number(data.stock ?? 0),
+        replacementDays: Number(data.replacementDays ?? 365)
+      };
+      }));
     } catch (err) {
       handleFirestoreError(err, OperationType.LIST, 'employees/ppe_catalog');
     }
   };
 
   useEffect(() => {
-    if (open) {
-      fetchData();
-    }
+    if (!open) return;
+
+    void (async () => {
+      await fetchData();
+    })();
   }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,28 +70,62 @@ export function AssignPpeDialog() {
       }
 
       const assignmentId = doc(collection(db, 'assignments')).id;
-      
-      await Promise.all([
-        setDoc(doc(db, 'assignments', assignmentId), {
+
+      await runTransaction(db, async (transaction) => {
+        const itemRef = doc(db, 'ppe_catalog', selectedItem);
+        const kioskItemRef = doc(db, 'kiosk_catalog', selectedItem);
+        const [itemSnap, kioskItemSnap] = await Promise.all([
+          transaction.get(itemRef),
+          transaction.get(kioskItemRef),
+        ]);
+
+        if (!itemSnap.exists()) {
+          throw new Error('item_not_found');
+        }
+
+        const itemData = itemSnap.data();
+        const stock = Number(itemData.stock ?? 0);
+        if (!Number.isFinite(stock) || stock <= 0) {
+          throw new Error('out_of_stock');
+        }
+
+        const nextStock = stock - 1;
+        const replacementDays = Number(itemData.replacementDays ?? itemRecord.replacementDays ?? 365);
+
+        transaction.set(doc(db, 'assignments', assignmentId), {
           employeeId: selectedEmployee,
-          sku: selectedItem,
+          sku: typeof itemData.sku === 'string' && itemData.sku ? itemData.sku : selectedItem,
+          size: 'N/A',
           assignedAt: serverTimestamp(),
-          nextReplacementAt: addDays(new Date(), itemRecord.replacementDays),
+          nextReplacementAt: Timestamp.fromDate(addDays(new Date(), replacementDays)),
           status: 'active',
           issuedByUserId: authUser?.uid || 'unknown'
-        }),
-        updateDoc(doc(db, 'ppe_catalog', selectedItem), {
-          stock: increment(-1),
+        });
+
+        transaction.update(itemRef, {
+          stock: nextStock,
           updatedAt: serverTimestamp()
-        })
-      ]);
+        });
+
+        if (kioskItemSnap.exists()) {
+          transaction.update(kioskItemRef, {
+            stock: nextStock,
+            available: nextStock > 0,
+            updatedAt: serverTimestamp()
+          });
+        }
+      });
 
       toast.success("EPP Asignado exitosamente");
       setOpen(false);
       setSelectedEmployee("");
       setSelectedItem("");
     } catch (err) {
-      toast.error("Hubo un error al registrar la entrega.");
+      if (err instanceof Error && err.message === 'out_of_stock') {
+        toast.error("No hay stock disponible para este artículo.");
+      } else {
+        toast.error("Hubo un error al registrar la entrega.");
+      }
       handleFirestoreError(err, OperationType.CREATE, 'assignments');
     } finally {
       setLoading(false);

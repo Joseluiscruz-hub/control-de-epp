@@ -5,19 +5,14 @@ import { useRouter } from "next/navigation";
 import { validateEmployeePin } from "@/lib/kiosk-api";
 import { Lock, Loader2 } from "lucide-react";
 
-function hashPin(pin: string): string {
-  let hash = 0;
-  for (let i = 0; i < pin.length; i++) {
-    hash = (hash << 5) - hash + pin.charCodeAt(i);
-    hash |= 0;
-  }
-  return "pin_" + Math.abs(hash).toString(36) + "_" + pin.length;
-}
-
 export default function KioskoLoginPage() {
   const router = useRouter();
-  const [employeeName, setEmployeeName] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
+  const [employeeName] = useState(() =>
+    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_name") ?? ""
+  );
+  const [employeeId] = useState(() =>
+    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_id") ?? ""
+  );
   const [pin, setPin] = useState("");
   const [attempts, setAttempts] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -25,12 +20,10 @@ export default function KioskoLoginPage() {
   const MAX_ATTEMPTS = 5;
 
   useEffect(() => {
-    const id = sessionStorage.getItem("kiosk_employee_id") ?? "";
-    const name = sessionStorage.getItem("kiosk_employee_name") ?? "";
-    if (!id) { router.push("/kiosko"); return; }
-    setEmployeeId(id);
-    setEmployeeName(name);
-  }, []);
+    if (!employeeId) {
+      router.push("/kiosko");
+    }
+  }, [employeeId, router]);
 
   const handleKey = async (k: string) => {
     if (loading || attempts >= MAX_ATTEMPTS) return;
@@ -40,8 +33,7 @@ export default function KioskoLoginPage() {
     if (k === "✓") {
       if (pin.length < 6) { setError("Ingresa los 6 dígitos."); return; }
       setLoading(true);
-      const hash = hashPin(pin);
-      const valid = await validateEmployeePin(employeeId, hash);
+      const valid = await validateEmployeePin(employeeId, pin);
       if (valid) {
         sessionStorage.setItem("kiosk_pin_verified", "true");
         router.push("/kiosko/catalogo");

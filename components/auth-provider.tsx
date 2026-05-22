@@ -19,6 +19,7 @@ const ADMIN_EMAILS: string[] = (() => {
   // Fallback para desarrollo local — REEMPLAZA con tu(s) email(s) real(es)
   return [
     'mimonkb222@gmail.com',
+    'malvamora23@gmail.com',
   ];
 })();
 

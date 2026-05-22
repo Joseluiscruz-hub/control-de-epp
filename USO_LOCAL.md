@@ -36,7 +36,7 @@ npm run local
 
 La interfaz corre en tu PC en `localhost`. Los datos y el inicio de sesion siguen usando Firebase, y el chat ARIA usa Gemini si defines `GEMINI_API_KEY` en `.env.local`.
 
-La configuracion de Firebase se toma primero de variables `NEXT_PUBLIC_FIREBASE_*`. Si no existen, la app usa `firebase-applet-config.json`, que sirve como configuracion local incluida.
+La configuracion de Firebase se toma exclusivamente de variables `NEXT_PUBLIC_FIREBASE_*`. Usa `.env.example` como plantilla para crear `.env.local`.
 
 Para un modo 100% local de datos se necesita configurar Firebase Emulator Suite y ajustar la app para conectarse a los emuladores.
 
