@@ -1,5 +1,76 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest } from 'next/server';
+import { getAdminDb } from '@/lib/firebase-admin';
+import { AuthHttpError, requireAdminUser } from '@/lib/server-auth';
+
+export const runtime = 'nodejs';
+
+function serializeFirestoreValue(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value !== 'object') return value;
+
+  if ('toDate' in value && typeof value.toDate === 'function') {
+    return value.toDate().toISOString();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(serializeFirestoreValue);
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+      key,
+      serializeFirestoreValue(entry),
+    ])
+  );
+}
+
+async function readPlantContext() {
+  const db = getAdminDb();
+  const [inventorySnap, employeesSnap, assignmentsSnap] = await Promise.all([
+    db.collection('ppe_catalog').limit(500).get(),
+    db.collection('employees').where('active', '==', true).limit(500).get(),
+    db.collection('assignments').orderBy('assignedAt', 'desc').limit(50).get(),
+  ]);
+
+  const inventory: Array<Record<string, unknown>> = inventorySnap.docs.map((docSnap) => ({
+    _id: docSnap.id,
+    ...(serializeFirestoreValue(docSnap.data()) as Record<string, unknown>),
+  }));
+
+  const employees: Array<Record<string, unknown>> = employeesSnap.docs.map((docSnap) => ({
+    _id: docSnap.id,
+    ...(serializeFirestoreValue(docSnap.data()) as Record<string, unknown>),
+  }));
+
+  const assignments: Array<Record<string, unknown>> = assignmentsSnap.docs.map((docSnap) => ({
+    _id: docSnap.id,
+    ...(serializeFirestoreValue(docSnap.data()) as Record<string, unknown>),
+  }));
+
+  const alerts = inventory
+    .filter((item) => {
+      const stock = typeof item.stock === 'number' ? item.stock : 0;
+      return stock === 0 || stock <= 20;
+    })
+    .map((item) => {
+      const stock = typeof item.stock === 'number' ? item.stock : 0;
+      return {
+        sku: item.sku,
+        name: item.name,
+        stock,
+        severity: stock === 0 ? 'CRITICO' : 'BAJO',
+      };
+    });
+
+  return {
+    inventory,
+    employees,
+    assignments,
+    alerts,
+    currentDate: new Date().toISOString(),
+  };
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,13 +82,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { message, context } = body;
+    await requireAdminUser(req);
 
-    if (!message) {
-      return Response.json({ error: 'Mensaje requerido' }, { status: 400 });
+    const body = await req.json();
+    const message = typeof body?.message === 'string' ? body.message.trim() : '';
+
+    if (!message || message.length > 2000) {
+      return Response.json({ error: 'Mensaje requerido de maximo 2000 caracteres.' }, { status: 400 });
     }
 
+    const context = await readPlantContext();
     const ai = new GoogleGenAI({ apiKey });
 
     const systemInstruction = `
@@ -76,6 +150,10 @@ ${JSON.stringify(context?.alerts ?? [], null, 2)}
 
     return Response.json({ text, success: true });
   } catch (error: unknown) {
+    if (error instanceof AuthHttpError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
+
     const status =
       typeof error === 'object' &&
       error !== null &&

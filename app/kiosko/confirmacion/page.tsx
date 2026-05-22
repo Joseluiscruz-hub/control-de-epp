@@ -8,20 +8,25 @@ import { CheckCircle2, AlertTriangle, Clock, Loader2, HardHat } from "lucide-rea
 export default function KioskoConfirmacionPage() {
   const router = useRouter();
   const [step, setStep] = useState<"confirm" | "loading" | "done" | "error">("confirm");
-  const [solicitud, setSolicitud] = useState<any>(null);
+  const [solicitud] = useState<any>(() => {
+    if (typeof window === "undefined") return null;
+    const raw = sessionStorage.getItem("kiosk_solicitud");
+    const employeeId = sessionStorage.getItem("kiosk_employee_id");
+    if (!raw || !employeeId) return null;
+    return { ...JSON.parse(raw), employeeId };
+  });
   const [errorMsg, setErrorMsg] = useState("");
   const [countdown, setCountdown] = useState(10);
-  const [employeeName, setEmployeeName] = useState("");
+  const [employeeName] = useState(() =>
+    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_name") ?? ""
+  );
 
   useEffect(() => {
-    const raw = sessionStorage.getItem("kiosk_solicitud");
-    const empId = sessionStorage.getItem("kiosk_employee_id");
-    const empName = sessionStorage.getItem("kiosk_employee_name") ?? "";
     const verified = sessionStorage.getItem("kiosk_pin_verified");
-    if (!raw || !empId || verified !== "true") { router.push("/kiosko"); return; }
-    setSolicitud({ ...JSON.parse(raw), employeeId: empId });
-    setEmployeeName(empName);
-  }, []);
+    if (!solicitud || verified !== "true") {
+      router.push("/kiosko");
+    }
+  }, [router, solicitud]);
 
   const handleConfirm = async () => {
     if (!solicitud) return;

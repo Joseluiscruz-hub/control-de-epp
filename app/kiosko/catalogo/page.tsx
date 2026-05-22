@@ -37,8 +37,12 @@ export default function KioskoCatalogoPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Todos");
   const [submitError, setSubmitError] = useState("");
-  const [employeeName, setEmployeeName] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
+  const [employeeName] = useState(() =>
+    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_name") ?? ""
+  );
+  const [employeeId] = useState(() =>
+    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_id") ?? ""
+  );
   const [selectedByItem, setSelectedByItem] = useState<Record<string, SelectedVariant>>({});
   const [sizeByItem, setSizeByItem] = useState<Record<string, string>>({});
   const selectedCount = Object.keys(selectedByItem).length;
@@ -54,21 +58,24 @@ export default function KioskoCatalogoPage() {
   });
 
   useEffect(() => {
-    const id = sessionStorage.getItem("kiosk_employee_id");
     const verified = sessionStorage.getItem("kiosk_pin_verified");
-    if (!id || verified !== "true") {
+    if (!employeeId || verified !== "true") {
       router.replace("/kiosko");
       return;
     }
 
-    setEmployeeId(id);
-    setEmployeeName(sessionStorage.getItem("kiosk_employee_name") ?? "");
+    let cancelled = false;
 
-    getPPECatalog().then((data) => {
+    void getPPECatalog().then((data) => {
+      if (cancelled) return;
       setItems(data);
       setLoading(false);
     });
-  }, [router]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeId, router]);
 
   const isItemAvailable = (item: PPECatalogItem): boolean => {
     if (item.hasSizes && item.sizes) {

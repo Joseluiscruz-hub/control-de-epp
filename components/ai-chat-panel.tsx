@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { collection, getDocs, query, orderBy, limit, where, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Bot, X, Send, Loader2, Minimize2, Maximize2,
   Sparkles, RefreshCw, TrendingUp, AlertTriangle,
-  ShoppingCart, BarChart3, ChevronRight, ShieldCheck
+  ShoppingCart, BarChart3, ChevronRight
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
@@ -53,50 +52,6 @@ export function AiChatPanel() {
     }
   }, [open, minimized]);
 
-  const fetchContext = useCallback(async () => {
-    try {
-      const [invSnap, empSnap, assignSnap] = await Promise.all([
-        getDocs(collection(db, 'ppe_catalog')),
-        getDocs(query(collection(db, 'employees'), where('active', '==', true))),
-        getDocs(query(collection(db, 'assignments'), orderBy('assignedAt', 'desc'), limit(50))),
-      ]);
-
-      const inventory = invSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
-      const employees = empSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
-      const assignments = assignSnap.docs.map(d => {
-        const data = d.data();
-        return {
-          ...data,
-          _id: d.id,
-          assignedAt: data.assignedAt instanceof Timestamp
-            ? data.assignedAt.toDate().toISOString()
-            : null,
-          nextReplacementAt: data.nextReplacementAt instanceof Timestamp
-            ? data.nextReplacementAt.toDate().toISOString()
-            : null,
-        };
-      });
-
-      // Compute alerts
-      const now = new Date();
-      const alerts = inventory
-        .filter((i: Record<string, unknown>) => {
-          const stock = i.stock as number;
-          return stock === 0 || stock <= 20;
-        })
-        .map((i: Record<string, unknown>) => ({
-          sku: i.sku,
-          name: i.name,
-          stock: i.stock,
-          severity: (i.stock as number) === 0 ? 'CRÍTICO' : 'BAJO',
-        }));
-
-      return { inventory, employees, assignments, alerts, currentDate: now.toISOString() };
-    } catch {
-      return { inventory: [], employees: [], assignments: [], alerts: [] };
-    }
-  }, []);
-
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
     const userMsg: Message = {
@@ -110,11 +65,18 @@ export function AiChatPanel() {
     setLoading(true);
 
     try {
-      const context = await fetchContext();
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        throw new Error('missing_auth');
+      }
+
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, context }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ message: text }),
       });
       const data = await res.json();
       const botMsg: Message = {
@@ -124,17 +86,19 @@ export function AiChatPanel() {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botMsg]);
-    } catch {
+    } catch (error) {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'No pude conectar con el servidor de IA. Verifica tu `GEMINI_API_KEY` en `.env.local`.',
+        content: error instanceof Error && error.message === 'missing_auth'
+          ? 'Necesitas iniciar sesión como administrador para usar ARIA.'
+          : 'No pude conectar con el servidor de IA. Verifica `GEMINI_API_KEY` y la sesión de Firebase.',
         timestamp: new Date(),
       }]);
     } finally {
       setLoading(false);
     }
-  }, [loading, fetchContext]);
+  }, [loading]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

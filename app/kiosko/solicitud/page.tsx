@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useState, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getActiveAssignment } from "@/lib/kiosk-api";
 import { PPECatalogItem, ReplacementReason } from "@/lib/kiosk-types";
@@ -19,67 +19,78 @@ const REASON_LABELS: Record<ReplacementReason, { label: string; icon: ReactNode;
 
 export default function KioskoSolicitudPage() {
   const router = useRouter();
-  const [item, setItem] = useState<PPECatalogItem | null>(null);
-  const [selectedSize, setSelectedSize] = useState<string | null>(null);
-  const [selectedSku, setSelectedSku] = useState<string | null>(null);
+  const employeeId = typeof window !== "undefined" ? sessionStorage.getItem("kiosk_employee_id") ?? "" : "";
+  const [item] = useState<PPECatalogItem | null>(() => {
+    if (typeof window === "undefined") return null;
+    const raw = sessionStorage.getItem("kiosk_selected_item");
+    return raw ? (JSON.parse(raw) as PPECatalogItem) : null;
+  });
+  const [selectedSize, setSelectedSize] = useState<string | null>(() =>
+    item && !item.hasSizes && item.sku ? "N/A" : null
+  );
+  const [selectedSku, setSelectedSku] = useState<string | null>(() =>
+    item && !item.hasSizes ? item.sku ?? null : null
+  );
   const [reason, setReason] = useState<ReplacementReason | null>(null);
-  const [evaluation, setEvaluation] = useState<ReturnType<typeof evaluateReplacement> | null>(null);
   const [lastAssignment, setLastAssignment] = useState<any>(null);
-  const [loadingAssignment, setLoadingAssignment] = useState(false);
-  const [showLossModal, setShowLossModal] = useState(false);
+  const [loadingAssignment, setLoadingAssignment] = useState(() => Boolean(item && !item.hasSizes && item.sku && employeeId));
   const [signatureDone, setSignatureDone] = useState(false);
   const [photoFile, setPhotoFile] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const employeeId = typeof window !== "undefined" ? sessionStorage.getItem("kiosk_employee_id") ?? "" : "";
 
   useEffect(() => {
-    const raw = sessionStorage.getItem("kiosk_selected_item");
     const verified = sessionStorage.getItem("kiosk_pin_verified");
-    if (!raw || verified !== "true") { router.push("/kiosko"); return; }
-    const parsed: PPECatalogItem = JSON.parse(raw);
-    setItem(parsed);
-
-    // Si no tiene tallas, pre-seleccionar SKU único
-    if (!parsed.hasSizes && parsed.sku) {
-      setSelectedSize("N/A");
-      setSelectedSku(parsed.sku);
+    if (!item || verified !== "true") {
+      router.push("/kiosko");
     }
-  }, []);
+  }, [item, router]);
 
   // Cargar asignación activa cuando se selecciona SKU
   useEffect(() => {
     if (!selectedSku || !employeeId) return;
-    setLoadingAssignment(true);
-    getActiveAssignment(employeeId, selectedSku).then(a => {
-      setLastAssignment(a);
+    let cancelled = false;
+
+    void getActiveAssignment(employeeId, selectedSku).then((assignment) => {
+      if (cancelled) return;
+      setLastAssignment(assignment);
       setLoadingAssignment(false);
     });
-  }, [selectedSku]);
 
-  // Calcular evaluación cuando cambia razón + asignación
-  useEffect(() => {
-    if (!reason || !item) return;
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeId, selectedSku]);
+
+  const evaluation = useMemo(() => {
+    if (!reason || !item) return null;
+
     if (lastAssignment?.assignedAt) {
       const assignedDate = lastAssignment.assignedAt.toDate
         ? lastAssignment.assignedAt.toDate()
         : new Date(lastAssignment.assignedAt);
-      const ev = evaluateReplacement(assignedDate, item.replacementDays, item.unitCost ?? 0, reason);
-      setEvaluation(ev);
-      if (reason === "extravio" && ev.chargeAmount > 0) {
-        setShowLossModal(true);
-      }
-    } else {
-      // No hay asignación previa → primer EPP, procede libre
-      setEvaluation({ daysUsed: 0, daysRemaining: item.replacementDays, lifeUsedPct: 0, isEligibleFree: true, requiresEvidence: false, chargeAmount: 0, chargeDescription: "" });
+      return evaluateReplacement(assignedDate, item.replacementDays, item.unitCost ?? 0, reason);
     }
-  }, [reason, lastAssignment]);
+
+    return {
+      daysUsed: 0,
+      daysRemaining: item.replacementDays,
+      lifeUsedPct: 0,
+      isEligibleFree: true,
+      requiresEvidence: false,
+      chargeAmount: 0,
+      chargeDescription: "",
+    };
+  }, [item, lastAssignment, reason]);
+
+  const showLossModal = reason === "extravio" && (evaluation?.chargeAmount ?? 0) > 0;
 
   const handleSizeSelect = (size: string, sku: string) => {
     setSelectedSize(size);
     setSelectedSku(sku);
+    setLoadingAssignment(true);
+    setLastAssignment(null);
     setReason(null);
-    setEvaluation(null);
   };
 
   const canProceed = () => {

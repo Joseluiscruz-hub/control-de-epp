@@ -1,301 +1,459 @@
-<div align="center">
+# AssetGuard - Control de EPP
 
-# 🦺 Control de EPP
-### Sistema Inteligente de Gestión de Equipo de Protección Personal
+Sistema empresarial para control, trazabilidad y operación de Equipo de Protección Personal en planta.
 
-[![Next.js](https://img.shields.io/badge/Next.js_15-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
-[![Firebase](https://img.shields.io/badge/Firebase-039BE5?style=for-the-badge&logo=Firebase&logoColor=white)](https://firebase.google.com/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Gemini AI](https://img.shields.io/badge/Gemini_2.5-8E75B2?style=for-the-badge&logo=google&logoColor=white)](https://aistudio.google.com/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-149ECA?style=for-the-badge&logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Firebase](https://img.shields.io/badge/Firebase-Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=111)](https://firebase.google.com/)
+[![Cloud Run](https://img.shields.io/badge/Google_Cloud-Run-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)](https://cloud.google.com/run)
+[![Gemini](https://img.shields.io/badge/Gemini-ARIA-8E75B2?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 
-> Sistema empresarial de trazabilidad y control de EPP con análisis predictivo impulsado por inteligencia artificial.
+AssetGuard es una plataforma de seguridad industrial para administrar colaboradores, inventario EPP, solicitudes de kiosko, trazabilidad de dotaciones y analítica asistida por IA. El objetivo no es solo registrar entregas: es convertir la operación de EPP en un sistema confiable, auditable y listo para datos reales de planta.
 
-[Ver Demo](#) · [Reportar Bug](https://github.com/Joseluiscruz-hub/control-de-epp/issues) · [Solicitar Feature](https://github.com/Joseluiscruz-hub/control-de-epp/issues)
+## Producción
 
-</div>
+- Cloud Run: [control-de-epp-659644890317.us-central1.run.app](https://control-de-epp-659644890317.us-central1.run.app)
+- CI y deploy desde GitHub Actions
+- Firebase y Gemini configurados por variables de entorno y secrets
 
----
+## Estado Actual
 
-## 📋 Tabla de Contenidos
+La aplicación ya cuenta con:
 
-- [Descripción](#-descripción)
-- [Características](#-características)
-- [Stack Tecnológico](#-stack-tecnológico)
-- [Arquitectura](#-arquitectura)
-- [Modelo de Datos](#-modelo-de-datos)
-- [Instalación](#-instalación)
-- [Configuración](#-configuración)
-- [Uso](#-uso)
-- [Seguridad](#-seguridad)
-- [Roadmap](#-roadmap)
+- Panel administrativo con autenticación Google y lista explícita de administradores.
+- Directorio de personal con importación masiva desde base operativa de planta.
+- Inventario EPP con importación masiva desde inventario real, tallas, stock y SKU temporales.
+- Portal público para consulta de colaborador por número de nómina.
+- Kiosko público para solicitar EPP sin exponer colecciones privadas.
+- ARIA, asistente de análisis operacional con Gemini.
+- Firestore Rules reforzadas con validación de esquemas y control por rol.
+- Validaciones server-side para ARIA y PIN del kiosko.
+- Transacciones para proteger stock y asignaciones concurrentes.
+- CI automático de `lint` y `build`.
+- Deploy automático a Google Cloud Run desde `master`.
 
----
+## Módulos Principales
 
-## 📖 Descripción
+| Módulo | Ruta | Propósito |
+| --- | --- | --- |
+| Dashboard ejecutivo | `/` | KPIs, señales de inventario, solicitudes y actividad reciente. |
+| Personal | `/empleados` | Directorio, altas manuales, carga masiva de personal y sincronización de kiosko. |
+| Inventario | `/inventario` | Catálogo EPP, carga masiva, stock consolidado y ajuste por artículo o talla. |
+| Portal colaborador | `/portal` | Consulta pública de EPP asignado por número de empleado. |
+| Kiosko EPP | `/kiosko` | Flujo público para identificación, PIN, catálogo y solicitud de EPP. |
+| ARIA | Panel flotante | Análisis del estado operativo con contexto de Firestore. |
 
-**Control de EPP** es una plataforma web de nivel empresarial diseñada para la gestión integral del Equipo de Protección Personal en entornos industriales. Permite registrar entregas, controlar inventarios, gestionar el directorio de empleados y recibir análisis predictivos en tiempo real a través de **ARIA**, un asistente virtual especializado en seguridad industrial impulsado por Google Gemini 2.5.
+## Arquitectura
 
-El sistema cumple con los estándares de la **STPS (Secretaría del Trabajo y Previsión Social)** y las normas **NOM** aplicables al manejo de EPP en México.
+```text
+Usuario admin
+  -> Next.js App Router
+  -> Firebase Auth
+  -> Firestore: employees, ppe_catalog, assignments, kiosk_requests
+  -> Cloud Run production
 
----
+Colaborador / Kiosko
+  -> Portal o kiosko publico
+  -> Firestore snapshots minimos: kiosk_employees, kiosk_catalog, kiosk_request_status
+  -> Sin acceso a datos privados del panel admin
 
-## ✨ Características
-
-### 🖥️ Dashboard Operativo
-- KPIs en tiempo real: entregas del día, empleados activos, alertas de reposición
-- Feed en vivo de las últimas asignaciones de EPP
-- Alertas proactivas de equipos próximos a vencer
-- Panel de estado del sistema con indicador de conectividad Firebase
-
-### 👷 Gestión de Empleados
-- Alta y baja de personal con validación de datos
-- Directorio filtrable por área, nombre o ID
-- Desactivación/reactivación de empleados sin borrar historial
-- Vista completa del historial de EPP por empleado con fechas de entrega y vencimiento
-
-### 📦 Control de Inventario
-- Catálogo de EPP con SKU, categoría y días de vida útil
-- Gestión de stock: entradas, salidas y ajuste directo
-- Alertas automáticas de stock bajo (≤20 unidades) y sin existencias
-- Banner de advertencia visible con artículos críticos
-
-### 🤖 Chatbot ARIA (IA Predictiva)
-- Panel flotante disponible en toda la aplicación
-- Análisis en tiempo real con datos de Firestore (patrón RAG)
-- Detección de anomalías de consumo por empleado o área
-- Predicción de desabasto con base en ritmo histórico
-- Recomendaciones de órdenes de compra
-- Respuestas sobre normativa NOM/STPS
-- Prompts rápidos preconfigurados
-
-### 🔐 Seguridad
-- Autenticación obligatoria con Google OAuth
-- Reglas de Firestore Zero-Trust (validación de esquema en BD)
-- API Key de Gemini exclusivamente en servidor (nunca expuesta al cliente)
-- Integridad referencial en asignaciones (empleado y SKU deben existir)
-
----
-
-## 🛠️ Stack Tecnológico
-
-| Capa | Tecnología |
-|------|-----------|
-| Framework | Next.js 15 (App Router) |
-| Lenguaje | TypeScript 5 |
-| Estilos | Tailwind CSS 4 + base-ui/react |
-| Base de datos | Firebase Firestore |
-| Autenticación | Firebase Auth (Google OAuth) |
-| IA / LLM | Google Gemini 2.5 Flash (`@google/genai`) |
-| Fechas | date-fns |
-| Iconos | lucide-react |
-| Notificaciones | sonner |
-| Render Markdown | react-markdown |
-
----
-
-## 🏗️ Arquitectura
-
-```
-control-de-epp/
-├── app/
-│   ├── api/
-│   │   └── chat/
-│   │       └── route.ts          # API Route segura — ARIA (Gemini)
-│   ├── empleados/
-│   │   └── page.tsx              # CRUD de empleados + historial EPP
-│   ├── inventario/
-│   │   └── page.tsx              # Catálogo EPP + gestión de stock
-│   ├── layout.tsx                # Layout global con Auth + ARIA
-│   ├── page.tsx                  # Dashboard principal
-│   └── globals.css
-├── components/
-│   ├── ui/                       # Componentes base (base-ui/react)
-│   ├── ai-chat-panel.tsx         # Panel flotante del chatbot ARIA
-│   ├── assign-ppe-dialog.tsx     # Formulario de registro de entregas
-│   ├── auth-provider.tsx         # Contexto de autenticación + AuthGuard
-│   └── navbar.tsx                # Navegación con indicador de ruta activa
-├── lib/
-│   ├── firebase.ts               # Inicialización Firebase
-│   └── firestore-error.ts        # Manejo de errores Firestore
-├── firestore.rules               # Reglas de seguridad Zero-Trust
-└── .env.example                  # Plantilla de variables de entorno
+ARIA
+  -> API Route /api/chat
+  -> Contexto operacional desde Firestore
+  -> Gemini con GEMINI_API_KEY solo en servidor
 ```
 
-### Patrón RAG del Chatbot
+### Estructura Relevante
 
+```text
+app/
+  page.tsx                    Dashboard ejecutivo
+  empleados/page.tsx          Personal + importador baseop
+  inventario/page.tsx         Inventario + importador EPP
+  portal/page.tsx             Portal publico del colaborador
+  kiosko/                     Flujo de kiosko EPP
+  api/chat/route.ts           API segura para ARIA
+
+components/
+  auth-provider.tsx           Auth, admins y guardas de acceso
+  ai-chat-panel.tsx           Interfaz ARIA
+  kiosk-requests-panel.tsx    Panel de solicitudes del kiosko
+  navbar.tsx                  Navegacion admin
+
+lib/
+  firebase.ts                 Inicializacion Firebase
+  personnel-import.ts         Parser/normalizador de base de personal
+  inventory-import.ts         Parser/normalizador de inventario EPP
+  kiosk-api.ts                Acceso publico controlado para kiosko
+  kiosk-local-store.ts        Respaldo local para pruebas en localhost
+
+firestore.rules               Reglas de seguridad
+.github/workflows/ci.yml      Validacion continua de lint + build
+.github/workflows/deploy.yml  Deploy Cloud Run + Firestore Rules
+Dockerfile                    Build standalone para Cloud Run
 ```
-Usuario pregunta
-      ↓
-Cliente Next.js
-      ↓
-POST /api/chat (servidor)
-      ↓
-Fetch Firestore → inventario + empleados + últimas 50 asignaciones
-      ↓
-Contexto JSON inyectado al prompt de sistema de Gemini
-      ↓
-Gemini 2.5 Flash analiza y genera respuesta
-      ↓
-Respuesta en markdown → renderizada en el panel ARIA
-```
 
----
-
-## 💾 Modelo de Datos
+## Modelo de Datos
 
 ### `employees`
-```typescript
-{
-  id: string;           // Número de empleado (ej. "1881")
-  name: string;         // Nombre completo
-  area: string;         // Área de trabajo (ej. "Soldadura")
-  active: boolean;      // Estado en planta
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-```
+
+Colección administrativa de personal. Requiere usuario autenticado y admin.
+
+Campos principales:
+
+- `id`: número de personal.
+- `name`: nombre editado del colaborador.
+- `area`: área operativa principal.
+- `plantArea`, `personnelArea`, `position`, `jobFunction`: datos para segmentación futura.
+- `active`: controla si el colaborador puede operar.
+- `source`, `schemaVersion`: trazabilidad de importación.
+
+Nota de privacidad: la carga inicial no escribe RFC, IMSS, CURP ni fecha de nacimiento.
+
+### `kiosk_employees`
+
+Snapshot público mínimo consultable por ID exacto. Permite que el portal y kiosko validen colaboradores sin exponer la base administrativa completa.
+
+Campos principales:
+
+- `name`
+- `area`
+- `plantArea`
+- `position`
+- `jobFunction`
+- `active`
+- `firstLogin`, `termsAccepted`, `pin`
 
 ### `ppe_catalog`
-```typescript
+
+Catálogo administrativo de EPP.
+
+Soporta artículos simples y artículos con tallas:
+
+```ts
 {
-  sku: string;              // Código único (ej. "G-01")
-  name: string;             // Descripción del artículo
-  category: string;         // Categoría (ej. "Guantes")
-  replacementDays: number;  // Días de vida útil esperada
-  stock: number;            // Unidades disponibles
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  sku: string;
+  name: string;
+  category: string;
+  replacementDays: number;
+  stock: number;
+  hasSizes: boolean;
+  sizes?: {
+    [size: string]: {
+      sku: string;
+      material?: string;
+      stock: number;
+      minStock: number;
+      available: boolean;
+      location?: string;
+      unit?: string;
+      unitCost?: number;
+      temporarySku?: boolean;
+    }
+  };
 }
 ```
+
+### `kiosk_catalog`
+
+Snapshot seguro del catálogo para kiosko. Se sincroniza desde el importador y desde ajustes de inventario.
 
 ### `assignments`
-```typescript
-{
-  employeeId: string;         // Referencia a employees
-  sku: string;                // Referencia a ppe_catalog
-  assignedAt: Timestamp;      // Fecha real de entrega
-  nextReplacementAt: Timestamp; // assignedAt + replacementDays
-  status: "active" | "replaced";
-  issuedByUserId: string;     // UID del almacenista que entregó
-}
+
+Historial de dotaciones y reposiciones.
+
+- `employeeId`
+- `sku`
+- `size`
+- `assignedAt`
+- `nextReplacementAt`
+- `status`
+- `replacementReason`
+- `issuedByUserId`
+
+### `kiosk_requests`
+
+Solicitudes generadas desde kiosko.
+
+- `employeeId`
+- `employeeName`
+- `items`
+- `status`: `pending`, `approved`, `rejected`
+- `source`: `kiosk`
+
+## Importadores de Datos Reales
+
+### Base de Personal
+
+Archivo esperado: TSV/TXT con columnas:
+
+```text
+Número de personal
+Nombre editado del empleado o candidato
+Fecha de alta
+División de personal
+ID POSICIÓN
+Posición
+Area de Personal
+AREA PLANTA
+CECO
+Función
+Fecha de Nacimiento
+RFC
+IMSS
+CURP
+SEXO
 ```
 
----
+Comportamiento:
 
-## 🚀 Instalación
+- Valida encabezados, filas, IDs vacíos y duplicados.
+- Usa `AREA PLANTA` como área operativa principal.
+- Conserva posición, función y área para futura matriz de permisos EPP.
+- Omite datos privados sensibles en la carga operativa inicial.
+- Escribe `employees` y `kiosk_employees`.
 
-### Prerequisitos
-- Node.js 18+
-- Cuenta de Firebase con proyecto activo
-- API Key de Google Gemini ([obtener gratis](https://aistudio.google.com/app/apikey))
+### Inventario EPP
 
-### Clonar e instalar
-```bash
-git clone https://github.com/Joseluiscruz-hub/control-de-epp.git
-cd control-de-epp
+Archivo esperado: TSV/TXT con columnas:
+
+```text
+Alma
+Material
+Texto breve de Material
+Talla
+Ubicación
+Umb
+Precio variable
+Stock
+```
+
+Comportamiento:
+
+- Agrupa filas por producto base.
+- Conserva tallas y variantes.
+- Suma stock consolidado por artículo.
+- Genera SKU temporal estable si falta el código de material.
+- Carga stock vacío como `0`.
+- Escribe `ppe_catalog` y `kiosk_catalog`.
+
+## Seguridad
+
+La app usa una separación deliberada entre colecciones administrativas y snapshots públicos.
+
+Principios:
+
+- El panel admin requiere Google Auth.
+- Solo emails en `NEXT_PUBLIC_ADMIN_EMAILS` tienen acceso administrativo.
+- Firestore Rules validan esquemas antes de permitir escritura.
+- `employees` no es público.
+- `kiosk_employees` permite `get` exacto, no `list`.
+- `kiosk_catalog` permite lectura pública controlada.
+- ARIA usa `GEMINI_API_KEY` solo en servidor.
+- Los importadores no escriben datos privados innecesarios.
+
+Administrador global configurado por defecto:
+
+```text
+mimonkb222@gmail.com
+```
+
+## Ejecución Local
+
+### Requisitos
+
+- Node.js 20 recomendado.
+- npm.
+- Acceso al proyecto Firebase configurado.
+- `GEMINI_API_KEY` si se desea usar ARIA.
+
+### Instalación
+
+```powershell
 npm install
 ```
 
----
+### Desarrollo local
 
-## ⚙️ Configuración
-
-1. **Copia el archivo de variables de entorno:**
-```bash
-cp .env.example .env.local
+```powershell
+npm run local
 ```
 
-2. **Rellena `.env.local` con tus credenciales:**
+Abre:
+
+```text
+http://127.0.0.1:3000
+```
+
+Rutas útiles:
+
+```text
+http://127.0.0.1:3000/portal
+http://127.0.0.1:3000/kiosko
+http://127.0.0.1:3000/empleados
+http://127.0.0.1:3000/inventario
+```
+
+También existe `INICIAR_APP_LOCAL.bat` para levantar la app en Windows.
+
+### Build local
+
+```powershell
+npm run build
+```
+
+### Producción local
+
+```powershell
+npm run build
+npm run local:start
+```
+
+## Variables de Entorno
+
+Copia `.env.example` a `.env.local`.
+
+Variables principales:
+
 ```env
-GEMINI_API_KEY=AIzaSy...TuKeyDeGemini
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+NEXT_PUBLIC_FIREBASE_DATABASE_ID=(default)
+NEXT_PUBLIC_ADMIN_EMAILS=mimonkb222@gmail.com
+GEMINI_API_KEY=
 ```
 
-> La configuración de Firebase ya está incluida en `firebase-applet-config.json`. Si usas tu propio proyecto de Firebase, actualiza ese archivo con tus credenciales.
+En Cloud Run estas variables se configuran desde GitHub Actions con GitHub Variables y Secrets.
 
-3. **Agrega `localhost` a los dominios autorizados de Firebase Auth:**
-   - Ve a [Firebase Console → Authentication → Settings → Authorized domains](https://console.firebase.google.com/)
-   - Agrega `localhost`
+La configuración real de Firebase no se versiona en el repositorio. Toda la inicialización sale de `.env.local`, GitHub Variables o las variables del entorno de Cloud Run.
 
-4. **Despliega las reglas de Firestore:**
-```bash
-npm install -g firebase-tools
-firebase login
-firebase deploy --only firestore:rules
+## Deploy
+
+El deploy se ejecuta automáticamente al hacer merge a `master`.
+
+Workflow:
+
+```text
+.github/workflows/deploy.yml
 ```
 
-5. **Inicia el servidor de desarrollo:**
-```bash
-npm run dev
+Flujo:
+
+1. Checkout del repo.
+2. Autenticación con `GCP_SA_KEY`.
+3. Setup de Google Cloud SDK.
+4. Deploy a Cloud Run con `gcloud run deploy --source .`.
+5. Inyección de variables públicas Firebase.
+6. Montaje de `GEMINI_API_KEY` desde Secret Manager.
+7. Deploy de `firestore.rules` con `FIREBASE_TOKEN`.
+
+Secrets requeridos:
+
+```text
+GCP_SA_KEY
+FIREBASE_TOKEN
 ```
 
-Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
+GitHub Variables requeridas:
 
----
+```text
+GCP_PROJECT_ID
+GCP_REGION
+CLOUD_RUN_SERVICE
+FIREBASE_API_KEY
+FIREBASE_AUTH_DOMAIN
+FIREBASE_PROJECT_ID
+FIREBASE_STORAGE_BUCKET
+FIREBASE_MESSAGING_SENDER_ID
+FIREBASE_APP_ID
+FIREBASE_DATABASE_ID
+ADMIN_EMAILS
+```
 
-## 📱 Uso
+## Operación Recomendada Después de Deploy
 
-| Módulo | Ruta | Descripción |
-|--------|------|-------------|
-| Dashboard | `/` | Vista general + feed en tiempo real |
-| Empleados | `/empleados` | Alta/baja de personal + historial EPP |
-| Inventario | `/inventario` | Catálogo + ajuste de stock |
-| ARIA | Botón flotante | Chatbot IA predictivo |
+1. Entrar al panel admin con una cuenta incluida en `ADMIN_EMAILS`.
+2. Ir a `/empleados`.
+3. Cargar la base de personal.
+4. Revisar preview: registros, duplicados, errores y áreas detectadas.
+5. Confirmar carga.
+6. Ir a `/inventario`.
+7. Cargar inventario EPP.
+8. Revisar preview: artículos, variantes, stock total y SKU temporales.
+9. Confirmar carga.
+10. Probar `/portal` con un número real de empleado.
+11. Probar `/kiosko` con el mismo colaborador.
 
-### Registrar una entrega
-1. Dashboard → **"Registrar Nueva Entrega"**
-2. Selecciona empleado y equipo (SKU)
-3. Confirma — el registro queda en Firestore en tiempo real
+## Kiosko y Modo Local
 
-### Consultar a ARIA
-Haz clic en el botón **ARIA** (esquina inferior derecha) y pregunta en lenguaje natural:
-- *"¿Qué EPP se agota esta semana?"*
-- *"¿Cuál área consume más guantes en el último mes?"*
-- *"Genera una orden de compra sugerida para los próximos 30 días"*
-- *"¿Hay empleados con consumo anómalo de equipo?"*
+En `localhost`, el kiosko tiene respaldo en `localStorage` para pruebas.
 
----
+Esto permite probar:
 
-## 🔒 Seguridad
+- login local de colaborador,
+- catálogo demo,
+- solicitudes locales,
+- flujo de PIN y términos.
 
-Las reglas de Firestore implementan un modelo **Zero-Trust**:
+En producción, si un colaborador no existe en `kiosk_employees` o está inactivo, el kiosko no lo autoriza.
 
-- ✅ Solo usuarios autenticados con Google pueden leer/escribir
-- ✅ Validación de esquema: rechaza documentos con campos incorrectos
-- ✅ Integridad referencial: no se puede asignar EPP a un empleado o SKU inexistente
-- ✅ Inmutabilidad: una vez creada una asignación, no se puede cambiar a quién pertenece
-- ✅ La `GEMINI_API_KEY` nunca sale del servidor (Route Handler de Next.js)
+## ARIA
 
----
+ARIA es el asistente de análisis operacional.
 
-## 🔮 Roadmap
+Puede consultar contexto de:
 
-- [ ] **Fase 2 — Cloud Functions**
-  - Trigger: descuento automático de stock al registrar una asignación
-  - Cron Job: alertas diarias a las 6:00 AM para EPP por vencer
-  - Notificaciones por email / webhook a Slack o Teams
+- inventario,
+- empleados,
+- asignaciones,
+- alertas,
+- solicitudes.
 
-- [ ] **Fase 3 — PWA Offline-First**
-  - Service Worker con `@serwist/next`
-  - Persistencia local con IndexedDB (Firestore offline mode)
-  - Sincronización automática al recuperar conexión
+La API de Gemini nunca se expone al navegador. Las llamadas pasan por:
 
-- [ ] **Fase 4 — Predicción con ML (Python)**
-  - Microservicio en Cloud Run
-  - Agrupación de consumo por área y tipo de EPP
-  - Forecast de demanda y detección de anomalías avanzada
+```text
+app/api/chat/route.ts
+```
 
----
+## Calidad y Validación
 
-## 👨‍💻 Autor
+Comandos recomendados antes de abrir PR:
 
-**José Luis Cruz Prieto**
-- GitHub: [@Joseluiscruz-hub](https://github.com/Joseluiscruz-hub)
+```powershell
+npm run build
+git diff --check
+```
 
----
+Para reglas de Firestore:
 
-<div align="center">
+```powershell
+npx firebase-tools emulators:exec --only firestore "node -e \"console.log('rules ok')\""
+```
 
-Construido con ❤️ para la seguridad industrial · México 🇲🇽
+## Roadmap
 
-</div>
+Próximas fases naturales:
+
+- Matriz de autorización EPP por área, puesto, función y tipo de colaborador.
+- Bloqueo de EPP no autorizado en kiosko.
+- Flujo de aprobación por supervisor para EPP crítico.
+- Inventario real nivel planta con movimientos, auditoría y entradas/salidas.
+- Reportes ejecutivos por área, consumo y riesgo.
+- Exportación de históricos para auditoría.
+- Integración de alertas por correo o Teams.
+- Modo offline más robusto para kioskos físicos.
+
+## Autor
+
+José Luis Cruz Prieto
+
+GitHub: [Joseluiscruz-hub](https://github.com/Joseluiscruz-hub)
+
+## Licencia
+
+Proyecto privado. Uso interno sujeto a autorización del propietario del repositorio.

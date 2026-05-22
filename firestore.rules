@@ -15,8 +15,7 @@ service cloud.firestore {
       allow get: if true;
       allow list: if false;
       allow create: if request.auth != null && isAdmin() && isValidKioskEmployeeSnapshot(request.resource.data);
-      allow update: if (request.auth != null && isAdmin() && isValidKioskEmployeeSnapshot(request.resource.data))
-        || isValidFirstKioskSetup(request.resource.data, resource.data);
+      allow update: if request.auth != null && isAdmin() && isValidKioskEmployeeSnapshot(request.resource.data);
       allow delete: if false;
     }
 
@@ -85,7 +84,8 @@ service cloud.firestore {
       return request.auth != null
         && request.auth.token.email_verified == true
         && request.auth.token.email in [
-          'mimonkb222@gmail.com'
+          'mimonkb222@gmail.com',
+          'malvamora23@gmail.com'
           // Agrega más emails separados por comas
         ];
     }
@@ -94,7 +94,8 @@ service cloud.firestore {
       return data.keys().hasOnly([
           "id", "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt",
           "createdAt", "updatedAt", "division", "personnelArea", "plantArea", "costCenter",
-          "positionId", "position", "jobFunction", "hireDate", "sex", "source", "schemaVersion"
+          "positionId", "position", "jobFunction", "hireDate", "sex", "source", "schemaVersion",
+          "rfc", "imss", "curp"
         ])
         && data.keys().hasAll(["id", "name", "area", "active", "createdAt", "updatedAt"])
         && data.id is string && data.id.size() > 0
@@ -116,6 +117,9 @@ service cloud.firestore {
         && optionalString(data.hireDate)
         && optionalString(data.sex)
         && optionalString(data.source)
+        && optionalString(data.rfc)
+        && optionalString(data.imss)
+        && optionalString(data.curp)
         && (data.schemaVersion == null || data.schemaVersion is int);
     }
 
@@ -143,22 +147,6 @@ service cloud.firestore {
 
     function optionalString(value) {
       return value == null || value is string;
-    }
-
-    function isValidFirstKioskSetup(newData, oldData) {
-      let changedFields = newData.diff(oldData).affectedKeys();
-      return oldData.active == true
-        && oldData.firstLogin == true
-        && oldData.termsAccepted == false
-        && changedFields.hasOnly(["pin", "firstLogin", "termsAccepted", "termsAcceptedAt", "updatedAt"])
-        && newData.active == oldData.active
-        && newData.name == oldData.name
-        && newData.pin is string
-        && newData.pin.size() >= 8
-        && newData.firstLogin == false
-        && newData.termsAccepted == true
-        && newData.termsAcceptedAt is timestamp
-        && newData.updatedAt is timestamp;
     }
 
     function isValidAssignment(data) {
