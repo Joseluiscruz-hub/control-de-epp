@@ -224,7 +224,7 @@ export async function dispenseEPP(params: DispenseParams): Promise<string> {
       size: params.size || "N/A",
       assignedAt: serverTimestamp(),
       nextReplacementAt: Timestamp.fromDate(nextReplacement),
-      status: params.reason === "desgaste" ? "pending_review" : "active",
+      status: "active",
       replacementReason: params.reason,
       chargeAmount: params.chargeAmount ?? 0,
       chargeApproved: params.chargeAmount ? false : true,

@@ -7,7 +7,7 @@ export interface ReplacementEvaluation {
   daysRemaining: number;
   lifeUsedPct: number;           // 0-100
   isEligibleFree: boolean;       // vida útil cumplida → gratis
-  requiresEvidence: boolean;     // desgaste → foto obligatoria
+  requiresEvidence: boolean;     // reservado para flujos que pidan evidencia
   chargeAmount: number;          // extravío → cobro proporcional
   chargeDescription: string;
 }
@@ -50,7 +50,7 @@ export function evaluateReplacement(
     daysRemaining,
     lifeUsedPct,
     isEligibleFree,
-    requiresEvidence: reason === "desgaste" && !isEligibleFree,
+    requiresEvidence: false,
     chargeAmount,
     chargeDescription,
   };

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import {
-  collection, onSnapshot, query, orderBy, limit, getDocs,
+  collection, onSnapshot, query, orderBy, limit,
   where, Timestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -171,51 +171,99 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const [empSnap, invSnap, allAssignSnap] = await Promise.all([
-          getDocs(query(collection(db, 'employees'), where('active', '==', true))),
-          getDocs(collection(db, 'ppe_catalog')),
-          getDocs(query(collection(db, 'assignments'), orderBy('assignedAt', 'desc'), limit(200))),
-        ]);
-        const invData = invSnap.docs.map(d => d.data());
-        const totalStockValue = invData.reduce((sum, d) => sum + (d.stock || 0), 0);
-        const lowStock = invData.filter(d => d.stock <= 20).length;
-        setStats(prev => ({
-          ...prev,
-          activeEmployees: empSnap.size,
-          totalInventoryItems: invSnap.size,
-          totalStock: totalStockValue,
-          lowStockItems: lowStock,
-        }));
-        const sortedByStock = [...invData].sort((a, b) => (a.stock || 0) - (b.stock || 0));
-        const lowestItem = sortedByStock.length > 0 ? { name: sortedByStock[0].name as string, stock: sortedByStock[0].stock as number } : null;
-        const empMap = new Map<string, string>();
-        empSnap.docs.forEach(d => { empMap.set(d.id, d.data().area as string); });
-        const areaCounts: Record<string, number> = {};
-        allAssignSnap.docs.forEach(d => {
-          const area = empMap.get(d.data().employeeId as string);
-          if (area) areaCounts[area] = (areaCounts[area] || 0) + 1;
-        });
-        const topAreaEntry = Object.entries(areaCounts).sort((a, b) => b[1] - a[1])[0];
-        const topArea = topAreaEntry ? { area: topAreaEntry[0], count: topAreaEntry[1] } : null;
-        const now = new Date();
-        const activeAssigns = allAssignSnap.docs.filter(d => d.data().status === 'active');
-        const compliant = activeAssigns.filter(d => {
-          const next = d.data().nextReplacementAt;
-          if (!next) return true;
-          const nextDate = next instanceof Timestamp ? next.toDate() : new Date(next);
-          return nextDate > now;
-        });
-        const complianceRate = activeAssigns.length > 0
-          ? Math.round((compliant.length / activeAssigns.length) * 100)
-          : 100;
-        setInsights({ lowStockItem: lowestItem, topArea, complianceRate });
-      } catch (err) {
-        console.error('[Dashboard stats error]', err);
-      }
+    let activeEmployees: Array<{ id: string; area: string }> = [];
+    let inventoryItems: Array<Record<string, unknown>> = [];
+    let assignmentItems: Array<Record<string, unknown>> = [];
+    let employeesReady = false;
+    let inventoryReady = false;
+    let assignmentsReady = false;
+
+    const recomputeStats = () => {
+      if (!employeesReady || !inventoryReady || !assignmentsReady) return;
+
+      const totalStockValue = inventoryItems.reduce((sum, item) => sum + Number(item.stock ?? 0), 0);
+      const lowStock = inventoryItems.filter((item) => Number(item.stock ?? 0) <= 20).length;
+      const sortedByStock = [...inventoryItems].sort((a, b) => Number(a.stock ?? 0) - Number(b.stock ?? 0));
+      const lowestItem = sortedByStock.length > 0
+        ? { name: String(sortedByStock[0].name ?? "EPP sin nombre"), stock: Number(sortedByStock[0].stock ?? 0) }
+        : null;
+
+      setStats(prev => ({
+        ...prev,
+        activeEmployees: activeEmployees.length,
+        totalInventoryItems: inventoryItems.length,
+        totalStock: totalStockValue,
+        lowStockItems: lowStock,
+      }));
+
+      const empMap = new Map(activeEmployees.map((employee) => [employee.id, employee.area]));
+      const areaCounts: Record<string, number> = {};
+      assignmentItems.forEach((assignment) => {
+        const area = empMap.get(String(assignment.employeeId ?? ""));
+        if (area) areaCounts[area] = (areaCounts[area] || 0) + 1;
+      });
+
+      const topAreaEntry = Object.entries(areaCounts).sort((a, b) => b[1] - a[1])[0];
+      const topArea = topAreaEntry ? { area: topAreaEntry[0], count: topAreaEntry[1] } : null;
+      const now = new Date();
+      const activeAssigns = assignmentItems.filter((assignment) => assignment.status === 'active');
+      const compliant = activeAssigns.filter((assignment) => {
+        const next = assignment.nextReplacementAt;
+        if (!next) return true;
+        const nextDate = next instanceof Timestamp ? next.toDate() : new Date(String(next));
+        return nextDate > now;
+      });
+      const complianceRate = activeAssigns.length > 0
+        ? Math.round((compliant.length / activeAssigns.length) * 100)
+        : 100;
+
+      setInsights({ lowStockItem: lowestItem, topArea, complianceRate });
     };
-    fetchStats();
+
+    const unsubscribeEmployees = onSnapshot(
+      query(collection(db, 'employees'), where('active', '==', true)),
+      (snapshot) => {
+        activeEmployees = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          area: String(docSnap.data().area ?? ''),
+        }));
+        employeesReady = true;
+        recomputeStats();
+      },
+      (error) => {
+        console.error('[Dashboard employees stats error]', error);
+      }
+    );
+
+    const unsubscribeInventory = onSnapshot(
+      collection(db, 'ppe_catalog'),
+      (snapshot) => {
+        inventoryItems = snapshot.docs.map((docSnap) => docSnap.data());
+        inventoryReady = true;
+        recomputeStats();
+      },
+      (error) => {
+        console.error('[Dashboard inventory stats error]', error);
+      }
+    );
+
+    const unsubscribeAssignments = onSnapshot(
+      query(collection(db, 'assignments'), orderBy('assignedAt', 'desc'), limit(200)),
+      (snapshot) => {
+        assignmentItems = snapshot.docs.map((docSnap) => docSnap.data());
+        assignmentsReady = true;
+        recomputeStats();
+      },
+      (error) => {
+        console.error('[Dashboard assignment stats error]', error);
+      }
+    );
+
+    return () => {
+      unsubscribeEmployees();
+      unsubscribeInventory();
+      unsubscribeAssignments();
+    };
   }, []);
 
   const kpiCards = [

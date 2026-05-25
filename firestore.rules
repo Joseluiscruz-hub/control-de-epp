@@ -125,13 +125,16 @@ service cloud.firestore {
 
     function isValidKioskEmployeeSnapshot(data) {
       return data.keys().hasOnly([
-          "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt", "pin",
+          "id", "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt", "pin",
+          "createdAt",
           "updatedAt", "personnelArea", "plantArea", "position", "jobFunction", "source", "schemaVersion"
         ])
         && data.keys().hasAll(["name", "active", "updatedAt"])
         && data.name is string && data.name.size() > 0
         && data.active is bool
         && data.updatedAt is timestamp
+        && optionalString(data.id)
+        && (data.createdAt == null || data.createdAt is timestamp)
         && (data.firstLogin == null || data.firstLogin is bool)
         && (data.termsAccepted == null || data.termsAccepted is bool)
         && optionalString(data.area)
@@ -200,12 +203,13 @@ service cloud.firestore {
 
     function isValidKioskRequestItem(item) {
       return item is map
-        && item.keys().hasOnly(["itemId", "itemName", "sku", "size", "replacementDays"])
+        && item.keys().hasOnly(["itemId", "itemName", "sku", "size", "replacementDays", "replacementReason"])
         && item.itemId is string && item.itemId.size() > 0
         && item.itemName is string && item.itemName.size() > 0
         && item.sku is string && item.sku.size() > 0
         && item.size is string && item.size.size() > 0
-        && item.replacementDays is int && item.replacementDays > 0;
+        && item.replacementDays is int && item.replacementDays > 0
+        && (item.replacementReason == null || item.replacementReason in ["vida_util", "desgaste", "extravio"]);
     }
 
     function onlyAdminUpdatingKioskRequestStatus(newData, oldData) {

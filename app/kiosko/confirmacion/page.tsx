@@ -67,12 +67,12 @@ export default function KioskoConfirmacionPage() {
       color: "text-green-400",
     },
     desgaste: {
-      title: "Solicitud en revisión",
-      body: "Tu solicitud fue registrada. Un supervisor la revisará y recibirás tu EPP una vez aprobado.",
+      title: "Cambio por uso aprobado",
+      body: "Tu EPP se cambió por uso normal. La entrega es sin costo.",
       color: "text-amber-400",
     },
     extravio: {
-      title: solicitud?.chargeAmount > 0 ? "Extravío — cargo aplicado" : "Sin cargo",
+      title: solicitud?.chargeAmount > 0 ? "Reposición con cargo" : "Sin cargo",
       body: solicitud?.chargeAmount > 0
         ? `Se aplicará un cargo de $${Number(solicitud?.chargeAmount).toFixed(2)} MXN en tu nómina. Revisa tu recibo.`
         : "Tu EPP ya había cumplido su vida útil. Sin cargo.",
@@ -145,7 +145,7 @@ export default function KioskoConfirmacionPage() {
           ["Empleado", employeeName],
           ["SKU", solicitud.sku],
           ...(solicitud.size !== "N/A" ? [["Talla", solicitud.size]] : []),
-          ["Motivo", { vida_util: "Vida útil cumplida", desgaste: "Desgaste / Daño", extravio: "Extravío" }[solicitud.reason as string]],
+          ["Motivo", { vida_util: "Vida útil cumplida", desgaste: "Uso / desgaste normal", extravio: "Pérdida / robo / mal uso" }[solicitud.reason as string]],
           ...(solicitud.chargeAmount > 0 ? [["Cargo a nómina", `$${Number(solicitud.chargeAmount).toFixed(2)} MXN`]] : []),
         ].map(([label, value], i, arr) => (
           <div key={label} className={`flex justify-between px-5 py-3 text-sm ${i < arr.length - 1 ? "border-b border-white/10" : ""}`}>
@@ -155,9 +155,9 @@ export default function KioskoConfirmacionPage() {
         ))}
       </div>
 
-      {solicitud.reason === "desgaste" && (
-        <p className="text-amber-300 text-sm text-center bg-amber-900/20 border border-amber-500/30 rounded-lg px-4 py-3">
-          Tu solicitud quedará en estado <strong>pendiente de revisión</strong> hasta que el supervisor la apruebe.
+      {solicitud.reason === "extravio" && (
+        <p className="text-red-200 text-sm text-center bg-red-900/20 border border-red-500/30 rounded-lg px-4 py-3">
+          Si el EPP se pierde, se lo roban o se usa de forma incorrecta, la reposición será cobrada al colaborador por nómina.
         </p>
       )}
 
