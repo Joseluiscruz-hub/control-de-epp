@@ -21,6 +21,16 @@ function getConfiguredAdminEmails() {
   return emails.length > 0 ? emails : ["mimonkb222@gmail.com", "malvamora23@gmail.com"];
 }
 
+function getConfiguredDeveloperEmails() {
+  const rawEmails = process.env.DEVELOPER_EMAILS || process.env.NEXT_PUBLIC_DEVELOPER_EMAILS || "";
+  const emails = rawEmails
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  return emails.length > 0 ? emails : ["mimonkb222@gmail.com"];
+}
+
 function getBearerToken(req: NextRequest) {
   const header = req.headers.get("authorization") || "";
   const [scheme, token] = header.split(" ");
@@ -53,4 +63,22 @@ export async function requireAdminUser(req: NextRequest) {
     uid: decodedToken.uid,
     email,
   };
+}
+
+export async function requireDeveloperUser(req: NextRequest) {
+  const user = await requireAdminUser(req);
+
+  if (!getConfiguredDeveloperEmails().includes(user.email)) {
+    throw new AuthHttpError("Cuenta sin permisos de modo desarrollador.", 403);
+  }
+
+  return user;
+}
+
+export function getServerAdminEmails() {
+  return getConfiguredAdminEmails();
+}
+
+export function getServerDeveloperEmails() {
+  return getConfiguredDeveloperEmails();
 }
