@@ -35,14 +35,26 @@ jobs:
         env:
           KIOSK_SESSION_SECRET: ${{ secrets.KIOSK_SESSION_SECRET }}
         run: |
-          if [ ${#KIOSK_SESSION_SECRET} -lt 32 ]; then
+          if [ "${#KIOSK_SESSION_SECRET}" -lt 32 ]; then
             echo "KIOSK_SESSION_SECRET debe existir y tener mínimo 32 caracteres."
             exit 1
           fi
 
+      - name: Write Cloud Run build env vars
+        run: |
+          cat > cloud-run-build-env.yaml <<'EOF'
+          NEXT_PUBLIC_FIREBASE_API_KEY: '${{ vars.FIREBASE_API_KEY }}'
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: '${{ vars.FIREBASE_AUTH_DOMAIN }}'
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: '${{ vars.FIREBASE_PROJECT_ID }}'
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: '${{ vars.FIREBASE_STORAGE_BUCKET }}'
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '${{ vars.FIREBASE_MESSAGING_SENDER_ID }}'
+          NEXT_PUBLIC_FIREBASE_APP_ID: '${{ vars.FIREBASE_APP_ID }}'
+          NEXT_PUBLIC_FIREBASE_DATABASE_ID: '${{ vars.FIREBASE_DATABASE_ID }}'
+          NEXT_PUBLIC_ADMIN_EMAILS: '${{ vars.ADMIN_EMAILS }}'
+          NEXT_PUBLIC_DEVELOPER_EMAILS: '${{ vars.DEVELOPER_EMAILS || 'mimonkb222@gmail.com' }}'
+          EOF
+
       - name: Deploy to Cloud Run
-        id: deploy
-        continue-on-error: true
         run: |
           gcloud run deploy "${SERVICE_NAME}" \
             --source . \
@@ -51,33 +63,11 @@ jobs:
             --allow-unauthenticated \
             --memory=1Gi \
             --port=8080 \
-            --build-arg="NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.FIREBASE_API_KEY }}" \
-            --build-arg="NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ vars.FIREBASE_AUTH_DOMAIN }}" \
-            --build-arg="NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ vars.FIREBASE_PROJECT_ID }}" \
-            --build-arg="NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }}" \
-            --build-arg="NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ vars.FIREBASE_MESSAGING_SENDER_ID }}" \
-            --build-arg="NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.FIREBASE_APP_ID }}" \
-            --build-arg="NEXT_PUBLIC_FIREBASE_DATABASE_ID=${{ vars.FIREBASE_DATABASE_ID }}" \
-            --build-arg="NEXT_PUBLIC_ADMIN_EMAILS=${{ vars.ADMIN_EMAILS }}" \
-            --build-arg="NEXT_PUBLIC_DEVELOPER_EMAILS=${{ vars.DEVELOPER_EMAILS || 'mimonkb222@gmail.com' }}" \
+            --build-env-vars-file=cloud-run-build-env.yaml \
             --set-env-vars="NODE_ENV=production,KIOSK_SESSION_SECRET=${{ secrets.KIOSK_SESSION_SECRET }}" \
             --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest"
-          echo "deploy_exit_code=$?" >> "${GITHUB_OUTPUT}"
-
-      - name: Instrucciones para habilitar Cloud Run Admin API
-        if: steps.deploy.outputs.missing_run_api == 'true'
-        run: |
-          echo "❌ El deploy falló porque la Cloud Run Admin API (run.googleapis.com) no está habilitada."
-          echo "🔵 Habilítala aquí:"
-          echo "https://console.developers.google.com/apis/api/run.googleapis.com/overview?project=${PROJECT_ID}"
-          echo "🔵 Cuando se termine de habilitar, vuelve a ejecutar este workflow."
 
       - name: Deploy Firestore Rules
-        if: steps.deploy.outputs.deploy_exit_code == '0'
         run: |
           npm install -g firebase-tools
           firebase deploy --only firestore:rules --project="${PROJECT_ID}" --token="${{ secrets.FIREBASE_TOKEN }}"
-
-      - name: Fallar workflow si el deploy no fue exitoso
-        if: steps.deploy.outputs.deploy_exit_code != '0'
-        run: exit 1
