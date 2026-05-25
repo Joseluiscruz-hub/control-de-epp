@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clock3, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { getKioskRequestStatus } from "@/lib/kiosk-api";
-import { clearKioskSession } from "@/lib/kiosk-session";
+import { clearKioskSession, hasKioskSessionToken } from "@/lib/kiosk-session";
 import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
 
 type ViewStatus = "pending" | "approved" | "rejected";
@@ -31,8 +31,7 @@ export default function KioskoEsperaPage() {
 
   useEffect(() => {
     const requestId = sessionStorage.getItem("kiosk_request_id");
-    const verified = sessionStorage.getItem("kiosk_pin_verified");
-    if (!requestId || verified !== "true") {
+    if (!requestId || !hasKioskSessionToken()) {
       returnToLogin();
       return;
     }

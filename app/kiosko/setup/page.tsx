@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { saveEmployeePin } from "@/lib/kiosk-api";
+import { setKioskSessionToken } from "@/lib/kiosk-session";
 import { Shield, Check, ChevronDown, Loader2 } from "lucide-react";
 
 const TERMS_TEXT = `
@@ -81,8 +82,8 @@ export default function KioskoSetupPage() {
   const handleSave = async () => {
     setLoading(true);
     try {
-      await saveEmployeePin(employeeId, pin);
-      sessionStorage.setItem("kiosk_pin_verified", "true");
+      const result = await saveEmployeePin(employeeId, pin);
+      setKioskSessionToken(result.sessionToken);
       router.push("/kiosko/catalogo");
     } catch (e) {
       setError("Error al guardar. Intenta de nuevo.");

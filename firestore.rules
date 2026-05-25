@@ -37,7 +37,7 @@ service cloud.firestore {
     match /kiosk_requests/{requestId} {
       allow get: if request.auth != null;
       allow list: if request.auth != null;
-      allow create: if isValidKioskRequest(request.resource.data);
+      allow create: if false;
       allow update: if request.auth != null && isAdmin() && onlyAdminUpdatingKioskRequestStatus(request.resource.data, resource.data);
       allow delete: if false;
     }
@@ -46,9 +46,14 @@ service cloud.firestore {
     match /kiosk_request_status/{requestId} {
       allow get: if true;
       allow list: if false;
-      allow create: if isValidKioskRequestStatus(request.resource.data, requestId);
+      allow create: if false;
       allow update: if request.auth != null && isAdmin() && isValidKioskRequestStatus(request.resource.data, requestId);
       allow delete: if false;
+    }
+
+    // ── Rate limit servidor para PIN de kiosko ─────────────────────────────
+    match /kiosk_pin_attempts/{attemptId} {
+      allow read, write: if false;
     }
 
     // ── Asignaciones ───────────────────────────────────────────────────────

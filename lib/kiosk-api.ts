@@ -14,6 +14,7 @@ import {
   saveLocalKioskEmployeePin,
   updateLocalKioskRequestStatus,
 } from "./kiosk-local-store";
+import { getKioskSessionToken } from "./kiosk-session";
 import { calcNextReplacementDate } from "./replacement-logic";
 import { legacyHashPin } from "./pin-utils";
 
@@ -57,7 +58,7 @@ export async function getEmployeeById(employeeId: string): Promise<KioskEmployee
   return getLocalKioskEmployee(employeeId, isLocalRuntime());
 }
 
-export async function saveEmployeePin(employeeId: string, pin: string): Promise<void> {
+export async function saveEmployeePin(employeeId: string, pin: string): Promise<{ sessionToken: string }> {
   try {
     const response = await fetch("/api/kiosk/pin/setup", {
       method: "POST",
@@ -71,11 +72,18 @@ export async function saveEmployeePin(employeeId: string, pin: string): Promise<
         response.status
       );
     }
+
+    const data = await response.json();
+    if (typeof data?.sessionToken !== "string" || data.sessionToken.length === 0) {
+      throw new KioskApiError("No se recibió una sesión segura del kiosko.", 500);
+    }
+
+    return { sessionToken: data.sessionToken };
   } catch (error) {
     if (canFallbackToLocal(error)) {
       console.warn("[Kiosko] Guardando PIN en modo local.", error);
       saveLocalKioskEmployeePin(employeeId, legacyHashPin(pin));
-      return;
+      return { sessionToken: "local-dev" };
     }
     throw error;
   }
@@ -84,7 +92,7 @@ export async function saveEmployeePin(employeeId: string, pin: string): Promise<
 export async function validateEmployeePin(
   employeeId: string,
   pin: string
-): Promise<boolean> {
+): Promise<{ valid: boolean; sessionToken?: string }> {
   try {
     const response = await fetch("/api/kiosk/pin/verify", {
       method: "POST",
@@ -94,7 +102,10 @@ export async function validateEmployeePin(
 
     if (response.ok) {
       const data = await response.json();
-      return data?.valid === true;
+      if (data?.valid === true && typeof data?.sessionToken === "string" && data.sessionToken.length > 0) {
+        return { valid: true, sessionToken: data.sessionToken };
+      }
+      return { valid: false };
     }
 
     throw new KioskApiError(
@@ -104,9 +115,10 @@ export async function validateEmployeePin(
   } catch (error) {
     if (canFallbackToLocal(error)) {
       const emp = await getEmployeeById(employeeId);
-      return !!emp?.pin && emp.pin === legacyHashPin(pin);
+      const valid = !!emp?.pin && emp.pin === legacyHashPin(pin);
+      return valid ? { valid: true, sessionToken: "local-dev" } : { valid: false };
     }
-    if (error instanceof KioskApiError && error.status === 401) return false;
+    if (error instanceof KioskApiError && error.status === 401) return { valid: false };
     throw error;
   }
 }
@@ -270,31 +282,43 @@ export async function createKioskRequest(input: {
   items: KioskRequestItem[];
 }): Promise<string> {
   try {
-    const ref = doc(collection(db, "kiosk_requests"));
-    const batch = writeBatch(db);
+    const sessionToken = getKioskSessionToken();
+    if (!sessionToken) {
+      throw new KioskApiError("La sesión del kiosko expiró. Vuelve a iniciar.", 401);
+    }
 
-    batch.set(ref, {
-      employeeId: input.employeeId,
-      employeeName: input.employeeName,
-      items: input.items,
-      status: "pending",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      source: "kiosk",
+    if (sessionToken === "local-dev" && isLocalRuntime()) {
+      return createLocalKioskRequest(input);
+    }
+
+    const response = await fetch("/api/kiosk/requests", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-kiosk-session-token": sessionToken,
+      },
+      body: JSON.stringify({ items: input.items }),
     });
 
-    batch.set(doc(db, "kiosk_request_status", ref.id), {
-      requestId: ref.id,
-      status: "pending",
-      source: "kiosk",
-      updatedAt: serverTimestamp(),
-    });
+    if (!response.ok) {
+      throw new KioskApiError(
+        await parseKioskApiError(response, "No se pudo crear la solicitud."),
+        response.status
+      );
+    }
 
-    await batch.commit();
-    return ref.id;
+    const data = await response.json();
+    if (typeof data?.requestId !== "string" || data.requestId.length === 0) {
+      throw new KioskApiError("No se recibió folio de solicitud.", 500);
+    }
+
+    return data.requestId;
   } catch (error) {
-    console.warn("[Kiosko] Creando solicitud en modo local.", error);
-    return createLocalKioskRequest(input);
+    if (canFallbackToLocal(error)) {
+      console.warn("[Kiosko] Creando solicitud en modo local.", error);
+      return createLocalKioskRequest(input);
+    }
+    throw error;
   }
 }
 
