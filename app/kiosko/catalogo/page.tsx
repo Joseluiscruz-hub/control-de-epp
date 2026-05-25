@@ -6,7 +6,7 @@ import { createKioskRequest, getPPECatalog } from "@/lib/kiosk-api";
 import { KioskRequestItem, PPECatalogItem, ReplacementReason } from "@/lib/kiosk-types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle, CheckCircle2, DollarSign, Footprints, Glasses, Hand, HardHat, Headphones, Loader2, Package, Search, Shirt, Wind } from "lucide-react";
-import { clearKioskSession } from "@/lib/kiosk-session";
+import { clearKioskSession, hasKioskSessionToken } from "@/lib/kiosk-session";
 import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
 
 const CATEGORY_ICONS: Record<string, ReactNode> = {
@@ -82,8 +82,7 @@ export default function KioskoCatalogoPage() {
   });
 
   useEffect(() => {
-    const verified = sessionStorage.getItem("kiosk_pin_verified");
-    if (!employeeId || verified !== "true") {
+    if (!employeeId || !hasKioskSessionToken()) {
       router.replace("/kiosko");
       return;
     }

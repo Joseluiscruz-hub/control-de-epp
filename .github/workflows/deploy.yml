@@ -31,6 +31,15 @@ jobs:
       - name: Enable Cloud Run API
         run: gcloud services enable run.googleapis.com --project="${PROJECT_ID}"
 
+      - name: Validate deployment secrets
+        env:
+          KIOSK_SESSION_SECRET: ${{ secrets.KIOSK_SESSION_SECRET }}
+        run: |
+          if [ ${#KIOSK_SESSION_SECRET} -lt 32 ]; then
+            echo "KIOSK_SESSION_SECRET debe existir y tener mínimo 32 caracteres."
+            exit 1
+          fi
+
       - name: Deploy to Cloud Run
         id: deploy
         continue-on-error: true
@@ -50,7 +59,7 @@ jobs:
             --build-arg="NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.FIREBASE_APP_ID }}" \
             --build-arg="NEXT_PUBLIC_FIREBASE_DATABASE_ID=${{ vars.FIREBASE_DATABASE_ID }}" \
             --build-arg="NEXT_PUBLIC_ADMIN_EMAILS=${{ vars.ADMIN_EMAILS }}" \
-            --set-env-vars="NODE_ENV=production" \
+            --set-env-vars="NODE_ENV=production,KIOSK_SESSION_SECRET=${{ secrets.KIOSK_SESSION_SECRET }}" \
             --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest"
           echo "deploy_exit_code=$?" >> "${GITHUB_OUTPUT}"
 

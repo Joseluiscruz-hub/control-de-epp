@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getActiveAssignment } from "@/lib/kiosk-api";
+import { hasKioskSessionToken } from "@/lib/kiosk-session";
 import { PPECatalogItem, ReplacementReason } from "@/lib/kiosk-types";
 import { evaluateReplacement, getStockStatus } from "@/lib/replacement-logic";
 import {
@@ -16,6 +17,17 @@ const REASON_LABELS: Record<ReplacementReason, { label: string; icon: ReactNode;
   desgaste:  { label: "Uso / Desgaste Normal", icon: <AlertTriangle size={22} />, desc: "Mi EPP se desgastó por uso de trabajo y necesito cambio." },
   extravio:  { label: "Pérdida / Robo / Mal Uso", icon: <DollarSign size={22} />, desc: "Perdí, me robaron o hice mal uso del EPP y necesito reposición." },
 };
+
+type ActiveAssignment = Awaited<ReturnType<typeof getActiveAssignment>>;
+
+function toAssignmentDate(value: unknown) {
+  if (value instanceof Date) return value;
+  if (typeof value === "string" || typeof value === "number") return new Date(value);
+  if (value && typeof value === "object" && "toDate" in value && typeof value.toDate === "function") {
+    return value.toDate();
+  }
+  return null;
+}
 
 export default function KioskoSolicitudPage() {
   const router = useRouter();
@@ -32,15 +44,14 @@ export default function KioskoSolicitudPage() {
     item && !item.hasSizes ? item.sku ?? null : null
   );
   const [reason, setReason] = useState<ReplacementReason | null>(null);
-  const [lastAssignment, setLastAssignment] = useState<any>(null);
+  const [lastAssignment, setLastAssignment] = useState<ActiveAssignment>(null);
   const [loadingAssignment, setLoadingAssignment] = useState(() => Boolean(item && !item.hasSizes && item.sku && employeeId));
   const [signatureDone, setSignatureDone] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
   useEffect(() => {
-    const verified = sessionStorage.getItem("kiosk_pin_verified");
-    if (!item || verified !== "true") {
+    if (!item || !hasKioskSessionToken()) {
       router.push("/kiosko");
     }
   }, [item, router]);
@@ -65,9 +76,8 @@ export default function KioskoSolicitudPage() {
     if (!reason || !item) return null;
 
     if (lastAssignment?.assignedAt) {
-      const assignedDate = lastAssignment.assignedAt.toDate
-        ? lastAssignment.assignedAt.toDate()
-        : new Date(lastAssignment.assignedAt);
+      const assignedDate = toAssignmentDate(lastAssignment.assignedAt);
+      if (!assignedDate) return null;
       return evaluateReplacement(assignedDate, item.replacementDays, item.unitCost ?? 0, reason);
     }
 

@@ -3,17 +3,30 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { dispenseEPP } from "@/lib/kiosk-api";
+import { hasKioskSessionToken } from "@/lib/kiosk-session";
+import type { ReplacementReason } from "@/lib/kiosk-types";
 import { CheckCircle2, AlertTriangle, Clock, Loader2, HardHat } from "lucide-react";
+
+interface KioskSolicitud {
+  employeeId: string;
+  itemId: string;
+  sku: string;
+  size: string;
+  reason: ReplacementReason;
+  replacementDays: number;
+  chargeAmount?: number;
+  signatureDataUrl?: string;
+}
 
 export default function KioskoConfirmacionPage() {
   const router = useRouter();
   const [step, setStep] = useState<"confirm" | "loading" | "done" | "error">("confirm");
-  const [solicitud] = useState<any>(() => {
+  const [solicitud] = useState<KioskSolicitud | null>(() => {
     if (typeof window === "undefined") return null;
     const raw = sessionStorage.getItem("kiosk_solicitud");
     const employeeId = sessionStorage.getItem("kiosk_employee_id");
     if (!raw || !employeeId) return null;
-    return { ...JSON.parse(raw), employeeId };
+    return { ...JSON.parse(raw), employeeId } as KioskSolicitud;
   });
   const [errorMsg, setErrorMsg] = useState("");
   const [countdown, setCountdown] = useState(10);
@@ -22,8 +35,7 @@ export default function KioskoConfirmacionPage() {
   );
 
   useEffect(() => {
-    const verified = sessionStorage.getItem("kiosk_pin_verified");
-    if (!solicitud || verified !== "true") {
+    if (!solicitud || !hasKioskSessionToken()) {
       router.push("/kiosko");
     }
   }, [router, solicitud]);
@@ -54,12 +66,13 @@ export default function KioskoConfirmacionPage() {
         setCountdown(c);
         if (c <= 0) { clearInterval(t); sessionStorage.clear(); router.push("/kiosko"); }
       }, 1000);
-    } catch (e: any) {
-      setErrorMsg(e?.message ?? "Error al procesar. Llama al supervisor.");
+    } catch (e: unknown) {
+      setErrorMsg(e instanceof Error ? e.message : "Error al procesar. Llama al supervisor.");
       setStep("error");
     }
   };
 
+  const chargeAmount = solicitud?.chargeAmount ?? 0;
   const REASON_MSGS: Record<string, { title: string; body: string; color: string }> = {
     vida_util: {
       title: "Reposición aprobada",
@@ -72,11 +85,11 @@ export default function KioskoConfirmacionPage() {
       color: "text-amber-400",
     },
     extravio: {
-      title: solicitud?.chargeAmount > 0 ? "Reposición con cargo" : "Sin cargo",
-      body: solicitud?.chargeAmount > 0
-        ? `Se aplicará un cargo de $${Number(solicitud?.chargeAmount).toFixed(2)} MXN en tu nómina. Revisa tu recibo.`
+      title: chargeAmount > 0 ? "Reposición con cargo" : "Sin cargo",
+      body: chargeAmount > 0
+        ? `Se aplicará un cargo de $${chargeAmount.toFixed(2)} MXN en tu nómina. Revisa tu recibo.`
         : "Tu EPP ya había cumplido su vida útil. Sin cargo.",
-      color: solicitud?.chargeAmount > 0 ? "text-red-400" : "text-green-400",
+      color: chargeAmount > 0 ? "text-red-400" : "text-green-400",
     },
   };
 
@@ -146,7 +159,7 @@ export default function KioskoConfirmacionPage() {
           ["SKU", solicitud.sku],
           ...(solicitud.size !== "N/A" ? [["Talla", solicitud.size]] : []),
           ["Motivo", { vida_util: "Vida útil cumplida", desgaste: "Uso / desgaste normal", extravio: "Pérdida / robo / mal uso" }[solicitud.reason as string]],
-          ...(solicitud.chargeAmount > 0 ? [["Cargo a nómina", `$${Number(solicitud.chargeAmount).toFixed(2)} MXN`]] : []),
+          ...(chargeAmount > 0 ? [["Cargo a nómina", `$${chargeAmount.toFixed(2)} MXN`]] : []),
         ].map(([label, value], i, arr) => (
           <div key={label} className={`flex justify-between px-5 py-3 text-sm ${i < arr.length - 1 ? "border-b border-white/10" : ""}`}>
             <span className="text-gray-400">{label}</span>

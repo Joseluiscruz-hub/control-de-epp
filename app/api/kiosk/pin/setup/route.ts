@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { FieldValue } from "firebase-admin/firestore";
 import { NextRequest } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { createKioskSessionToken } from "@/lib/kiosk-session-token";
 import { isSixDigitPin } from "@/lib/pin-utils";
 
 export const runtime = "nodejs";
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
     const db = getAdminDb();
     const employeeRef = db.collection("kiosk_employees").doc(employeeId);
     const pinHash = await bcrypt.hash(pin, 12);
+    let employeeName = "";
 
     await db.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(employeeRef);
@@ -45,6 +47,8 @@ export async function POST(req: NextRequest) {
         throw new KioskPinError("El PIN ya fue configurado.", 409);
       }
 
+      employeeName = typeof employee.name === "string" ? employee.name : "";
+
       transaction.update(employeeRef, {
         pin: pinHash,
         firstLogin: false,
@@ -54,7 +58,10 @@ export async function POST(req: NextRequest) {
       });
     });
 
-    return Response.json({ success: true });
+    return Response.json({
+      success: true,
+      sessionToken: createKioskSessionToken({ employeeId, employeeName }),
+    });
   } catch (error) {
     if (error instanceof KioskPinError) {
       return Response.json({ error: error.message }, { status: error.status });
