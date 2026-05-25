@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { Button } from './ui/button';
-import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X, HardHat, Zap } from 'lucide-react';
+import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X, HardHat } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
+import { DeveloperModeDialog } from './developer-mode-dialog';
 
 const NAV_LINKS = [
   { href: '/', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
@@ -109,6 +110,8 @@ export function NavBar() {
                   Kiosko
                 </Button>
               </Link>
+
+              <DeveloperModeDialog />
 
               {/* ARIA status */}
               <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{background:'rgba(212,160,23,0.09)', border:'1px solid rgba(212,160,23,0.18)'}}>
@@ -227,6 +230,7 @@ export function NavBar() {
                   <HardHat className="h-4 w-4 text-amber-500/50" />
                   Kiosko de EPP
                 </Link>
+                <DeveloperModeDialog mobile />
               </nav>
 
               <div className="mt-4 pt-4 flex items-center justify-between gap-4" style={{borderTop:'1px solid rgba(255,255,255,0.06)'}}>

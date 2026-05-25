@@ -59,6 +59,7 @@ jobs:
             --build-arg="NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.FIREBASE_APP_ID }}" \
             --build-arg="NEXT_PUBLIC_FIREBASE_DATABASE_ID=${{ vars.FIREBASE_DATABASE_ID }}" \
             --build-arg="NEXT_PUBLIC_ADMIN_EMAILS=${{ vars.ADMIN_EMAILS }}" \
+            --build-arg="NEXT_PUBLIC_DEVELOPER_EMAILS=${{ vars.DEVELOPER_EMAILS || 'mimonkb222@gmail.com' }}" \
             --set-env-vars="NODE_ENV=production,KIOSK_SESSION_SECRET=${{ secrets.KIOSK_SESSION_SECRET }}" \
             --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest"
           echo "deploy_exit_code=$?" >> "${GITHUB_OUTPUT}"
