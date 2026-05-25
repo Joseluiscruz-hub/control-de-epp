@@ -72,6 +72,27 @@ async function readExistingDocumentIds(collectionName: 'employees' | 'kiosk_empl
   return existing;
 }
 
+async function readExistingEmployeesMetadata(ids: string[]) {
+  const existing = new Map<string, { exists: boolean; hasCreatedAt: boolean }>();
+  for (let index = 0; index < ids.length; index += 60) {
+    const chunk = ids.slice(index, index + 60);
+    const snapshots = await Promise.all(chunk.map(id => getDoc(doc(db, 'employees', id))));
+    snapshots.forEach((snapshot, offset) => {
+      const id = chunk[offset];
+      if (!id) return;
+      if (!snapshot.exists()) {
+        existing.set(id, { exists: false, hasCreatedAt: false });
+        return;
+      }
+      existing.set(id, {
+        exists: true,
+        hasCreatedAt: snapshot.get('createdAt') != null,
+      });
+    });
+  }
+  return existing;
+}
+
 export default function EmpleadosPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -187,7 +208,7 @@ export default function EmpleadosPage() {
     try {
       const employeeIds = importPreview.records.map(record => record.id);
       const [existingEmployees, existingKioskEmployees] = await Promise.all([
-        readExistingDocumentIds('employees', employeeIds),
+        readExistingEmployeesMetadata(employeeIds),
         readExistingDocumentIds('kiosk_employees', employeeIds),
       ]);
 
@@ -204,7 +225,9 @@ export default function EmpleadosPage() {
       };
 
       for (const record of importPreview.records) {
-        const employeeExists = existingEmployees.has(record.id);
+        const employeeMetadata = existingEmployees.get(record.id) ?? { exists: false, hasCreatedAt: false };
+        const employeeExists = employeeMetadata.exists;
+        const needsCreatedAt = !employeeMetadata.hasCreatedAt;
         const kioskEmployeeExists = existingKioskEmployees.has(record.id);
         const employeePayload = buildEmployeeImportPayload(record);
         const kioskPayload = buildKioskEmployeeImportPayload(record);
@@ -213,7 +236,8 @@ export default function EmpleadosPage() {
           doc(db, 'employees', record.id),
           {
             ...employeePayload,
-            ...(employeeExists ? {} : { firstLogin: true, termsAccepted: false, createdAt: serverTimestamp() }),
+            ...(needsCreatedAt ? { createdAt: serverTimestamp() } : {}),
+            ...(employeeExists ? {} : { firstLogin: true, termsAccepted: false }),
             updatedAt: serverTimestamp(),
           },
           { merge: true }
@@ -258,7 +282,12 @@ export default function EmpleadosPage() {
       resetPersonnelImport();
     } catch (error) {
       console.error('[Personnel import write error]', error);
-      toast.error('No se pudo cargar la base. Verifica permisos de admin y reglas de Firebase.');
+      const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+      if (code === 'permission-denied') {
+        toast.error('Permiso denegado. Verifica que tu correo esté en la lista admin del frontend y también en firestore.rules (isAdmin).');
+      } else {
+        toast.error('No se pudo cargar la base. Verifica permisos de admin y reglas de Firebase.');
+      }
     } finally {
       setImportingPersonnel(false);
     }
