@@ -5,7 +5,7 @@ import {
   collection, onSnapshot, doc,
   serverTimestamp, query, where, getDocs, getDoc, writeBatch
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,8 +27,6 @@ import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
 import { syncLocalKioskEmployees } from '@/lib/kiosk-local-store';
 import {
-  buildEmployeeImportPayload,
-  buildKioskEmployeeImportPayload,
   hasBlockingPersonnelIssues,
   parsePersonnelTsv,
   type ParsedPersonnelImport,
@@ -59,39 +57,6 @@ const AREAS = [
   'Soldadura', 'Ensamble', 'Pintura', 'Logística', 'Mantenimiento',
   'Calidad', 'Almacén', 'Administración', 'Seguridad Industrial', 'Producción'
 ];
-
-async function readExistingDocumentIds(collectionName: 'employees' | 'kiosk_employees', ids: string[]) {
-  const existing = new Set<string>();
-  for (let index = 0; index < ids.length; index += 60) {
-    const chunk = ids.slice(index, index + 60);
-    const snapshots = await Promise.all(chunk.map(id => getDoc(doc(db, collectionName, id))));
-    snapshots.forEach((snapshot, offset) => {
-      if (snapshot.exists()) existing.add(chunk[offset]);
-    });
-  }
-  return existing;
-}
-
-async function readExistingEmployeesMetadata(ids: string[]) {
-  const existing = new Map<string, { exists: boolean; hasCreatedAt: boolean }>();
-  for (let index = 0; index < ids.length; index += 60) {
-    const chunk = ids.slice(index, index + 60);
-    const snapshots = await Promise.all(chunk.map(id => getDoc(doc(db, 'employees', id))));
-    snapshots.forEach((snapshot, offset) => {
-      const id = chunk[offset];
-      if (!id) return;
-      if (!snapshot.exists()) {
-        existing.set(id, { exists: false, hasCreatedAt: false });
-        return;
-      }
-      existing.set(id, {
-        exists: true,
-        hasCreatedAt: snapshot.get('createdAt') != null,
-      });
-    });
-  }
-  return existing;
-}
 
 export default function EmpleadosPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -206,61 +171,24 @@ export default function EmpleadosPage() {
 
     setImportingPersonnel(true);
     try {
-      const employeeIds = importPreview.records.map(record => record.id);
-      const [existingEmployees, existingKioskEmployees] = await Promise.all([
-        readExistingEmployeesMetadata(employeeIds),
-        readExistingDocumentIds('kiosk_employees', employeeIds),
-      ]);
-
-      let batch = writeBatch(db);
-      let writes = 0;
-      let createdEmployees = 0;
-      let updatedEmployees = 0;
-
-      const commitIfNeeded = async (force = false) => {
-        if (writes === 0 || (!force && writes < 440)) return;
-        await batch.commit();
-        batch = writeBatch(db);
-        writes = 0;
-      };
-
-      for (const record of importPreview.records) {
-        const employeeMetadata = existingEmployees.get(record.id) ?? { exists: false, hasCreatedAt: false };
-        const employeeExists = employeeMetadata.exists;
-        const needsCreatedAt = !employeeMetadata.hasCreatedAt;
-        const kioskEmployeeExists = existingKioskEmployees.has(record.id);
-        const employeePayload = buildEmployeeImportPayload(record);
-        const kioskPayload = buildKioskEmployeeImportPayload(record);
-
-        batch.set(
-          doc(db, 'employees', record.id),
-          {
-            ...employeePayload,
-            ...(needsCreatedAt ? { createdAt: serverTimestamp() } : {}),
-            ...(employeeExists ? {} : { firstLogin: true, termsAccepted: false }),
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        batch.set(
-          doc(db, 'kiosk_employees', record.id),
-          {
-            ...kioskPayload,
-            ...(kioskEmployeeExists ? {} : { firstLogin: true, termsAccepted: false }),
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        if (employeeExists) updatedEmployees++;
-        else createdEmployees++;
-
-        writes += 2;
-        await commitIfNeeded();
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        throw new Error('missing_admin_session');
       }
 
-      await commitIfNeeded(true);
+      const response = await fetch('/api/personnel/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ records: importPreview.records }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof result?.error === 'string' ? result.error : 'personnel_import_failed');
+      }
 
       const localSync = syncLocalKioskEmployees(
         importPreview.records.map(record => ({
@@ -276,18 +204,15 @@ export default function EmpleadosPage() {
       );
 
       toast.success(
-        `Base cargada: ${createdEmployees} nuevos, ${updatedEmployees} actualizados. Kiosko local: ${localSync.total}.`
+        `Base cargada: ${result.createdEmployees ?? 0} nuevos, ${result.updatedEmployees ?? 0} actualizados. Kiosko local: ${localSync.total}.`
       );
       setImportOpen(false);
       resetPersonnelImport();
     } catch (error) {
       console.error('[Personnel import write error]', error);
-      const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
-      if (code === 'permission-denied') {
-        toast.error('Permiso denegado. Verifica que tu correo esté en la lista admin del frontend y también en firestore.rules (isAdmin).');
-      } else {
-        toast.error('No se pudo cargar la base. Verifica permisos de admin y reglas de Firebase.');
-      }
+      toast.error(error instanceof Error && error.message !== 'personnel_import_failed'
+        ? error.message
+        : 'No se pudo cargar la base. Verifica tu sesión de admin y la configuración del servidor.');
     } finally {
       setImportingPersonnel(false);
     }

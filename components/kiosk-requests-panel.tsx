@@ -8,6 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminKioskRequest, listAdminKioskRequests, updateKioskRequestStatus } from "@/lib/kiosk-api";
 import { toast } from "sonner";
 
+const REASON_LABELS: Record<string, string> = {
+  vida_util: "Vida útil",
+  desgaste: "Uso normal",
+  extravio: "Pérdida/robo/mal uso",
+};
+
 export function KioskRequestsPanel() {
   const [requests, setRequests] = useState<AdminKioskRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +103,9 @@ export function KioskRequestsPanel() {
                   {request.items.map((item) => (
                     <li key={`${request.id}-${item.itemId}-${item.sku}`}>
                       {item.itemName} · {item.sku} · {item.size}
+                      {item.replacementReason && (
+                        <span className="ml-1 text-amber-300">· {REASON_LABELS[item.replacementReason] ?? item.replacementReason}</span>
+                      )}
                     </li>
                   ))}
                 </ul>

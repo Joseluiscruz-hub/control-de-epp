@@ -6,15 +6,15 @@ import { getActiveAssignment } from "@/lib/kiosk-api";
 import { PPECatalogItem, ReplacementReason } from "@/lib/kiosk-types";
 import { evaluateReplacement, getStockStatus } from "@/lib/replacement-logic";
 import {
-  ArrowLeft, AlertTriangle, CheckCircle2, Camera,
+  ArrowLeft, AlertTriangle, CheckCircle2,
   PenLine, DollarSign, RotateCcw, Loader2,
   HardHat,
 } from "lucide-react";
 
 const REASON_LABELS: Record<ReplacementReason, { label: string; icon: ReactNode; desc: string }> = {
   vida_util: { label: "Vida Útil Cumplida", icon: <CheckCircle2 size={22} />, desc: "Mi EPP ya completó su período de uso establecido." },
-  desgaste:  { label: "Desgaste / Daño",    icon: <AlertTriangle size={22} />, desc: "Mi EPP presenta daño o desgaste visible antes de completar su vida útil." },
-  extravio:  { label: "Extravío / Pérdida", icon: <DollarSign size={22} />,   desc: "He extraviado mi EPP y necesito reposición." },
+  desgaste:  { label: "Uso / Desgaste Normal", icon: <AlertTriangle size={22} />, desc: "Mi EPP se desgastó por uso de trabajo y necesito cambio." },
+  extravio:  { label: "Pérdida / Robo / Mal Uso", icon: <DollarSign size={22} />, desc: "Perdí, me robaron o hice mal uso del EPP y necesito reposición." },
 };
 
 export default function KioskoSolicitudPage() {
@@ -35,7 +35,6 @@ export default function KioskoSolicitudPage() {
   const [lastAssignment, setLastAssignment] = useState<any>(null);
   const [loadingAssignment, setLoadingAssignment] = useState(() => Boolean(item && !item.hasSizes && item.sku && employeeId));
   const [signatureDone, setSignatureDone] = useState(false);
-  const [photoFile, setPhotoFile] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
@@ -95,7 +94,6 @@ export default function KioskoSolicitudPage() {
 
   const canProceed = () => {
     if (!selectedSku || !reason) return false;
-    if (reason === "desgaste" && !photoFile) return false;
     if (reason === "extravio" && (evaluation?.chargeAmount ?? 0) > 0 && !signatureDone) return false;
     return true;
   };
@@ -109,7 +107,6 @@ export default function KioskoSolicitudPage() {
       reason,
       replacementDays: item.replacementDays,
       chargeAmount: evaluation?.chargeAmount ?? 0,
-      photoDataUrl: photoFile,
     }));
     router.push("/kiosko/confirmacion");
   };
@@ -258,7 +255,7 @@ export default function KioskoSolicitudPage() {
           )}
           {reason === "desgaste" && (
             <p className="text-amber-300 flex items-center gap-2">
-              <AlertTriangle size={16} /> Solicitud pendiente de aprobación por supervisor. <strong>Adjunta foto del daño.</strong>
+              <AlertTriangle size={16} /> Cambio por uso normal. La reposición se realizará <strong>sin cargo</strong>.
             </p>
           )}
           {reason === "extravio" && evaluation.chargeAmount === 0 && (
@@ -272,26 +269,6 @@ export default function KioskoSolicitudPage() {
             </p>
           )}
         </div>
-      )}
-
-      {/* Foto evidencia (desgaste) */}
-      {reason === "desgaste" && (
-        <section>
-          <h3 className="text-base font-semibold mb-3 text-gray-300">Evidencia fotográfica</h3>
-          <label className="flex flex-col items-center gap-3 border-2 border-dashed border-gray-600 rounded-lg p-6 cursor-pointer hover:border-amber-400/60 transition-colors">
-            <Camera size={28} className="text-gray-500" />
-            <span className="text-sm text-gray-400">{photoFile ? "Foto adjunta" : "Toca para tomar foto o seleccionar"}</span>
-            <input type="file" accept="image/*" capture="environment" className="hidden"
-              onChange={e => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                const reader = new FileReader();
-                reader.onload = ev => setPhotoFile(ev.target?.result as string);
-                reader.readAsDataURL(f);
-              }}
-            />
-          </label>
-        </section>
       )}
 
       {/* Firma digital (extravío con cobro) */}

@@ -14,11 +14,11 @@ El empleado es responsable del uso, cuidado y resguardo del EPP asignado durante
 2. REPOSICIÓN POR VIDA ÚTIL
 Cuando el EPP haya cumplido su período de vida útil definido por la empresa, el empleado tendrá derecho a solicitar reposición sin costo alguno.
 
-3. REPOSICIÓN POR DESGASTE
-En caso de desgaste prematuro, el empleado deberá presentar evidencia fotográfica del daño. La reposición estará sujeta a revisión y aprobación del supervisor de área.
+3. REPOSICIÓN POR USO NORMAL
+Cuando el EPP presente desgaste por uso de trabajo, el empleado podrá solicitar cambio sin costo.
 
-4. PÉRDIDA O EXTRAVÍO
-Si el empleado extravía el EPP antes de que concluya su vida útil, se aplicará un cargo proporcional al tiempo restante de uso. Dicho cargo será descontado de la nómina conforme a la NOM-017-STPS.
+4. PÉRDIDA, ROBO O MAL USO
+Si el empleado pierde el EPP, se lo roban o hace mal uso de él antes de que concluya su vida útil, se cobrará la reposición correspondiente. Dicho cargo será descontado de la nómina conforme a las políticas internas aplicables.
 
 5. CUMPLIMIENTO NORMATIVO
 Este sistema opera bajo las disposiciones de la Secretaría del Trabajo y Previsión Social (STPS) y las normas NOM-017-STPS y NOM-030-STPS vigentes.

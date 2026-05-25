@@ -47,6 +47,7 @@ export interface KioskRequestItem {
   sku: string;
   size: string;
   replacementDays: number;
+  replacementReason?: ReplacementReason;
 }
 
 export type KioskRequestStatus = "pending" | "approved" | "rejected";

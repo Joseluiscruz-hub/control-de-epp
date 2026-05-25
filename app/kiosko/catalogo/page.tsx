@@ -3,8 +3,9 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createKioskRequest, getPPECatalog } from "@/lib/kiosk-api";
-import { KioskRequestItem, PPECatalogItem } from "@/lib/kiosk-types";
-import { CheckCircle2, Footprints, Glasses, Hand, HardHat, Headphones, Loader2, Package, Search, Shirt, Wind } from "lucide-react";
+import { KioskRequestItem, PPECatalogItem, ReplacementReason } from "@/lib/kiosk-types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertTriangle, CheckCircle2, DollarSign, Footprints, Glasses, Hand, HardHat, Headphones, Loader2, Package, Search, Shirt, Wind } from "lucide-react";
 import { clearKioskSession } from "@/lib/kiosk-session";
 import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
 
@@ -20,6 +21,27 @@ const CATEGORY_ICONS: Record<string, ReactNode> = {
 };
 
 const CATEGORIES = ["Todos", "Guantes", "Cascos", "Gafas", "Calzado", "Proteccion Auditiva", "Ropa", "Respiradores", "Otros"];
+
+const REQUEST_REASONS: Record<ReplacementReason, { label: string; desc: string; icon: ReactNode; tone: string }> = {
+  desgaste: {
+    label: "Uso normal",
+    desc: "El EPP se cambió por desgaste de trabajo. Se atenderá sin problema.",
+    icon: <AlertTriangle className="h-5 w-5" />,
+    tone: "border-amber-400/35 bg-amber-400/10 text-amber-200",
+  },
+  vida_util: {
+    label: "Vida útil cumplida",
+    desc: "El EPP ya completó su periodo de uso. Se atenderá sin problema.",
+    icon: <CheckCircle2 className="h-5 w-5" />,
+    tone: "border-emerald-400/35 bg-emerald-400/10 text-emerald-200",
+  },
+  extravio: {
+    label: "Pérdida, robo o mal uso",
+    desc: "La reposición se cobrará por nómina conforme al costo aplicable.",
+    icon: <DollarSign className="h-5 w-5" />,
+    tone: "border-red-400/40 bg-red-500/10 text-red-200",
+  },
+};
 
 type SelectedVariant = {
   itemId: string;
@@ -37,6 +59,8 @@ export default function KioskoCatalogoPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Todos");
   const [submitError, setSubmitError] = useState("");
+  const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
+  const [requestReason, setRequestReason] = useState<ReplacementReason | null>(null);
   const [employeeName] = useState(() =>
     typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_name") ?? ""
   );
@@ -122,17 +146,27 @@ export default function KioskoCatalogoPage() {
     });
   };
 
-  const submitRequest = async () => {
+  const submitRequest = async (reasonOverride?: ReplacementReason) => {
     const selectedItems = Object.values(selectedByItem);
     if (!employeeId || selectedItems.length === 0) return;
+    const reasonToUse = reasonOverride ?? requestReason;
+
+    if (!reasonToUse) {
+      setReasonDialogOpen(true);
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError("");
+    setReasonDialogOpen(false);
     try {
       const requestId = await createKioskRequest({
         employeeId,
         employeeName,
-        items: selectedItems as KioskRequestItem[],
+        items: selectedItems.map((item) => ({
+          ...item,
+          replacementReason: reasonToUse,
+        })) as KioskRequestItem[],
       });
       sessionStorage.setItem("kiosk_request_id", requestId);
       router.push("/kiosko/espera");
@@ -287,7 +321,7 @@ export default function KioskoCatalogoPage() {
             {submitError && <p className="text-xs text-red-400 mt-1">{submitError}</p>}
           </div>
           <button
-            onClick={submitRequest}
+            onClick={() => void submitRequest()}
             disabled={submitting || selectedCount === 0}
             className="px-8 py-4 rounded-lg bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-gray-900 font-bold text-lg flex items-center gap-2"
           >
@@ -296,6 +330,69 @@ export default function KioskoCatalogoPage() {
           </button>
         </div>
       </div>
+
+      <Dialog open={reasonDialogOpen} onOpenChange={setReasonDialogOpen}>
+        <DialogContent className="sm:max-w-2xl rounded-xl border border-white/10 bg-[#07090d] p-0 text-white shadow-2xl">
+          <div className="border-b border-white/10 bg-white/[0.055] p-6">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black uppercase tracking-tight">Motivo del cambio</DialogTitle>
+              <p className="text-sm font-medium text-white/55">
+                Selecciona por qué estás cambiando tu EPP antes de enviar la solicitud.
+              </p>
+            </DialogHeader>
+          </div>
+
+          <div className="space-y-4 p-6">
+            <div className="grid gap-3">
+              {(Object.entries(REQUEST_REASONS) as [ReplacementReason, typeof REQUEST_REASONS[ReplacementReason]][]).map(([key, option]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setRequestReason(key)}
+                  className={`flex items-start gap-4 rounded-lg border p-4 text-left transition-all ${
+                    requestReason === key
+                      ? option.tone
+                      : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25 hover:bg-white/[0.06]"
+                  }`}
+                >
+                  <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${
+                    requestReason === key ? "border-current bg-black/15" : "border-white/10 bg-white/5"
+                  }`}>
+                    {option.icon}
+                  </span>
+                  <span>
+                    <span className="block text-base font-black uppercase tracking-wide">{option.label}</span>
+                    <span className="mt-1 block text-sm font-medium opacity-75">{option.desc}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="rounded-lg border border-red-400/25 bg-red-500/10 p-4 text-sm font-semibold leading-relaxed text-red-100">
+              Si el EPP se pierde, se lo roban o se usa de forma incorrecta, la reposición será cobrada al colaborador por nómina.
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setReasonDialogOpen(false)}
+                disabled={submitting}
+                className="rounded-lg border border-white/10 px-5 py-3 text-sm font-bold text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => requestReason && void submitRequest(requestReason)}
+                disabled={!requestReason || submitting}
+                className="rounded-lg bg-amber-400 px-6 py-3 text-sm font-black uppercase tracking-widest text-gray-900 transition-colors hover:bg-amber-300 disabled:opacity-40"
+              >
+                {submitting ? "Enviando..." : "Enviar solicitud"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
