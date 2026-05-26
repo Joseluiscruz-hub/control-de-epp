@@ -36,10 +36,28 @@ jobs:
         id: deploy
         continue-on-error: true
         env:
+          FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+          FIREBASE_DATABASE_ID: ${{ vars.FIREBASE_DATABASE_ID }}
           ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
         run: |
-          # Escapar comas en ADMIN_EMAILS para que gcloud no las interprete como separadores
-          ESCAPED_EMAILS=$(echo "${ADMIN_EMAILS}" | sed 's/,/^,/g')
+          # Crear flags-file para evitar problemas con caracteres especiales (comas en emails)
+          cat > /tmp/cloudrun-flags.yaml << 'YAML_EOF'
+          set-build-env-vars:
+          YAML_EOF
+          # Agregar cada variable al flags file
+          echo "  - NEXT_PUBLIC_FIREBASE_API_KEY=${FIREBASE_API_KEY}" >> /tmp/cloudrun-flags.yaml
+          echo "  - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}" >> /tmp/cloudrun-flags.yaml
+          echo "  - NEXT_PUBLIC_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}" >> /tmp/cloudrun-flags.yaml
+          echo "  - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET}" >> /tmp/cloudrun-flags.yaml
+          echo "  - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID}" >> /tmp/cloudrun-flags.yaml
+          echo "  - NEXT_PUBLIC_FIREBASE_APP_ID=${FIREBASE_APP_ID}" >> /tmp/cloudrun-flags.yaml
+          echo "  - NEXT_PUBLIC_FIREBASE_DATABASE_ID=${FIREBASE_DATABASE_ID}" >> /tmp/cloudrun-flags.yaml
+          echo "  - NEXT_PUBLIC_ADMIN_EMAILS=${ADMIN_EMAILS}" >> /tmp/cloudrun-flags.yaml
           gcloud run deploy "${SERVICE_NAME}" \
             --source . \
             --region="${REGION}" \
@@ -47,7 +65,7 @@ jobs:
             --allow-unauthenticated \
             --memory=1Gi \
             --port=8080 \
-            --set-build-env-vars="NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.FIREBASE_API_KEY }},NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ vars.FIREBASE_AUTH_DOMAIN }},NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ vars.FIREBASE_PROJECT_ID }},NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ vars.FIREBASE_STORAGE_BUCKET }},NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ vars.FIREBASE_MESSAGING_SENDER_ID }},NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.FIREBASE_APP_ID }},NEXT_PUBLIC_FIREBASE_DATABASE_ID=${{ vars.FIREBASE_DATABASE_ID }},NEXT_PUBLIC_ADMIN_EMAILS=${ESCAPED_EMAILS}" \
+            --flags-file=/tmp/cloudrun-flags.yaml \
             --set-env-vars="NODE_ENV=production" \
             --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest"
           echo "deploy_exit_code=$?" >> "${GITHUB_OUTPUT}"
