@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { Button } from './ui/button';
-import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X, HardHat, Zap } from 'lucide-react';
+import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X, HardHat, FileSpreadsheet } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: '/', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
   { href: '/empleados', label: 'Empleados', icon: <Users className="h-4 w-4" /> },
   { href: '/inventario', label: 'Inventario', icon: <Package className="h-4 w-4" /> },
+  { href: '/reportes', label: 'Reportes', icon: <FileSpreadsheet className="h-4 w-4" /> },
 ];
 
 export function NavBar() {
