@@ -29,7 +29,7 @@ jobs:
       - name: Enable Cloud Run API
         run: gcloud services enable run.googleapis.com --project="${PROJECT_ID}"
 
-      - name: Create build env vars flags file
+      - name: Create Cloud Run env vars files
         env:
           FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
           FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
@@ -37,26 +37,60 @@ jobs:
           FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
           FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
           FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+          FIREBASE_MEASUREMENT_ID: ${{ vars.FIREBASE_MEASUREMENT_ID }}
           FIREBASE_DATABASE_ID: ${{ vars.FIREBASE_DATABASE_ID }}
           ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
         run: |
           python3 - <<'PYEOF'
-          import os, json
-          flags = {
-            "--set-build-env-vars": {
-              "NEXT_PUBLIC_FIREBASE_API_KEY": os.environ["FIREBASE_API_KEY"],
-              "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN": os.environ["FIREBASE_AUTH_DOMAIN"],
-              "NEXT_PUBLIC_FIREBASE_PROJECT_ID": os.environ["FIREBASE_PROJECT_ID"],
-              "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET": os.environ["FIREBASE_STORAGE_BUCKET"],
-              "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": os.environ["FIREBASE_MESSAGING_SENDER_ID"],
-              "NEXT_PUBLIC_FIREBASE_APP_ID": os.environ["FIREBASE_APP_ID"],
-              "NEXT_PUBLIC_FIREBASE_DATABASE_ID": os.environ["FIREBASE_DATABASE_ID"],
-              "NEXT_PUBLIC_ADMIN_EMAILS": os.environ["ADMIN_EMAILS"],
-            }
+          import os
+          import sys
+
+          required = [
+            "FIREBASE_API_KEY",
+            "FIREBASE_AUTH_DOMAIN",
+            "FIREBASE_PROJECT_ID",
+            "FIREBASE_STORAGE_BUCKET",
+            "FIREBASE_MESSAGING_SENDER_ID",
+            "FIREBASE_APP_ID",
+            "FIREBASE_DATABASE_ID",
+            "ADMIN_EMAILS",
+          ]
+          missing = [key for key in required if not os.environ.get(key)]
+          if missing:
+            sys.exit("Missing required GitHub variables: " + ", ".join(missing))
+
+          build_vars = {
+            "NEXT_PUBLIC_FIREBASE_API_KEY": os.environ["FIREBASE_API_KEY"],
+            "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN": os.environ["FIREBASE_AUTH_DOMAIN"],
+            "NEXT_PUBLIC_FIREBASE_PROJECT_ID": os.environ["FIREBASE_PROJECT_ID"],
+            "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET": os.environ["FIREBASE_STORAGE_BUCKET"],
+            "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": os.environ["FIREBASE_MESSAGING_SENDER_ID"],
+            "NEXT_PUBLIC_FIREBASE_APP_ID": os.environ["FIREBASE_APP_ID"],
+            "NEXT_PUBLIC_FIREBASE_DATABASE_ID": os.environ["FIREBASE_DATABASE_ID"],
+            "NEXT_PUBLIC_ADMIN_EMAILS": os.environ["ADMIN_EMAILS"],
           }
-          with open("/tmp/cloudrun-flags.json", "w") as f:
-            json.dump(flags, f)
-          print("Flags file created:", json.dumps(flags, indent=2))
+
+          measurement_id = os.environ.get("FIREBASE_MEASUREMENT_ID", "").strip()
+          if measurement_id:
+            build_vars["NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID"] = measurement_id
+
+          runtime_vars = {
+            "NODE_ENV": "production",
+            "FIREBASE_PROJECT_ID": os.environ["FIREBASE_PROJECT_ID"],
+            "FIREBASE_DATABASE_ID": os.environ["FIREBASE_DATABASE_ID"],
+            "ADMIN_EMAILS": os.environ["ADMIN_EMAILS"],
+          }
+
+          def write_yaml(path, values):
+            with open(path, "w", encoding="utf-8") as f:
+              for key, value in values.items():
+                escaped = str(value).replace("'", "''")
+                f.write(f"{key}: '{escaped}'\n")
+
+          write_yaml("/tmp/build-env-vars.yaml", build_vars)
+          write_yaml("/tmp/runtime-env-vars.yaml", runtime_vars)
+          print("Build env vars file created for:", ", ".join(build_vars.keys()))
+          print("Runtime env vars file created for:", ", ".join(runtime_vars.keys()))
           PYEOF
 
       - name: Deploy to Cloud Run
@@ -70,8 +104,8 @@ jobs:
             --allow-unauthenticated \
             --memory=1Gi \
             --port=8080 \
-            --flags-file=/tmp/cloudrun-flags.json \
-            --set-env-vars="NODE_ENV=production" \
+            --build-env-vars-file=/tmp/build-env-vars.yaml \
+            --env-vars-file=/tmp/runtime-env-vars.yaml \
             --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest"
           echo "deploy_exit_code=$?" >> "${GITHUB_OUTPUT}"
 
