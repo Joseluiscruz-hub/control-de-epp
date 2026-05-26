@@ -1,4 +1,4 @@
-const CACHE_VERSION = "assetguard-pwa-v1";
+const CACHE_VERSION = "assetguard-pwa-v2";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -6,6 +6,7 @@ const APP_SHELL_URLS = [
   "/",
   "/empleados",
   "/inventario",
+  "/reportes",
   "/portal",
   "/kiosko",
   "/kiosko/setup",
