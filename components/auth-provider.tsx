@@ -69,8 +69,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (window.localStorage.getItem(OFFLINE_SESSION_KEY) === 'true') {
-      startOfflineSession();
-      return;
+      const timeout = window.setTimeout(() => {
+        startOfflineSession();
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
 
     const authTimeout = window.setTimeout(() => {
@@ -105,10 +107,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       window.clearTimeout(authTimeout);
       console.warn('[Auth unavailable, offline mode can be used]', error);
-      setUser(null);
-      setIsAdmin(false);
-      setIsOfflineSession(false);
-      setLoading(false);
+      const timeout = window.setTimeout(() => {
+        setUser(null);
+        setIsAdmin(false);
+        setIsOfflineSession(false);
+        setLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
   }, []);
 

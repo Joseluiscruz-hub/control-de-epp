@@ -195,7 +195,10 @@ export default function DashboardPage() {
       return () => unsubscribe();
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'assignments');
-      applyLocalDashboard();
+      const timeout = window.setTimeout(() => {
+        applyLocalDashboard();
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
   }, [applyLocalDashboard]);
 
@@ -299,7 +302,10 @@ export default function DashboardPage() {
       };
     } catch (error) {
       console.error('[Dashboard local fallback]', error);
-      applyLocalDashboard();
+      const timeout = window.setTimeout(() => {
+        applyLocalDashboard();
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
   }, [applyLocalDashboard]);
 

@@ -143,7 +143,10 @@ export default function InventarioPage() {
       }, () => loadLocalInventory());
       return () => unsub();
     } catch {
-      loadLocalInventory();
+      const timeout = window.setTimeout(() => {
+        loadLocalInventory();
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
   }, [loadLocalInventory]);
 

@@ -115,7 +115,10 @@ export default function EmpleadosPage() {
       }, () => loadLocalEmployees());
       return () => unsub();
     } catch {
-      loadLocalEmployees();
+      const timeout = window.setTimeout(() => {
+        loadLocalEmployees();
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
   }, [loadLocalEmployees]);
 
