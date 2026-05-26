@@ -11,9 +11,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      # ── Todas las variables se configuran en:
-      # ── GitHub → Settings → Secrets and Variables → Actions
-      # ── Pestaña "Variables" para las vars.*, pestaña "Secrets" para secrets.*
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       REGION: ${{ vars.GCP_REGION || 'us-central1' }}
       SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE || 'control-de-epp' }}
@@ -32,9 +29,7 @@ jobs:
       - name: Enable Cloud Run API
         run: gcloud services enable run.googleapis.com --project="${PROJECT_ID}"
 
-      - name: Deploy to Cloud Run
-        id: deploy
-        continue-on-error: true
+      - name: Create build env vars flags file
         env:
           FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
           FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
@@ -45,19 +40,29 @@ jobs:
           FIREBASE_DATABASE_ID: ${{ vars.FIREBASE_DATABASE_ID }}
           ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
         run: |
-          # Crear flags-file para evitar problemas con caracteres especiales (comas en emails)
-          cat > /tmp/cloudrun-flags.yaml << 'YAML_EOF'
-          set-build-env-vars:
-          YAML_EOF
-          # Agregar cada variable al flags file
-          echo "  - NEXT_PUBLIC_FIREBASE_API_KEY=${FIREBASE_API_KEY}" >> /tmp/cloudrun-flags.yaml
-          echo "  - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}" >> /tmp/cloudrun-flags.yaml
-          echo "  - NEXT_PUBLIC_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}" >> /tmp/cloudrun-flags.yaml
-          echo "  - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET}" >> /tmp/cloudrun-flags.yaml
-          echo "  - NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID}" >> /tmp/cloudrun-flags.yaml
-          echo "  - NEXT_PUBLIC_FIREBASE_APP_ID=${FIREBASE_APP_ID}" >> /tmp/cloudrun-flags.yaml
-          echo "  - NEXT_PUBLIC_FIREBASE_DATABASE_ID=${FIREBASE_DATABASE_ID}" >> /tmp/cloudrun-flags.yaml
-          echo "  - NEXT_PUBLIC_ADMIN_EMAILS=${ADMIN_EMAILS}" >> /tmp/cloudrun-flags.yaml
+          python3 - <<'PYEOF'
+          import os, json
+          flags = {
+            "--set-build-env-vars": {
+              "NEXT_PUBLIC_FIREBASE_API_KEY": os.environ["FIREBASE_API_KEY"],
+              "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN": os.environ["FIREBASE_AUTH_DOMAIN"],
+              "NEXT_PUBLIC_FIREBASE_PROJECT_ID": os.environ["FIREBASE_PROJECT_ID"],
+              "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET": os.environ["FIREBASE_STORAGE_BUCKET"],
+              "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": os.environ["FIREBASE_MESSAGING_SENDER_ID"],
+              "NEXT_PUBLIC_FIREBASE_APP_ID": os.environ["FIREBASE_APP_ID"],
+              "NEXT_PUBLIC_FIREBASE_DATABASE_ID": os.environ["FIREBASE_DATABASE_ID"],
+              "NEXT_PUBLIC_ADMIN_EMAILS": os.environ["ADMIN_EMAILS"],
+            }
+          }
+          with open("/tmp/cloudrun-flags.json", "w") as f:
+            json.dump(flags, f)
+          print("Flags file created:", json.dumps(flags, indent=2))
+          PYEOF
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        continue-on-error: true
+        run: |
           gcloud run deploy "${SERVICE_NAME}" \
             --source . \
             --region="${REGION}" \
@@ -65,7 +70,7 @@ jobs:
             --allow-unauthenticated \
             --memory=1Gi \
             --port=8080 \
-            --flags-file=/tmp/cloudrun-flags.yaml \
+            --flags-file=/tmp/cloudrun-flags.json \
             --set-env-vars="NODE_ENV=production" \
             --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest"
           echo "deploy_exit_code=$?" >> "${GITHUB_OUTPUT}"
@@ -73,10 +78,8 @@ jobs:
       - name: Instrucciones para habilitar Cloud Run Admin API
         if: steps.deploy.outputs.missing_run_api == 'true'
         run: |
-          echo "❌ El deploy falló porque la Cloud Run Admin API (run.googleapis.com) no está habilitada."
-          echo "🔵 Habilítala aquí:"
-          echo "https://console.developers.google.com/apis/api/run.googleapis.com/overview?project=${PROJECT_ID}"
-          echo "🔵 Cuando se termine de habilitar, vuelve a ejecutar este workflow."
+          echo "❌ El deploy falló porque la Cloud Run Admin API no está habilitada."
+          echo "Habilítala: https://console.developers.google.com/apis/api/run.googleapis.com/overview?project=${PROJECT_ID}"
 
       - name: Deploy Firestore Rules
         if: steps.deploy.outputs.deploy_exit_code == '0'
