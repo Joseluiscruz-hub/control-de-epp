@@ -1,0 +1,339 @@
+{
+  "version": "2.0",
+  "description": "Control de EPP — Schema extendido con módulo kiosko v0.5",
+  "entities": {
+    "Employee": {
+      "title": "Employee",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "area": {
+          "type": "string"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "pin": {
+          "type": "string",
+          "description": "Bcrypt hash del PIN de 6 dígitos"
+        },
+        "termsAccepted": {
+          "type": "boolean",
+          "default": false
+        },
+        "termsAcceptedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "firstLogin": {
+          "type": "boolean",
+          "default": true,
+          "description": "true = nunca ha usado el kiosko"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "area",
+        "active",
+        "createdAt",
+        "updatedAt",
+        "firstLogin",
+        "termsAccepted"
+      ]
+    },
+    "PPEItem": {
+      "title": "PPE Item",
+      "type": "object",
+      "properties": {
+        "sku": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "Guantes",
+            "Cascos",
+            "Gafas",
+            "Calzado",
+            "Proteccion Auditiva",
+            "Ropa",
+            "Respiradores",
+            "Otros"
+          ]
+        },
+        "replacementDays": {
+          "type": "number"
+        },
+        "stock": {
+          "type": "number",
+          "description": "Stock global (para EPP sin tallas)"
+        },
+        "minStock": {
+          "type": "number",
+          "description": "Umbral mínimo de alerta"
+        },
+        "unitCost": {
+          "type": "number",
+          "description": "Costo unitario MXN para cálculo de cobro por extravío"
+        },
+        "hasSizes": {
+          "type": "boolean",
+          "default": false
+        },
+        "sizes": {
+          "type": "object",
+          "description": "Mapa talla → variante con SKU único",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "sku": {
+                "type": "string",
+                "description": "SKU único por talla, ej. GUANTE-L-001"
+              },
+              "stock": {
+                "type": "number"
+              },
+              "minStock": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "sku",
+              "stock",
+              "minStock"
+            ]
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "name",
+        "category",
+        "replacementDays",
+        "unitCost",
+        "hasSizes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Assignment": {
+      "title": "PPE Assignment",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string"
+        },
+        "sku": {
+          "type": "string"
+        },
+        "size": {
+          "type": "string",
+          "description": "Talla asignada, 'N/A' si no aplica"
+        },
+        "assignedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "nextReplacementAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "replaced",
+            "returned",
+            "pending_review"
+          ]
+        },
+        "replacementReason": {
+          "type": "string",
+          "enum": [
+            "vida_util",
+            "desgaste",
+            "extravio"
+          ]
+        },
+        "chargeAmount": {
+          "type": "number",
+          "default": 0,
+          "description": "Monto MXN a descontar de nómina"
+        },
+        "chargeApproved": {
+          "type": "boolean",
+          "default": true
+        },
+        "evidenceUrl": {
+          "type": "string",
+          "description": "URL Firebase Storage foto de desgaste"
+        },
+        "signatureDataUrl": {
+          "type": "string",
+          "description": "Data URL de firma digital en extravío"
+        },
+        "issuedByUserId": {
+          "type": "string"
+        },
+        "issuedByKiosk": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "employeeId",
+        "sku",
+        "size",
+        "assignedAt",
+        "nextReplacementAt",
+        "status",
+        "issuedByUserId"
+      ]
+    },
+    "LossCharge": {
+      "title": "Loss Charge",
+      "description": "Registro de cobros por extravío para integración con nómina",
+      "type": "object",
+      "properties": {
+        "assignmentId": {
+          "type": "string"
+        },
+        "employeeId": {
+          "type": "string"
+        },
+        "sku": {
+          "type": "string"
+        },
+        "chargeAmount": {
+          "type": "number"
+        },
+        "signatureDataUrl": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending_payroll",
+            "applied",
+            "cancelled"
+          ]
+        }
+      },
+      "required": [
+        "assignmentId",
+        "employeeId",
+        "sku",
+        "chargeAmount",
+        "createdAt",
+        "status"
+      ]
+    },
+    "KioskSession": {
+      "title": "Kiosk Session",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "itemsDispensed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sku": {
+                "type": "string"
+              },
+              "size": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "completed",
+            "cancelled"
+          ]
+        }
+      },
+      "required": [
+        "employeeId",
+        "startedAt",
+        "status"
+      ]
+    }
+  },
+  "firestore": {
+    "/employees/{employeeId}": {
+      "schema": {
+        "$ref": "#/entities/Employee"
+      },
+      "description": "Directorio de empleados con soporte de PIN y T&C"
+    },
+    "/ppe_catalog/{itemId}": {
+      "schema": {
+        "$ref": "#/entities/PPEItem"
+      },
+      "description": "Catálogo EPP con soporte de tallas y SKU por talla"
+    },
+    "/assignments/{assignmentId}": {
+      "schema": {
+        "$ref": "#/entities/Assignment"
+      },
+      "description": "Historial de entregas con motivo, talla y cobro"
+    },
+    "/loss_charges/{chargeId}": {
+      "schema": {
+        "$ref": "#/entities/LossCharge"
+      },
+      "description": "Cobros pendientes de aplicar en nómina por extravío"
+    },
+    "/kiosk_sessions/{sessionId}": {
+      "schema": {
+        "$ref": "#/entities/KioskSession"
+      },
+      "description": "Auditoría de sesiones en el kiosko"
+    }
+  }
+}

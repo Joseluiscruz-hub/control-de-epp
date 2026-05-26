@@ -1,0 +1,6 @@
+{
+  "name": "Control de EPP",
+  "description": "Sistema de gestión y asignación de Equipo de Protección Personal (EPP) en tiempo real, validación de fechas límite y dashboard gerencial.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
