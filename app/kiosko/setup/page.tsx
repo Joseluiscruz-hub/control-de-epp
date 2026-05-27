@@ -60,6 +60,7 @@ export default function KioskoSetupPage() {
   };
 
   const handlePinKey = (k: string) => {
+    if (loading) return;
     const target = pinStep === "enter" ? pin : pinConfirm;
     const setter = pinStep === "enter" ? setPin : setPinConfirm;
     setError("");
@@ -79,13 +80,27 @@ export default function KioskoSetupPage() {
   };
 
   const handleSave = async () => {
+    if (loading) return;
     setLoading(true);
     try {
       await saveEmployeePin(employeeId, pin);
       sessionStorage.setItem("kiosk_pin_verified", "true");
       router.push("/kiosko/catalogo");
     } catch (e) {
-      setError("Error al guardar. Intenta de nuevo.");
+      const status =
+        typeof e === "object" &&
+        e !== null &&
+        "status" in e &&
+        typeof (e as { status?: unknown }).status === "number"
+          ? (e as { status: number }).status
+          : 0;
+
+      if (status === 409) {
+        setError("El PIN ya estaba configurado. Ingresa tu PIN para continuar.");
+        window.setTimeout(() => router.replace("/kiosko/login"), 1200);
+      } else {
+        setError(e instanceof Error ? e.message : "Error al guardar. Intenta de nuevo.");
+      }
       setLoading(false);
     }
   };

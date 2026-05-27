@@ -124,7 +124,7 @@ export async function ensureFirebaseReady() {
   await _initPromise;
 }
 
-function getInitializedApp(): FirebaseApp {
+export function getFirebaseApp(): FirebaseApp {
   ensureInitialized();
   const app = getApps()[0];
   if (!app) {
@@ -133,8 +133,12 @@ function getInitializedApp(): FirebaseApp {
   return app;
 }
 
-function getInitializedFirestore() {
-  const app = getInitializedApp();
+export function getFirebaseAuth() {
+  return getAuth(getFirebaseApp());
+}
+
+export function getFirebaseDb() {
+  const app = getFirebaseApp();
   return _firestoreDatabaseId && _firestoreDatabaseId !== '(default)'
     ? getFirestore(app, _firestoreDatabaseId)
     : getFirestore(app);
@@ -150,12 +154,22 @@ initializeFromStaticConfig();
 
 export const auth = new Proxy({} as ReturnType<typeof getAuth>, {
   get(_target, prop) {
-    return (getAuth(getInitializedApp()) as unknown as Record<string | symbol, unknown>)[prop];
+    const authInstance = getFirebaseAuth();
+    if (prop === '_delegate') return authInstance;
+    return (authInstance as unknown as Record<string | symbol, unknown>)[prop];
+  },
+  getPrototypeOf() {
+    return Object.getPrototypeOf(getFirebaseAuth());
   },
 });
 
 export const db = new Proxy({} as ReturnType<typeof getFirestore>, {
   get(_target, prop) {
-    return (getInitializedFirestore() as unknown as Record<string | symbol, unknown>)[prop];
+    const firestore = getFirebaseDb();
+    if (prop === '_delegate') return firestore;
+    return (firestore as unknown as Record<string | symbol, unknown>)[prop];
+  },
+  getPrototypeOf() {
+    return Object.getPrototypeOf(getFirebaseDb());
   },
 });

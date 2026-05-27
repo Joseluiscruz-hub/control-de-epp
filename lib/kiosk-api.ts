@@ -2,7 +2,7 @@ import {
   doc, getDoc, collection, serverTimestamp, query, where, getDocs, limit, writeBatch,
   runTransaction, Timestamp
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, ensureFirebaseReady } from "./firebase";
 import { KioskEmployee, KioskRequestItem, KioskRequestStatus, PPECatalogItem, ReplacementReason } from "./kiosk-types";
 import {
   canUseLocalFallback,
@@ -56,6 +56,7 @@ function isLocalRuntime() {
 
 export async function getEmployeeById(employeeId: string): Promise<KioskEmployee | null> {
   try {
+    await ensureFirebaseReady();
     const snap = await getDoc(doc(db, "kiosk_employees", employeeId));
     if (snap.exists()) return { id: snap.id, ...snap.data() } as KioskEmployee;
   } catch (error) {
@@ -123,6 +124,7 @@ export async function validateEmployeePin(
 
 export async function getPPECatalog(): Promise<PPECatalogItem[]> {
   try {
+    await ensureFirebaseReady();
     const snap = await getDocs(query(collection(db, "kiosk_catalog"), where("active", "==", true)));
     const items = snap.docs
       .map(d => ({ id: d.id, ...d.data() } as PPECatalogItem))
@@ -138,6 +140,7 @@ export async function getPPECatalog(): Promise<PPECatalogItem[]> {
 
 export async function getActiveAssignment(employeeId: string, sku: string): Promise<{ id: string } & Record<string, unknown> | null> {
   try {
+    await ensureFirebaseReady();
     const q = query(
       collection(db, "assignments"),
       where("employeeId", "==", employeeId),
@@ -172,6 +175,7 @@ export interface DispenseParams {
 export async function dispenseEPP(params: DispenseParams): Promise<string> {
   const nextReplacement = calcNextReplacementDate(params.replacementDays);
   try {
+    await ensureFirebaseReady();
     const prev = await getActiveAssignment(params.employeeId, params.sku);
     const assignmentRef = doc(collection(db, "assignments"));
     const chargeRef = params.chargeAmount && params.chargeAmount > 0
@@ -300,6 +304,7 @@ export async function createKioskRequest(input: {
   items: KioskRequestItem[];
 }): Promise<string> {
   try {
+    await ensureFirebaseReady();
     const ref = doc(collection(db, "kiosk_requests"));
     const batch = writeBatch(db);
 
@@ -336,6 +341,7 @@ export async function getKioskRequestStatus(requestId: string): Promise<KioskReq
   }
 
   try {
+    await ensureFirebaseReady();
     const snap = await getDoc(doc(db, "kiosk_request_status", requestId));
     if (!snap.exists()) throw new Error("kiosk_request_not_found");
 
@@ -364,6 +370,7 @@ export async function listAdminKioskRequests(status: KioskRequestStatus = "pendi
   const localRequests = listLocalKioskRequests(status, max);
 
   try {
+    await ensureFirebaseReady();
     const snap = await getDocs(
       query(
         collection(db, "kiosk_requests"),
@@ -399,6 +406,7 @@ export async function updateKioskRequestStatus(requestId: string, status: Extrac
     return;
   }
 
+  await ensureFirebaseReady();
   const batch = writeBatch(db);
   batch.update(doc(db, "kiosk_requests", requestId), {
     status,
