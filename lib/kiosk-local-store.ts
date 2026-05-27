@@ -22,6 +22,7 @@ export type LocalAssignmentRecord = {
   id: string;
   employeeId: string;
   sku: string;
+  itemId?: string;
   size?: string;
   assignedAt: string;
   nextReplacementAt?: string;
@@ -583,6 +584,7 @@ export function createLocalAssignment(input: {
     id,
     employeeId: input.employeeId,
     sku: input.sku,
+    itemId: input.itemId,
     size: input.size || "N/A",
     assignedAt: now,
     nextReplacementAt: addDaysIso(input.replacementDays),

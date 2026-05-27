@@ -3,7 +3,15 @@ import {
   runTransaction, Timestamp
 } from "firebase/firestore";
 import { db, ensureFirebaseReady } from "./firebase";
-import { KioskEmployee, KioskRequestItem, KioskRequestStatus, PPECatalogItem, ReplacementReason } from "./kiosk-types";
+import { resolveEppReplacementDays, getEppDurationRulePayload } from "./epp-duration-rules";
+import {
+  KioskEarlyReplacementAlert,
+  KioskEmployee,
+  KioskRequestItem,
+  KioskRequestStatus,
+  PPECatalogItem,
+  ReplacementReason,
+} from "./kiosk-types";
 import {
   canUseLocalFallback,
   createLocalAssignment,
@@ -46,6 +54,21 @@ function canFallbackToLocal(error: unknown) {
     isOfflineRuntime() ||
     (isLocalRuntime() && (!(error instanceof KioskApiError) || error.status >= 500))
   );
+}
+
+function normalizeCatalogDuration(item: PPECatalogItem): PPECatalogItem {
+  const ruleInput = {
+    sku: item.sku,
+    material: item.material,
+    name: item.name,
+    sizes: item.sizes,
+  };
+  const replacementDays = resolveEppReplacementDays(ruleInput, Number(item.replacementDays ?? 365));
+  return {
+    ...item,
+    replacementDays,
+    ...getEppDurationRulePayload(ruleInput),
+  };
 }
 
 // ── Empleado ──────────────────────────────────────────────────────────────────
@@ -127,7 +150,7 @@ export async function getPPECatalog(): Promise<PPECatalogItem[]> {
     await ensureFirebaseReady();
     const snap = await getDocs(query(collection(db, "kiosk_catalog"), where("active", "==", true)));
     const items = snap.docs
-      .map(d => ({ id: d.id, ...d.data() } as PPECatalogItem))
+      .map(d => normalizeCatalogDuration({ id: d.id, ...d.data() } as PPECatalogItem))
       .sort((a, b) => a.name.localeCompare(b.name, "es"));
     return items.length > 0 ? items : getLocalPPECatalog();
   } catch (error) {
@@ -239,6 +262,8 @@ export async function dispenseEPP(params: DispenseParams): Promise<string> {
       transaction.set(assignmentRef, {
         employeeId: params.employeeId,
         sku: params.sku,
+        itemId: params.itemId,
+        replacementDays: params.replacementDays,
         size: params.size || "N/A",
         assignedAt: serverTimestamp(),
         nextReplacementAt: Timestamp.fromDate(nextReplacement),
@@ -304,6 +329,28 @@ export async function createKioskRequest(input: {
   items: KioskRequestItem[];
 }): Promise<string> {
   try {
+    const response = await fetch("/api/kiosk/requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+
+    if (!response.ok) {
+      throw new KioskApiError(
+        await parseKioskApiError(response, "No se pudo crear la solicitud."),
+        response.status
+      );
+    }
+
+    const data = await response.json();
+    if (typeof data?.requestId === "string") return data.requestId;
+    throw new KioskApiError("Respuesta invalida del servidor.", 500);
+  } catch (error) {
+    if (error instanceof KioskApiError && error.status < 500) throw error;
+    console.warn("[Kiosko] API de solicitudes no disponible; usando respaldo local/directo.", error);
+  }
+
+  try {
     await ensureFirebaseReady();
     const ref = doc(collection(db, "kiosk_requests"));
     const batch = writeBatch(db);
@@ -361,9 +408,12 @@ export interface AdminKioskRequest {
   id: string;
   employeeId: string;
   employeeName: string;
+  employeeArea?: string;
   items: KioskRequestItem[];
   status: KioskRequestStatus;
   createdAt?: Date;
+  hasEarlyReplacementAlert?: boolean;
+  earlyReplacementWarnings?: KioskEarlyReplacementAlert[];
 }
 
 export async function listAdminKioskRequests(status: KioskRequestStatus = "pending", max = 25): Promise<AdminKioskRequest[]> {
@@ -385,9 +435,14 @@ export async function listAdminKioskRequests(status: KioskRequestStatus = "pendi
         id: d.id,
         employeeId: data.employeeId ?? "",
         employeeName: data.employeeName ?? "",
+        employeeArea: data.employeeArea ?? "",
         items: Array.isArray(data.items) ? (data.items as KioskRequestItem[]) : [],
         status: data.status as KioskRequestStatus,
         createdAt: data.createdAt?.toDate?.(),
+        hasEarlyReplacementAlert: data.hasEarlyReplacementAlert === true,
+        earlyReplacementWarnings: Array.isArray(data.earlyReplacementWarnings)
+          ? (data.earlyReplacementWarnings as KioskEarlyReplacementAlert[])
+          : [],
       };
     });
 

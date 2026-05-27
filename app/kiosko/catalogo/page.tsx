@@ -258,6 +258,11 @@ export default function KioskoCatalogoPage() {
                   <div>
                     <p className="font-semibold text-white text-base leading-tight">{item.name}</p>
                     <p className="text-xs text-gray-500 mt-1">{item.category}</p>
+                    <p className="text-xs text-amber-300/85 mt-1 font-semibold">
+                      {item.requiredQuantity && item.requiredUnit
+                        ? `${item.requiredQuantity} ${item.requiredUnit} cada ${item.replacementDays} dias`
+                        : `Vigencia: ${item.replacementDays} dias`}
+                    </p>
                   </div>
 
                   {item.hasSizes && item.sizes && status !== "empty" && (

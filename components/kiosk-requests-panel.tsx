@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Check, HardHat, Loader2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AlertTriangle, Check, HardHat, Loader2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,12 +19,22 @@ export function KioskRequestsPanel() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const warnedRequestIds = useRef(new Set<string>());
 
   const refresh = useCallback(async () => {
     setLoadError(false);
     try {
       const data = await listAdminKioskRequests("pending", 20);
       setRequests(data);
+      const newEarlyAlerts = data.filter((request) => (
+        request.hasEarlyReplacementAlert && !warnedRequestIds.current.has(request.id)
+      ));
+      if (newEarlyAlerts.length > 0) {
+        newEarlyAlerts.forEach((request) => warnedRequestIds.current.add(request.id));
+        toast.warning(
+          `${newEarlyAlerts.length} solicitud(es) de kiosko llegaron antes de cumplir vigencia.`
+        );
+      }
     } catch (error) {
       console.error("[Kiosk requests load error]", error);
       setLoadError(true);
@@ -95,16 +105,45 @@ export function KioskRequestsPanel() {
         ) : (
           <div className="space-y-3">
             {requests.map((request) => (
-              <div key={request.id} className="surface-action p-4">
+              <div
+                key={request.id}
+                className={`surface-action p-4 ${
+                  request.hasEarlyReplacementAlert ? "border-amber-400/35 bg-amber-500/10" : ""
+                }`}
+              >
                 <p className="font-bold text-white">
                   #{request.employeeId} · {request.employeeName}
                 </p>
+                {request.employeeArea && (
+                  <p className="mt-1 text-xs font-bold uppercase tracking-widest text-white/35">
+                    {request.employeeArea}
+                  </p>
+                )}
+                {request.hasEarlyReplacementAlert && (
+                  <div className="mt-3 rounded-lg border border-amber-400/25 bg-amber-500/10 p-3 text-sm font-semibold text-amber-100">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-300" />
+                      Solicitud anticipada: revisar antes de aprobar.
+                    </div>
+                    <div className="mt-2 space-y-1 text-xs font-medium text-amber-100/75">
+                      {(request.earlyReplacementWarnings ?? []).map((warning) => (
+                        <p key={`${warning.itemId}-${warning.sku}-${warning.size}`}>
+                          {warning.itemName}: usado {warning.daysUsed} de {warning.replacementDays} dias,
+                          faltan {warning.daysRemaining} dias.
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <ul className="mt-2 text-sm text-white/55 list-disc pl-5">
                   {request.items.map((item) => (
                     <li key={`${request.id}-${item.itemId}-${item.sku}`}>
                       {item.itemName} · {item.sku} · {item.size}
                       {item.replacementReason && (
                         <span className="ml-1 text-amber-300">· {REASON_LABELS[item.replacementReason] ?? item.replacementReason}</span>
+                      )}
+                      {item.earlyReplacementAlert && (
+                        <span className="ml-1 text-red-300">· anticipado</span>
                       )}
                     </li>
                   ))}

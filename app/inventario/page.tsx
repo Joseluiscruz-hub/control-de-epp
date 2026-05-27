@@ -34,6 +34,7 @@ import {
   upsertLocalCatalogItem,
 } from '@/lib/kiosk-local-store';
 import { PPECatalogItem } from '@/lib/kiosk-types';
+import { getEppDurationRulePayload, resolveEppReplacementDays } from '@/lib/epp-duration-rules';
 
 interface PpeSizeVariant {
   sku: string;
@@ -121,13 +122,22 @@ export default function InventarioPage() {
           const sizeStock = sizes
             ? Object.values(sizes).reduce((sum, variant) => sum + (variant.stock ?? 0), 0)
             : 0;
+          const replacementDays = resolveEppReplacementDays(
+            {
+              sku: item.sku ?? d.id,
+              material: item.material,
+              name: item.name,
+              sizes,
+            },
+            Number(item.replacementDays ?? 365)
+          );
 
           return {
             docId: d.id,
             sku: item.sku ?? d.id,
             name: item.name,
             category: item.category,
-            replacementDays: item.replacementDays,
+            replacementDays,
             stock: typeof item.stock === 'number' ? item.stock : sizeStock,
             hasSizes: item.hasSizes,
             sizes,
@@ -264,7 +274,9 @@ export default function InventarioPage() {
     setSaving(true);
     try {
       const initialStock = parseInt(form.stock);
-      const replacementDays = parseInt(form.replacementDays);
+      const ruleInput = { sku: form.sku, name: form.name };
+      const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
+      const rulePayload = getEppDurationRulePayload(ruleInput);
       const batch = writeBatch(db);
 
       batch.set(doc(db, 'ppe_catalog', form.sku), {
@@ -272,6 +284,7 @@ export default function InventarioPage() {
         name: form.name,
         category: form.category,
         replacementDays,
+        ...rulePayload,
         stock: initialStock,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -280,6 +293,7 @@ export default function InventarioPage() {
         name: form.name,
         category: form.category,
         replacementDays,
+        ...rulePayload,
         hasSizes: false,
         sku: form.sku,
         active: true,
@@ -293,6 +307,7 @@ export default function InventarioPage() {
         name: form.name,
         category: form.category,
         replacementDays,
+        ...rulePayload,
         stock: initialStock,
         minStock: 2,
         hasSizes: false,
@@ -304,13 +319,16 @@ export default function InventarioPage() {
       setAddOpen(false);
     } catch {
       const initialStock = parseInt(form.stock);
-      const replacementDays = parseInt(form.replacementDays);
+      const ruleInput = { sku: form.sku, name: form.name };
+      const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
+      const rulePayload = getEppDurationRulePayload(ruleInput);
       upsertLocalCatalogItem({
         id: form.sku,
         sku: form.sku,
         name: form.name,
         category: form.category,
         replacementDays,
+        ...rulePayload,
         stock: initialStock,
         minStock: 2,
         hasSizes: false,

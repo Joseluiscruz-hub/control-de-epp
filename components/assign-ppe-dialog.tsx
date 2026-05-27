@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { addDays } from "date-fns";
 import { motion } from "motion/react";
 import { createLocalAssignment, listLocalEmployees, listLocalInventory } from "@/lib/kiosk-local-store";
+import { resolveEppReplacementDays } from "@/lib/epp-duration-rules";
 
 export function AssignPpeDialog() {
   const { user: authUser } = useAuth();
@@ -39,7 +40,15 @@ export function AssignPpeDialog() {
         id: d.id, 
         name: data.name,
         stock: Number(data.stock ?? 0),
-        replacementDays: Number(data.replacementDays ?? 365)
+        replacementDays: resolveEppReplacementDays(
+          {
+            sku: data.sku ?? d.id,
+            material: data.material,
+            name: data.name,
+            sizes: data.sizes,
+          },
+          Number(data.replacementDays ?? 365)
+        )
       };
       }));
     } catch (err) {
@@ -98,11 +107,23 @@ export function AssignPpeDialog() {
         }
 
         const nextStock = stock - 1;
-        const replacementDays = Number(itemData.replacementDays ?? itemRecord.replacementDays ?? 365);
+        const assignmentSku = typeof itemData.sku === 'string' && itemData.sku ? itemData.sku : selectedItem;
+        const replacementDays = resolveEppReplacementDays(
+          {
+            sku: assignmentSku,
+            material: itemData.material,
+            name: itemData.name,
+            sizes: itemData.sizes,
+          },
+          Number(itemData.replacementDays ?? itemRecord.replacementDays ?? 365)
+        );
 
         transaction.set(doc(db, 'assignments', assignmentId), {
           employeeId: selectedEmployee,
-          sku: typeof itemData.sku === 'string' && itemData.sku ? itemData.sku : selectedItem,
+          sku: assignmentSku,
+          itemId: selectedItem,
+          itemName: itemData.name ?? itemRecord.name,
+          replacementDays,
           size: 'N/A',
           assignedAt: serverTimestamp(),
           nextReplacementAt: Timestamp.fromDate(addDays(new Date(), replacementDays)),

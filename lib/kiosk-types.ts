@@ -17,6 +17,7 @@ export interface KioskEmployee {
 
 export interface PPESizeVariant {
   sku: string;
+  material?: string;
   stock?: number;
   minStock?: number;
   available?: boolean;
@@ -27,12 +28,19 @@ export interface PPECatalogItem {
   name: string;
   category: string;
   replacementDays: number;
+  durationRuleId?: string;
+  durationRuleSource?: string;
+  durationRuleSku?: string;
+  durationRuleSapMaterial?: string | null;
+  requiredQuantity?: number;
+  requiredUnit?: string;
   unitCost?: number;
   hasSizes: boolean;
   active?: boolean;
   sizes?: Record<string, PPESizeVariant>;
   // Para EPP sin tallas, SKU y stock directo:
   sku?: string;
+  material?: string;
   stock?: number;
   minStock?: number;
   available?: boolean;
@@ -47,10 +55,31 @@ export interface KioskRequestItem {
   sku: string;
   size: string;
   replacementDays: number;
+  durationRuleId?: string;
+  durationRuleSource?: string;
+  durationRuleSku?: string;
+  durationRuleSapMaterial?: string | null;
+  requiredQuantity?: number;
+  requiredUnit?: string;
   replacementReason?: ReplacementReason;
+  earlyReplacementAlert?: KioskEarlyReplacementAlert;
 }
 
 export type KioskRequestStatus = "pending" | "approved" | "rejected";
+
+export interface KioskEarlyReplacementAlert {
+  itemId: string;
+  itemName: string;
+  sku: string;
+  size: string;
+  replacementDays: number;
+  daysUsed: number;
+  daysRemaining: number;
+  assignedAt?: Date | string;
+  nextEligibleAt?: Date | string;
+  previousAssignmentId?: string;
+  severity: "warning" | "critical";
+}
 
 export interface KioskSession {
   employeeId: string;

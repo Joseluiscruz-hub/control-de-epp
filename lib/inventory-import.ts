@@ -1,3 +1,10 @@
+import {
+  getEppDurationRule,
+  getEppDurationRulePayload,
+  resolveEppReplacementDays,
+  type EppDurationRule,
+} from "./epp-duration-rules";
+
 export const INVENTORY_IMPORT_SOURCE = "plant_epp_inventory";
 export const INVENTORY_SCHEMA_VERSION = 1;
 export const DEFAULT_MIN_STOCK = 2;
@@ -32,6 +39,12 @@ export interface InventoryImportItem {
   name: string;
   category: string;
   replacementDays: number;
+  durationRuleId?: string;
+  durationRuleSource?: string;
+  durationRuleSku?: string;
+  durationRuleSapMaterial?: string | null;
+  requiredQuantity?: number;
+  requiredUnit?: string;
   stock: number;
   hasSizes: boolean;
   sizes?: Record<string, Omit<InventoryVariant, "size">>;
@@ -242,6 +255,7 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
   const groups = new Map<string, {
     baseName: string;
     category: string;
+    durationRule?: EppDurationRule;
     variants: InventoryVariant[];
     sourceRows: number[];
   }>();
@@ -296,6 +310,12 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
     const category = inferCategory(baseName);
     const baseId = `epp-${slugify(baseName || rawName)}`;
     const sku = material || createTemporarySku(baseId, size, rowNumber);
+    const durationRule = getEppDurationRule({
+      sku,
+      material,
+      description: rawName,
+      name: baseName,
+    });
 
     const variant: InventoryVariant = {
       size,
@@ -314,10 +334,12 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
     if (current) {
       current.variants.push(variant);
       current.sourceRows.push(rowNumber);
+      if (!current.durationRule && durationRule) current.durationRule = durationRule;
     } else {
       groups.set(baseId, {
         baseName,
         category,
+        durationRule,
         variants: [variant],
         sourceRows: [rowNumber],
       });
@@ -335,6 +357,17 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
       const hasSizes = variants.length > 1 || variants.some((variant) => variant.size !== "N/A");
       const primary = pickPrimaryVariant(variants);
       const stock = variants.reduce((sum, variant) => sum + variant.stock, 0);
+      const ruleInput = {
+        sku: primary.sku,
+        material: primary.material,
+        name: group.baseName,
+        codes: [group.durationRule?.kofSku, group.durationRule?.sapMaterial],
+        sizes: Object.fromEntries(variants.map((variant) => [
+          variant.size,
+          { sku: variant.sku, material: variant.material },
+        ])),
+      };
+      const rulePayload = getEppDurationRulePayload(ruleInput);
       temporarySkuCount += variants.filter((variant) => variant.temporarySku).length;
       totalStock += stock;
       incrementCounter(byCategory, group.category);
@@ -353,7 +386,10 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
         sku: primary.sku,
         name: titleCase(group.baseName),
         category: group.category,
-        replacementDays: defaultReplacementDays(group.category),
+        replacementDays:
+          group.durationRule?.replacementDays ??
+          resolveEppReplacementDays(ruleInput, defaultReplacementDays(group.category)),
+        ...rulePayload,
         stock,
         hasSizes,
         sizes,
@@ -399,6 +435,12 @@ export function buildInventoryCatalogPayload(item: InventoryImportItem) {
     name: item.name,
     category: item.category,
     replacementDays: item.replacementDays,
+    durationRuleId: item.durationRuleId,
+    durationRuleSource: item.durationRuleSource,
+    durationRuleSku: item.durationRuleSku,
+    durationRuleSapMaterial: item.durationRuleSapMaterial,
+    requiredQuantity: item.requiredQuantity,
+    requiredUnit: item.requiredUnit,
     stock: item.stock,
     minStock: DEFAULT_MIN_STOCK,
     hasSizes: item.hasSizes,
