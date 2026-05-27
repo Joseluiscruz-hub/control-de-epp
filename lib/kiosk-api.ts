@@ -148,7 +148,7 @@ export async function validateEmployeePin(
 export async function getPPECatalog(): Promise<PPECatalogItem[]> {
   try {
     await ensureFirebaseReady();
-    const snap = await getDocs(query(collection(db, "kiosk_catalog"), where("active", "==", true)));
+    const snap = await getDocs(collection(db, "kiosk_catalog"));
     const items = snap.docs
       .map(d => normalizeCatalogDuration({ id: d.id, ...d.data() } as PPECatalogItem))
       .sort((a, b) => a.name.localeCompare(b.name, "es"));

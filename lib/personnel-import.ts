@@ -90,6 +90,7 @@ export interface EmployeeImportPayload {
 }
 
 export interface KioskEmployeeImportPayload {
+  id: string;
   name: string;
   area: string;
   active: boolean;
@@ -300,6 +301,7 @@ export function buildEmployeeImportPayload(record: PersonnelRecord): EmployeeImp
 
 export function buildKioskEmployeeImportPayload(record: PersonnelRecord): KioskEmployeeImportPayload {
   return {
+    id: record.id,
     name: record.name,
     area: record.area,
     active: true,

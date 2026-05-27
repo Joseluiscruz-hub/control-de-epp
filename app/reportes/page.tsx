@@ -96,6 +96,8 @@ type SummaryRow = {
   employeeCount: number;
 };
 
+type PeriodMode = "day" | "month" | "year" | "range";
+
 const REPORTABLE_STATUSES = new Set(["active", "replaced", "pending_review"]);
 
 const REASON_LABELS: Record<string, string> = {
@@ -108,9 +110,18 @@ function currentDateInputValue() {
   return format(new Date(), "yyyy-MM-dd");
 }
 
+function currentMonthInputValue() {
+  return format(new Date(), "yyyy-MM");
+}
+
+function currentYearInputValue() {
+  return format(new Date(), "yyyy");
+}
+
 function parseDateInput(value: string) {
   const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day);
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
 }
 
 function getDayRange(value: string) {
@@ -119,6 +130,63 @@ function getDayRange(value: string) {
   const end = new Date(start);
   end.setHours(23, 59, 59, 999);
   return { start, end };
+}
+
+function getMonthRange(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  const safeYear = Number.isFinite(year) ? year : new Date().getFullYear();
+  const safeMonth = Number.isFinite(month) && month >= 1 && month <= 12 ? month : new Date().getMonth() + 1;
+  const start = new Date(safeYear, safeMonth - 1, 1);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(safeYear, safeMonth, 0);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+function getYearRange(value: string) {
+  const parsedYear = Number(value);
+  const year = Number.isFinite(parsedYear) && parsedYear >= 1900 ? parsedYear : new Date().getFullYear();
+  const start = new Date(year, 0, 1);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(year, 11, 31);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+function getPeriodRange(params: {
+  mode: PeriodMode;
+  selectedDate: string;
+  selectedMonth: string;
+  selectedYear: string;
+  rangeStart: string;
+  rangeEnd: string;
+}) {
+  if (params.mode === "month") return getMonthRange(params.selectedMonth);
+  if (params.mode === "year") return getYearRange(params.selectedYear);
+  if (params.mode === "range") {
+    const first = parseDateInput(params.rangeStart);
+    const second = parseDateInput(params.rangeEnd);
+    const start = first <= second ? first : second;
+    const end = first <= second ? second : first;
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+  return getDayRange(params.selectedDate);
+}
+
+function formatPeriodLabel(start: Date, end: Date, mode: PeriodMode) {
+  if (mode === "day") return format(start, "dd MMM yyyy", { locale: es });
+  if (mode === "month") return format(start, "MMMM yyyy", { locale: es });
+  if (mode === "year") return format(start, "yyyy", { locale: es });
+  return `${format(start, "dd MMM yyyy", { locale: es })} - ${format(end, "dd MMM yyyy", { locale: es })}`;
+}
+
+function periodSlug(start: Date, end: Date, mode: PeriodMode) {
+  if (mode === "day") return format(start, "yyyyMMdd");
+  if (mode === "month") return format(start, "yyyyMM");
+  if (mode === "year") return format(start, "yyyy");
+  return `${format(start, "yyyyMMdd")}-${format(end, "yyyyMMdd")}`;
 }
 
 function toDate(value: unknown) {
@@ -321,11 +389,52 @@ function StatTile({
 }
 
 export default function ReportesPage() {
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("day");
   const [selectedDate, setSelectedDate] = useState(currentDateInputValue);
-  const [rows, setRows] = useState<ConsumptionRow[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthInputValue);
+  const [selectedYear, setSelectedYear] = useState(currentYearInputValue);
+  const [rangeStart, setRangeStart] = useState(currentDateInputValue);
+  const [rangeEnd, setRangeEnd] = useState(currentDateInputValue);
+  const [allRows, setAllRows] = useState<ConsumptionRow[]>([]);
+  const [itemFilter, setItemFilter] = useState("");
+  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [areaFilter, setAreaFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [localMode, setLocalMode] = useState(false);
 
+  const activePeriod = useMemo(
+    () => getPeriodRange({ mode: periodMode, selectedDate, selectedMonth, selectedYear, rangeStart, rangeEnd }),
+    [periodMode, selectedDate, selectedMonth, selectedYear, rangeStart, rangeEnd]
+  );
+  const periodLabel = useMemo(
+    () => formatPeriodLabel(activePeriod.start, activePeriod.end, periodMode),
+    [activePeriod, periodMode]
+  );
+  const activePeriodSlug = useMemo(
+    () => periodSlug(activePeriod.start, activePeriod.end, periodMode),
+    [activePeriod, periodMode]
+  );
+  const rows = useMemo(() => {
+    const itemNeedle = itemFilter.trim().toLowerCase();
+    const employeeNeedle = employeeFilter.trim().toLowerCase();
+    const areaNeedle = areaFilter.trim().toLowerCase();
+
+    return allRows.filter((row) => {
+      const matchesItem = !itemNeedle || [row.itemName, row.sku, row.material, row.category]
+        .join(" ")
+        .toLowerCase()
+        .includes(itemNeedle);
+      const matchesEmployee = !employeeNeedle || [row.employeeId, row.employeeName]
+        .join(" ")
+        .toLowerCase()
+        .includes(employeeNeedle);
+      const matchesArea = !areaNeedle || [row.area, row.costCenter]
+        .join(" ")
+        .toLowerCase()
+        .includes(areaNeedle);
+      return matchesItem && matchesEmployee && matchesArea;
+    });
+  }, [allRows, areaFilter, employeeFilter, itemFilter]);
   const summaryRows = useMemo(() => summarizeRows(rows), [rows]);
   const totalQuantity = rows.reduce((sum, row) => sum + row.quantity, 0);
   const uniqueEmployees = new Set(rows.map((row) => row.employeeId)).size;
@@ -335,12 +444,12 @@ export default function ReportesPage() {
     for (const row of rows) areas.set(row.area, (areas.get(row.area) ?? 0) + row.quantity);
     return Array.from(areas.entries()).sort((a, b) => b[1] - a[1])[0] ?? null;
   }, [rows]);
-  const sapFolio = `SAP-EPP-${selectedDate.replaceAll("-", "")}-${String(totalQuantity).padStart(3, "0")}`;
+  const sapFolio = `SAP-EPP-${activePeriodSlug}-${String(totalQuantity).padStart(3, "0")}`;
 
   const loadReport = useCallback(async () => {
     setLoading(true);
     setLocalMode(false);
-    const { start, end } = getDayRange(selectedDate);
+    const { start, end } = activePeriod;
 
     try {
       const [assignmentsSnap, employeesSnap, catalogSnap] = await Promise.all([
@@ -368,7 +477,7 @@ export default function ReportesPage() {
         catalog,
       });
 
-      setRows(nextRows);
+      setAllRows(nextRows);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, "reporte diario SAP");
       const localEmployees = buildEmployeeIndex(
@@ -390,12 +499,12 @@ export default function ReportesPage() {
           data: assignment as unknown as Record<string, unknown>,
         }));
 
-      setRows(buildRows({ assignments: localAssignments, employees: localEmployees, catalog: localCatalog }));
+      setAllRows(buildRows({ assignments: localAssignments, employees: localEmployees, catalog: localCatalog }));
       setLocalMode(true);
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [activePeriod]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -407,8 +516,9 @@ export default function ReportesPage() {
 
   const exportSap = () => {
     downloadCsv(
-      `sap-bajas-epp-${selectedDate}.csv`,
+      `sap-bajas-epp-${activePeriodSlug}.csv`,
       [
+        "Periodo",
         "Fecha",
         "Material",
         "Descripcion",
@@ -420,6 +530,7 @@ export default function ReportesPage() {
         "Texto SAP",
       ],
       summaryRows.map((row) => [
+        periodLabel,
         row.date,
         row.material,
         row.itemName,
@@ -435,8 +546,9 @@ export default function ReportesPage() {
 
   const exportDetail = () => {
     downloadCsv(
-      `detalle-consumo-epp-${selectedDate}.csv`,
+      `detalle-consumo-epp-${activePeriodSlug}.csv`,
       [
+        "Periodo",
         "Folio",
         "Fecha",
         "Hora",
@@ -455,6 +567,7 @@ export default function ReportesPage() {
         "Estado",
       ],
       rows.map((row) => [
+        periodLabel,
         row.folio,
         row.date,
         row.time,
@@ -477,7 +590,7 @@ export default function ReportesPage() {
 
   const copySummary = async () => {
     const lines = [
-      `${sapFolio} | ${format(parseDateInput(selectedDate), "dd MMM yyyy", { locale: es })}`,
+      `${sapFolio} | ${periodLabel}`,
       `Total piezas: ${totalQuantity}`,
       `Colaboradores: ${uniqueEmployees}`,
       `Area lider: ${topArea ? `${topArea[0]} (${topArea[1]})` : "Sin consumo"}`,
@@ -499,20 +612,67 @@ export default function ReportesPage() {
               </div>
               <div>
                 <p className="section-eyebrow">Bajas SAP</p>
-                <h1 className="text-2xl font-black tracking-tight text-white">Reporte Diario de Consumo EPP</h1>
+                <h1 className="text-2xl font-black tracking-tight text-white">Reporte de Consumo EPP</h1>
+                <p className="mt-1 text-sm font-semibold text-white/45">{periodLabel}</p>
               </div>
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <select
+                value={periodMode}
+                onChange={(event) => setPeriodMode(event.target.value as PeriodMode)}
+                className="h-10 rounded-lg border border-white/10 bg-[#111827] px-3 text-sm font-bold text-white outline-none"
+              >
+                <option value="day">Diario</option>
+                <option value="month">Mensual</option>
+                <option value="year">Anual</option>
+                <option value="range">Rango</option>
+              </select>
               <div className="relative">
                 <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(event) => setSelectedDate(event.target.value)}
-                  className="h-10 rounded-lg border-white/10 bg-white/5 pl-10 font-bold text-white"
-                />
+                {periodMode === "day" && (
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(event) => setSelectedDate(event.target.value)}
+                    className="h-10 rounded-lg border-white/10 bg-white/5 pl-10 font-bold text-white"
+                  />
+                )}
+                {periodMode === "month" && (
+                  <Input
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(event) => setSelectedMonth(event.target.value)}
+                    className="h-10 rounded-lg border-white/10 bg-white/5 pl-10 font-bold text-white"
+                  />
+                )}
+                {periodMode === "year" && (
+                  <Input
+                    type="number"
+                    value={selectedYear}
+                    min="2020"
+                    max="2100"
+                    onChange={(event) => setSelectedYear(event.target.value)}
+                    className="h-10 w-28 rounded-lg border-white/10 bg-white/5 pl-10 font-bold text-white"
+                  />
+                )}
               </div>
+              {periodMode === "range" && (
+                <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={rangeStart}
+                    onChange={(event) => setRangeStart(event.target.value)}
+                    className="h-10 rounded-lg border-white/10 bg-white/5 font-bold text-white"
+                  />
+                  <Input
+                    type="date"
+                    value={rangeEnd}
+                    onChange={(event) => setRangeEnd(event.target.value)}
+                    className="h-10 rounded-lg border-white/10 bg-white/5 font-bold text-white"
+                  />
+                </div>
+              )}
               <Button
                 variant="outline"
                 className="h-10 rounded-lg border-white/10 bg-white/5 text-white hover:bg-white/10"
@@ -523,6 +683,26 @@ export default function ReportesPage() {
                 Actualizar
               </Button>
             </div>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <Input
+              value={itemFilter}
+              onChange={(event) => setItemFilter(event.target.value)}
+              placeholder="Filtrar por articulo, SKU o material"
+              className="h-10 rounded-lg border-white/10 bg-white/5 font-semibold text-white placeholder:text-white/30"
+            />
+            <Input
+              value={employeeFilter}
+              onChange={(event) => setEmployeeFilter(event.target.value)}
+              placeholder="Filtrar por usuario o nomina"
+              className="h-10 rounded-lg border-white/10 bg-white/5 font-semibold text-white placeholder:text-white/30"
+            />
+            <Input
+              value={areaFilter}
+              onChange={(event) => setAreaFilter(event.target.value)}
+              placeholder="Filtrar por area o CECO"
+              className="h-10 rounded-lg border-white/10 bg-white/5 font-semibold text-white placeholder:text-white/30"
+            />
           </div>
         </div>
 
@@ -557,6 +737,9 @@ export default function ReportesPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Badge className="rounded-md border border-white/10 bg-white/5 px-3 py-1 text-white/70">
               Folio {sapFolio}
+            </Badge>
+            <Badge className="rounded-md border border-white/10 bg-white/5 px-3 py-1 text-white/60">
+              {rows.length} de {allRows.length} movimientos
             </Badge>
             {localMode && (
               <Badge className="rounded-md border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-amber-200">

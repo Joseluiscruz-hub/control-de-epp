@@ -36,6 +36,7 @@ import {
   hasBlockingPersonnelIssues,
   parsePersonnelTsv,
   type ParsedPersonnelImport,
+  type PersonnelRecord,
 } from '@/lib/personnel-import';
 
 interface Employee {
@@ -127,36 +128,46 @@ export default function EmpleadosPage() {
     if (!form.id || !form.name || !form.area) return;
     setSaving(true);
     try {
-      const batch = writeBatch(db);
-      batch.set(doc(db, 'employees', form.id), {
-        id: form.id,
-        name: form.name,
-        area: form.area,
-        active: true,
-        firstLogin: true,
-        termsAccepted: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('missing_admin_session');
+
+      const record: PersonnelRecord = {
+        id: form.id.trim(),
+        name: form.name.trim(),
+        area: form.area.trim(),
+        hireDate: '',
+        division: '',
+        positionId: '',
+        position: '',
+        personnelArea: form.area.trim(),
+        plantArea: form.area.trim(),
+        costCenter: '',
+        jobFunction: '',
+        sex: '',
+        sourceRow: 1,
+      };
+
+      const response = await fetch('/api/personnel/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ records: [record] }),
       });
-      batch.set(doc(db, 'kiosk_employees', form.id), {
-        name: form.name,
-        area: form.area,
-        active: true,
-        firstLogin: true,
-        termsAccepted: false,
-        updatedAt: serverTimestamp(),
-      });
-      await batch.commit();
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof result?.error === 'string' ? result.error : 'employee_create_failed');
+      }
+
       upsertLocalEmployee({ id: form.id, name: form.name, area: form.area, active: true });
       toast.success(`Empleado registrado: ${form.name}`);
       setForm({ id: '', name: '', area: '' });
       setAddOpen(false);
-    } catch {
-      upsertLocalEmployee({ id: form.id, name: form.name, area: form.area, active: true });
-      setEmployees(listLocalEmployees());
-      toast.success(`Empleado registrado localmente: ${form.name}`);
-      setForm({ id: '', name: '', area: '' });
-      setAddOpen(false);
+    } catch (error) {
+      console.error('[Employee admin create error]', error);
+      toast.error('No se pudo registrar en la plataforma administradora. Revisa tu sesión online.');
     } finally {
       setSaving(false);
     }

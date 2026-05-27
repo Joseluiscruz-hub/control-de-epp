@@ -19,7 +19,7 @@ const CATEGORY_ICONS: Record<string, ReactNode> = {
   Otros: <Package className="h-5 w-5" />,
 };
 
-const CATEGORIES = ["Todos", "Guantes", "Cascos", "Gafas", "Calzado", "Proteccion Auditiva", "Ropa", "Respiradores", "Otros"];
+const CATEGORIES = ["Todos", "Guantes", "Cascos", "Gafas", "Calzado", "Proteccion Auditiva", "Ropa", "Respiradores", "Arneses", "Otros"];
 
 const REQUEST_REASONS: Record<ReplacementReason, { label: string; desc: string; icon: ReactNode; tone: string }> = {
   desgaste: {
@@ -49,6 +49,8 @@ type SelectedVariant = {
   size: string;
   replacementDays: number;
 };
+
+type CatalogAvailabilityStatus = "ok" | "empty" | "unauthorized";
 
 export default function KioskoCatalogoPage() {
   const router = useRouter();
@@ -95,11 +97,22 @@ export default function KioskoCatalogoPage() {
     };
   }, [employeeId, router]);
 
-  const isItemAvailable = (item: PPECatalogItem): boolean => {
+  const isVariantAvailable = (variant?: { available?: boolean; stock?: number }) => (
+    Boolean(variant) && (variant?.available === true || Number(variant?.stock ?? 0) > 0)
+  );
+
+  const getItemStatus = (item: PPECatalogItem): CatalogAvailabilityStatus => {
+    if (item.active === false) return "unauthorized";
     if (item.hasSizes && item.sizes) {
-      return Object.values(item.sizes).some((variant) => variant.available === true || (variant.stock ?? 0) > 0);
+      return Object.values(item.sizes).some(isVariantAvailable) ? "ok" : "empty";
     }
-    return item.available === true || (item.stock ?? 0) > 0;
+    return item.available === true || Number(item.stock ?? 0) > 0 ? "ok" : "empty";
+  };
+
+  const statusMessage = (status: CatalogAvailabilityStatus) => {
+    if (status === "unauthorized") return "Sin autorización";
+    if (status === "empty") return "Sin stock";
+    return "";
   };
 
   const filtered = useMemo(
@@ -113,12 +126,31 @@ export default function KioskoCatalogoPage() {
   );
 
   const toggleSelection = (item: PPECatalogItem) => {
+    const status = getItemStatus(item);
+    if (status !== "ok") {
+      setSubmitError(`${item.name}: ${statusMessage(status).toLowerCase()}.`);
+      return;
+    }
+
     const size = item.hasSizes ? sizeByItem[item.id] : "N/A";
-    if (item.hasSizes && !size) return;
+    if (item.hasSizes && !size) {
+      setSubmitError(`Selecciona una talla autorizada para ${item.name}.`);
+      return;
+    }
     if (item.hasSizes && (!item.sizes || !item.sizes[size])) return;
 
     const sku = item.hasSizes ? item.sizes?.[size]?.sku : item.sku;
-    if (!sku) return;
+    const variant = item.hasSizes ? item.sizes?.[size] : undefined;
+    if (item.hasSizes && !isVariantAvailable(variant)) {
+      setSubmitError(`${item.name} talla ${size}: sin stock.`);
+      return;
+    }
+    if (!sku) {
+      setSubmitError(`${item.name}: sin SKU autorizado para solicitud.`);
+      return;
+    }
+
+    setSubmitError("");
 
     setSelectedByItem((prev) => {
       if (prev[item.id]?.sku === sku && prev[item.id]?.size === size) {
@@ -232,7 +264,8 @@ export default function KioskoCatalogoPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((item) => {
-              const status = isItemAvailable(item) ? "ok" : "empty";
+              const status = getItemStatus(item);
+              const statusText = statusMessage(status);
               const selected = !!selectedByItem[item.id];
               const selectedSize = sizeByItem[item.id];
 
@@ -243,6 +276,8 @@ export default function KioskoCatalogoPage() {
                     ${
                       status === "empty"
                         ? "border-white/10 bg-white/5 opacity-50"
+                        : status === "unauthorized"
+                        ? "border-red-400/20 bg-red-500/5 opacity-55"
                         : selected
                         ? "border-amber-400 bg-amber-400/10"
                         : "border-white/10 bg-white/5 hover:bg-white/10"
@@ -259,17 +294,28 @@ export default function KioskoCatalogoPage() {
                         ? `${item.requiredQuantity} ${item.requiredUnit} cada ${item.replacementDays} dias`
                         : `Vigencia: ${item.replacementDays} dias`}
                     </p>
+                    {status !== "ok" && (
+                      <p className="mt-2 inline-flex rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-white/35">
+                        {statusText}
+                      </p>
+                    )}
                   </div>
 
-                  {item.hasSizes && item.sizes && status !== "empty" && (
+                  {item.hasSizes && item.sizes && status !== "unauthorized" && (
                     <div className="flex flex-wrap gap-2">
                       {Object.entries(item.sizes)
-                        .filter(([, variant]) => variant.available === true || (variant.stock ?? 0) > 0)
-                        .map(([size]) => (
+                        .map(([size, variant]) => {
+                          const variantOk = isVariantAvailable(variant);
+                          return (
                           <button
                             key={size}
                             onClick={() => {
+                              if (!variantOk) {
+                                setSubmitError(`${item.name} talla ${size}: sin stock.`);
+                                return;
+                              }
                               setSizeByItem((prev) => ({ ...prev, [item.id]: size }));
+                              setSubmitError("");
                               setSelectedByItem((prev) => {
                                 const current = prev[item.id];
                                 if (!current || !item.sizes?.[size]) return prev;
@@ -286,25 +332,31 @@ export default function KioskoCatalogoPage() {
                             className={`px-3 py-1 rounded-lg text-sm border ${
                               selectedSize === size
                                 ? "border-amber-400 bg-amber-400/15 text-amber-300"
+                                : !variantOk
+                                ? "border-white/10 bg-white/[0.02] text-white/25"
                                 : "border-gray-600 text-gray-300"
                             }`}
+                            aria-disabled={!variantOk}
                           >
                             {size}
+                            {!variantOk && <span className="ml-1 text-[10px] font-normal text-white/25">sin stock</span>}
                           </button>
-                        ))}
+                        )})}
                     </div>
                   )}
 
                   <button
-                    onClick={() => status !== "empty" && toggleSelection(item)}
-                    disabled={status === "empty" || (item.hasSizes && !selectedSize)}
+                    onClick={() => toggleSelection(item)}
+                    disabled={submitting}
                     className={`mt-auto w-full py-3 rounded-lg font-semibold transition-colors ${
                       selected
                         ? "bg-green-500/20 text-green-300 border border-green-500/40"
+                        : status !== "ok"
+                        ? "border border-white/10 bg-white/[0.03] text-white/35"
                         : "bg-amber-400 text-gray-900 hover:bg-amber-300 disabled:opacity-40"
                     }`}
                   >
-                    {selected ? "Seleccionado" : "Seleccionar"}
+                    {selected ? "Seleccionado" : statusText || "Seleccionar"}
                   </button>
                 </div>
               );

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   collection, onSnapshot, doc, getDoc,
-  serverTimestamp, query, increment, writeBatch
+  serverTimestamp, query, writeBatch
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -296,6 +296,8 @@ export default function InventarioPage() {
         ...rulePayload,
         hasSizes: false,
         sku: form.sku,
+        stock: initialStock,
+        minStock: 2,
         active: true,
         available: initialStock > 0,
         updatedAt: serverTimestamp(),
@@ -405,20 +407,18 @@ export default function InventarioPage() {
       }
 
       let nextStock = adjustItem.stock;
-      let newStock: number | ReturnType<typeof increment>;
       if (adjustType === 'add') {
-        newStock = increment(qty);
         nextStock = adjustItem.stock + qty;
       } else if (adjustType === 'subtract') {
-        newStock = increment(-qty);
         nextStock = adjustItem.stock - qty;
       } else {
-        newStock = qty;
         nextStock = qty;
       }
+      nextStock = Math.max(0, nextStock);
       const batch = writeBatch(db);
       batch.update(doc(db, 'ppe_catalog', adjustItem.docId), {
-        stock: newStock,
+        stock: nextStock,
+        available: nextStock > 0,
         updatedAt: serverTimestamp(),
       });
       batch.set(
@@ -429,6 +429,8 @@ export default function InventarioPage() {
           replacementDays: adjustItem.replacementDays,
           hasSizes: false,
           sku: adjustItem.sku,
+          stock: nextStock,
+          minStock: 2,
           active: true,
           available: nextStock > 0,
           updatedAt: serverTimestamp(),
