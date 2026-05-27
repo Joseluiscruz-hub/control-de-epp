@@ -41,8 +41,8 @@ export async function requireAdminUser(req: NextRequest) {
   }
 
   const email = decodedToken.email?.toLowerCase();
-  if (!email || decodedToken.email_verified !== true) {
-    throw new AuthHttpError("Cuenta sin email verificado.", 403);
+  if (!email) {
+    throw new AuthHttpError("Cuenta sin email disponible.", 403);
   }
 
   if (!getConfiguredAdminEmails().includes(email)) {

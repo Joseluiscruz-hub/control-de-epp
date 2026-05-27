@@ -2,7 +2,7 @@ import {
   doc, getDoc, collection, serverTimestamp, query, where, getDocs, limit, writeBatch,
   runTransaction, Timestamp
 } from "firebase/firestore";
-import { db, ensureFirebaseReady } from "./firebase";
+import { auth, db, ensureFirebaseReady } from "./firebase";
 import { resolveEppReplacementDays, getEppDurationRulePayload } from "./epp-duration-rules";
 import {
   KioskEarlyReplacementAlert,
@@ -462,20 +462,24 @@ export async function updateKioskRequestStatus(requestId: string, status: Extrac
   }
 
   await ensureFirebaseReady();
-  const batch = writeBatch(db);
-  batch.update(doc(db, "kiosk_requests", requestId), {
-    status,
-    updatedAt: serverTimestamp(),
-  });
-  batch.set(
-    doc(db, "kiosk_request_status", requestId),
-    {
-      requestId,
-      status,
-      source: "kiosk",
-      updatedAt: serverTimestamp(),
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) {
+    throw new KioskApiError("Inicia sesion online como administrador para gestionar solicitudes.", 401);
+  }
+
+  const response = await fetch("/api/kiosk/requests", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
-    { merge: true }
-  );
-  await batch.commit();
+    body: JSON.stringify({ requestId, status }),
+  });
+
+  if (!response.ok) {
+    throw new KioskApiError(
+      await parseKioskApiError(response, "No se pudo actualizar la solicitud."),
+      response.status
+    );
+  }
 }

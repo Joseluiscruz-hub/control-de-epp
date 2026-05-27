@@ -58,8 +58,8 @@ export function KioskRequestsPanel() {
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
       toast.success(status === "approved" ? "Solicitud aprobada." : "Solicitud rechazada.");
     } catch (error) {
-      console.error("[Kiosk request update error]", error);
-      toast.error("No se pudo actualizar el estado de la solicitud.");
+      console.error("[Kiosk request status update error]", error);
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar el estado de la solicitud.");
     } finally {
       setUpdatingId(null);
     }

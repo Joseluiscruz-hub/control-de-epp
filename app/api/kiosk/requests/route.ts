@@ -1,6 +1,7 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { NextRequest } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
 import {
   getEppDurationRulePayload,
   resolveEppReplacementDays,
@@ -257,5 +258,53 @@ export async function POST(req: NextRequest) {
 
     console.error("[Kiosk request create error]:", error);
     return Response.json({ error: "No se pudo crear la solicitud de kiosko." }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    await requireAdminUser(req);
+    const body = await req.json();
+    const requestId = readText(body?.requestId);
+    const status = readText(body?.status);
+
+    if (!requestId || (status !== "approved" && status !== "rejected")) {
+      return Response.json({ error: "Solicitud y estado requeridos." }, { status: 400 });
+    }
+
+    const db = getAdminDb();
+    const requestRef = db.collection("kiosk_requests").doc(requestId);
+    const statusRef = db.collection("kiosk_request_status").doc(requestId);
+    const requestSnap = await requestRef.get();
+
+    if (!requestSnap.exists) {
+      return Response.json({ error: "Solicitud de kiosko no encontrada." }, { status: 404 });
+    }
+
+    const batch = db.batch();
+    batch.update(requestRef, {
+      status,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    batch.set(
+      statusRef,
+      {
+        requestId,
+        status,
+        source: "kiosk",
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    await batch.commit();
+
+    return Response.json({ success: true, requestId, status });
+  } catch (error) {
+    if (error instanceof AuthHttpError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
+
+    console.error("[Kiosk request status update error]:", error);
+    return Response.json({ error: "No se pudo actualizar la solicitud de kiosko." }, { status: 500 });
   }
 }
