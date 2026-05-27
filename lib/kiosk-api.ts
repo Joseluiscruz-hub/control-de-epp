@@ -415,6 +415,7 @@ export interface AdminKioskRequest {
   hasEarlyReplacementAlert?: boolean;
   earlyReplacementWarnings?: KioskEarlyReplacementAlert[];
   earlyReplacementAlertIds?: string[];
+  assignmentIds?: string[];
 }
 
 function normalizeEarlyReplacementAlert(input: unknown): KioskEarlyReplacementAlert | null {
@@ -476,6 +477,9 @@ export async function listAdminKioskRequests(status: KioskRequestStatus = "pendi
           : [],
         earlyReplacementAlertIds: Array.isArray(data.earlyReplacementAlertIds)
           ? data.earlyReplacementAlertIds.filter((id: unknown): id is string => typeof id === "string")
+          : [],
+        assignmentIds: Array.isArray(data.assignmentIds)
+          ? data.assignmentIds.filter((id: unknown): id is string => typeof id === "string")
           : [],
       };
     });

@@ -22,6 +22,7 @@ type LocalKioskRequest = {
   status: KioskRequestStatus;
   hasEarlyReplacementAlert?: boolean;
   earlyReplacementWarnings?: KioskEarlyReplacementAlert[];
+  assignmentIds?: string[];
   createdAt: string;
   updatedAt: string;
   source: "local-kiosk";
@@ -546,6 +547,7 @@ export function listLocalKioskRequests(status: KioskRequestStatus, max: number) 
       status: request.status,
       hasEarlyReplacementAlert: request.hasEarlyReplacementAlert === true,
       earlyReplacementWarnings: request.earlyReplacementWarnings ?? [],
+      assignmentIds: request.assignmentIds ?? [],
       createdAt: new Date(request.createdAt),
     }));
 }
@@ -553,11 +555,32 @@ export function listLocalKioskRequests(status: KioskRequestStatus, max: number) 
 export function updateLocalKioskRequestStatus(requestId: string, status: Extract<KioskRequestStatus, "approved" | "rejected">) {
   ensureLocalKioskSeed();
   const requests = readJson<LocalKioskRequest[]>(REQUESTS_KEY, []);
-  const next = requests.map((request) =>
-    request.id === requestId
-      ? { ...request, status, updatedAt: new Date().toISOString() }
-      : request
-  );
+  const target = requests.find((request) => request.id === requestId);
+  if (!target) return;
+
+  let assignmentIds = target.assignmentIds ?? [];
+  if (status === "approved" && assignmentIds.length === 0) {
+    assignmentIds = target.items.map((item) => createLocalAssignment({
+      employeeId: target.employeeId,
+      sku: item.sku,
+      size: item.size || "N/A",
+      itemId: item.itemId,
+      replacementDays: item.replacementDays,
+      replacementReason: item.replacementReason,
+      issuedByKiosk: true,
+      issuedByUserId: "offline-admin",
+    }));
+  }
+
+  const next = requests.map((request) => {
+    if (request.id !== requestId) return request;
+    return {
+      ...request,
+      status,
+      assignmentIds,
+      updatedAt: new Date().toISOString(),
+    };
+  });
   writeJson(REQUESTS_KEY, next);
 }
 

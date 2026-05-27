@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, HardHat, Loader2, X } from "lucide-react";
+import { AlertTriangle, Check, HardHat, Loader2, RefreshCw, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +40,7 @@ export function KioskRequestsPanel() {
   const [requests, setRequests] = useState<AdminKioskRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [repairingSync, setRepairingSync] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const warnedRequestIds = useRef(new Set<string>());
   const refreshInFlight = useRef(false);
@@ -109,6 +110,46 @@ export function KioskRequestsPanel() {
     }
   };
 
+  const repairApprovedSync = async () => {
+    setRepairingSync(true);
+    try {
+      const approved = await listAdminKioskRequests("approved", 50);
+      const unsynced = approved.filter((request) => (request.assignmentIds?.length ?? 0) === 0);
+
+      if (unsynced.length === 0) {
+        toast.success("Solicitudes aprobadas ya sincronizadas.");
+        return;
+      }
+
+      let synced = 0;
+      let failed = 0;
+      for (const request of unsynced) {
+        try {
+          await updateKioskRequestStatus(request.id, "approved");
+          synced++;
+        } catch (error) {
+          failed++;
+          console.error("[Kiosk approved sync repair error]", request.id, error);
+        }
+      }
+
+      if (synced > 0) {
+        await refresh(true);
+      }
+
+      if (failed > 0) {
+        toast.warning(`Sincronizadas ${synced}; ${failed} requieren revision.`);
+      } else {
+        toast.success(`Sincronizadas ${synced} solicitud(es) aprobadas.`);
+      }
+    } catch (error) {
+      console.error("[Kiosk approved sync scan error]", error);
+      toast.error("No se pudo revisar la sincronizacion de aprobadas.");
+    } finally {
+      setRepairingSync(false);
+    }
+  };
+
   const earlyAlertCount = requests.filter((request) => request.hasEarlyReplacementAlert).length;
   const criticalAlertCount = requests.filter((request) => (
     request.earlyReplacementWarnings?.some((warning) => warning.severity === "critical")
@@ -128,6 +169,16 @@ export function KioskRequestsPanel() {
             </div>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 rounded-md border-white/15 bg-white/5 px-2 text-xs text-white/70 hover:bg-white/10 hover:text-white"
+              disabled={repairingSync}
+              onClick={repairApprovedSync}
+            >
+              {repairingSync ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              Sincronizar
+            </Button>
             {earlyAlertCount > 0 && (
               <Badge className="rounded-md border border-red-400/25 bg-red-500/10 text-red-200">
                 {earlyAlertCount} vida util

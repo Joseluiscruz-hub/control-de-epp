@@ -25,6 +25,10 @@ class KioskRequestError extends Error {
 }
 
 type RequestItemInput = Partial<KioskRequestItem>;
+type FulfillableKioskItem = KioskRequestItem & {
+  chargeAmount?: number;
+  signatureDataUrl?: string | null;
+};
 
 function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -49,6 +53,39 @@ function addDays(date: Date, days: number) {
   return next;
 }
 
+function readNumber(value: unknown, fallback = 0) {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeFulfillableItems(input: unknown): FulfillableKioskItem[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((raw): FulfillableKioskItem | null => {
+      if (!raw || typeof raw !== "object") return null;
+      const item = raw as Record<string, unknown>;
+      const itemId = readText(item.itemId);
+      const itemName = readText(item.itemName);
+      const sku = readText(item.sku);
+      const size = readText(item.size) || "N/A";
+      const replacementDays = readNumber(item.replacementDays);
+      const replacementReason = readText(item.replacementReason);
+      if (!itemId || !itemName || !sku || replacementDays <= 0) return null;
+
+      return {
+        itemId,
+        itemName,
+        sku,
+        size,
+        replacementDays,
+        ...(VALID_REASONS.has(replacementReason) ? { replacementReason: replacementReason as ReplacementReason } : {}),
+        ...(readNumber(item.chargeAmount) > 0 ? { chargeAmount: readNumber(item.chargeAmount) } : {}),
+        ...(typeof item.signatureDataUrl === "string" ? { signatureDataUrl: item.signatureDataUrl } : {}),
+      };
+    })
+    .filter((item): item is FulfillableKioskItem => item !== null);
+}
+
 function getSizes(data: FirebaseFirestore.DocumentData) {
   return typeof data.sizes === "object" && data.sizes !== null
     ? data.sizes as Record<string, { sku?: string; material?: string; available?: boolean; stock?: number }>
@@ -66,6 +103,247 @@ function isCatalogItemAvailable(data: FirebaseFirestore.DocumentData, size: stri
     return Boolean(variant && isVariantAvailable(variant));
   }
   return data.available === true || Number(data.stock ?? 0) > 0;
+}
+
+function buildStockUpdates(
+  catalogData: FirebaseFirestore.DocumentData,
+  item: FulfillableKioskItem
+) {
+  const updates: Record<string, unknown> = {
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+
+  if (item.size && item.size !== "N/A") {
+    const sizes = getSizes(catalogData);
+    const currentVariant = sizes?.[item.size];
+    const currentStock = readNumber(currentVariant?.stock);
+
+    if (!currentVariant || currentStock <= 0) {
+      throw new KioskRequestError(`Sin stock disponible para ${item.itemName} talla ${item.size}.`, 409);
+    }
+
+    const nextVariantStock = currentStock - 1;
+    const aggregateStock = Math.max(
+      0,
+      typeof catalogData.stock === "number"
+        ? readNumber(catalogData.stock) - 1
+        : Object.values(sizes ?? {}).reduce((sum, variant) => sum + readNumber(variant.stock), 0) - 1
+    );
+
+    updates[`sizes.${item.size}.stock`] = nextVariantStock;
+    updates[`sizes.${item.size}.available`] = nextVariantStock > 0;
+    updates.stock = aggregateStock;
+    updates.available = aggregateStock > 0;
+    return updates;
+  }
+
+  const currentStock = readNumber(catalogData.stock);
+  if (currentStock <= 0) {
+    throw new KioskRequestError(`Sin stock disponible para ${item.itemName}.`, 409);
+  }
+
+  const nextStock = currentStock - 1;
+  updates.stock = nextStock;
+  updates.available = nextStock > 0;
+  return updates;
+}
+
+async function fulfillApprovedKioskRequest(params: {
+  db: FirebaseFirestore.Firestore;
+  requestId: string;
+  approvedByUserId: string;
+  approvedByEmail: string;
+}) {
+  const { db, requestId, approvedByUserId, approvedByEmail } = params;
+  const requestRef = db.collection("kiosk_requests").doc(requestId);
+  const statusRef = db.collection("kiosk_request_status").doc(requestId);
+
+  return db.runTransaction(async (transaction) => {
+    const requestSnap = await transaction.get(requestRef);
+
+    if (!requestSnap.exists) {
+      throw new KioskRequestError("Solicitud de kiosko no encontrada.", 404);
+    }
+
+    const requestData = requestSnap.data() ?? {};
+    const currentStatus = readText(requestData.status) || "pending";
+    const employeeId = readText(requestData.employeeId);
+    const employeeName = readText(requestData.employeeName);
+    const employeeArea = readText(requestData.employeeArea);
+    const items = normalizeFulfillableItems(requestData.items);
+    const existingAssignmentIds = Array.isArray(requestData.assignmentIds)
+      ? requestData.assignmentIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+      : [];
+
+    if (!employeeId || !employeeName || items.length === 0) {
+      throw new KioskRequestError("Solicitud de kiosko incompleta para sincronizar consumo.", 409);
+    }
+
+    const existingFulfillmentSnap = await transaction.get(
+      db.collection("assignments").where("kioskRequestId", "==", requestId).limit(20)
+    );
+    const existingFulfillmentIds = existingFulfillmentSnap.docs.map((docSnap) => docSnap.id);
+    const alreadyFulfilledIds = existingAssignmentIds.length > 0 ? existingAssignmentIds : existingFulfillmentIds;
+
+    if (alreadyFulfilledIds.length > 0) {
+      transaction.update(requestRef, {
+        status: "approved",
+        assignmentIds: alreadyFulfilledIds,
+        syncedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      transaction.set(
+        statusRef,
+        {
+          requestId,
+          status: "approved",
+          source: "kiosk",
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      return { assignmentIds: alreadyFulfilledIds, fulfilled: false };
+    }
+
+    if (currentStatus !== "pending" && currentStatus !== "approved") {
+      throw new KioskRequestError(`La solicitud ya esta ${currentStatus}.`, 409);
+    }
+
+    const catalogRefs = items.map((item) => db.collection("ppe_catalog").doc(item.itemId));
+    const kioskCatalogRefs = items.map((item) => db.collection("kiosk_catalog").doc(item.itemId));
+    const previousAssignmentQueries = items.map((item) =>
+      db
+        .collection("assignments")
+        .where("employeeId", "==", employeeId)
+        .where("sku", "==", item.sku)
+        .where("status", "==", "active")
+        .limit(10)
+    );
+
+    const catalogSnaps = await Promise.all(catalogRefs.map((ref) => transaction.get(ref)));
+    const kioskCatalogSnaps = await Promise.all(kioskCatalogRefs.map((ref) => transaction.get(ref)));
+    const previousAssignmentSnaps = await Promise.all(
+      previousAssignmentQueries.map((previousQuery) => transaction.get(previousQuery))
+    );
+
+    const now = new Date();
+    const assignmentRefs: FirebaseFirestore.DocumentReference[] = [];
+    items.forEach((item, index) => {
+      const catalogSnap = catalogSnaps[index];
+      if (!catalogSnap.exists) {
+        throw new KioskRequestError(`Material ${item.itemName} no encontrado en inventario.`, 404);
+      }
+
+      const stockUpdates = buildStockUpdates(catalogSnap.data() ?? {}, item);
+      const assignmentRef = db.collection("assignments").doc();
+      assignmentRefs.push(assignmentRef);
+
+      transaction.set(assignmentRef, {
+        employeeId,
+        employeeName,
+        employeeArea,
+        sku: item.sku,
+        itemId: item.itemId,
+        itemName: item.itemName,
+        replacementDays: item.replacementDays,
+        size: item.size || "N/A",
+        assignedAt: FieldValue.serverTimestamp(),
+        nextReplacementAt: Timestamp.fromDate(addDays(now, item.replacementDays)),
+        status: "active",
+        replacementReason: item.replacementReason ?? "vida_util",
+        chargeAmount: item.chargeAmount ?? 0,
+        chargeApproved: item.chargeAmount ? false : true,
+        signatureDataUrl: item.signatureDataUrl ?? null,
+        issuedByKiosk: true,
+        issuedByUserId: approvedByUserId,
+        approvedByEmail,
+        kioskRequestId: requestId,
+      });
+
+      transaction.update(catalogRefs[index], stockUpdates);
+      if (kioskCatalogSnaps[index].exists) {
+        transaction.update(kioskCatalogRefs[index], stockUpdates);
+      }
+
+      previousAssignmentSnaps[index].docs.forEach((previousDoc) => {
+        if (previousDoc.id === assignmentRef.id) return;
+        transaction.update(previousDoc.ref, {
+          status: "replaced",
+          replacedByAssignmentId: assignmentRef.id,
+          replacedByKioskRequestId: requestId,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+    });
+
+    const assignmentIds = assignmentRefs.map((ref) => ref.id);
+    transaction.update(requestRef, {
+      status: "approved",
+      assignmentIds,
+      approvedAt: FieldValue.serverTimestamp(),
+      approvedByUserId,
+      approvedByEmail,
+      syncedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    transaction.set(
+      statusRef,
+      {
+        requestId,
+        status: "approved",
+        source: "kiosk",
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return { assignmentIds, fulfilled: true };
+  });
+}
+
+async function rejectKioskRequest(params: {
+  db: FirebaseFirestore.Firestore;
+  requestId: string;
+  rejectedByUserId: string;
+  rejectedByEmail: string;
+}) {
+  const { db, requestId, rejectedByUserId, rejectedByEmail } = params;
+  const requestRef = db.collection("kiosk_requests").doc(requestId);
+  const statusRef = db.collection("kiosk_request_status").doc(requestId);
+
+  return db.runTransaction(async (transaction) => {
+    const requestSnap = await transaction.get(requestRef);
+
+    if (!requestSnap.exists) {
+      throw new KioskRequestError("Solicitud de kiosko no encontrada.", 404);
+    }
+
+    const requestData = requestSnap.data() ?? {};
+    const currentStatus = readText(requestData.status) || "pending";
+    if (currentStatus !== "pending" && currentStatus !== "rejected") {
+      throw new KioskRequestError(`La solicitud ya esta ${currentStatus}.`, 409);
+    }
+
+    transaction.update(requestRef, {
+      status: "rejected",
+      rejectedAt: FieldValue.serverTimestamp(),
+      rejectedByUserId,
+      rejectedByEmail,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    transaction.set(
+      statusRef,
+      {
+        requestId,
+        status: "rejected",
+        source: "kiosk",
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return { assignmentIds: [], fulfilled: false };
+  });
 }
 
 async function sanitizeRequestItem(db: FirebaseFirestore.Firestore, input: RequestItemInput) {
@@ -293,7 +571,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    await requireAdminUser(req);
+    const adminUser = await requireAdminUser(req);
     const body = await req.json();
     const requestId = readText(body?.requestId);
     const status = readText(body?.status);
@@ -303,29 +581,19 @@ export async function PATCH(req: NextRequest) {
     }
 
     const db = getAdminDb();
-    const requestRef = db.collection("kiosk_requests").doc(requestId);
-    const statusRef = db.collection("kiosk_request_status").doc(requestId);
-    const requestSnap = await requestRef.get();
-
-    if (!requestSnap.exists) {
-      return Response.json({ error: "Solicitud de kiosko no encontrada." }, { status: 404 });
-    }
-
-    const batch = db.batch();
-    batch.update(requestRef, {
-      status,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-    batch.set(
-      statusRef,
-      {
-        requestId,
-        status,
-        source: "kiosk",
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
+    const result = status === "approved"
+      ? await fulfillApprovedKioskRequest({
+          db,
+          requestId,
+          approvedByUserId: adminUser.uid,
+          approvedByEmail: adminUser.email,
+        })
+      : await rejectKioskRequest({
+          db,
+          requestId,
+          rejectedByUserId: adminUser.uid,
+          rejectedByEmail: adminUser.email,
+        });
 
     const alertsSnap = await db
       .collection(ALERT_COLLECTION)
@@ -333,6 +601,7 @@ export async function PATCH(req: NextRequest) {
       .limit(50)
       .get();
 
+    const batch = db.batch();
     alertsSnap.docs.forEach((alertDoc) => {
       batch.update(alertDoc.ref, {
         status: status === "approved" ? "acknowledged" : "dismissed",
@@ -344,9 +613,12 @@ export async function PATCH(req: NextRequest) {
 
     await batch.commit();
 
-    return Response.json({ success: true, requestId, status });
+    return Response.json({ success: true, requestId, status, ...result });
   } catch (error) {
     if (error instanceof AuthHttpError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof KioskRequestError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
 
