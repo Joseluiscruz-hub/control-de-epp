@@ -51,6 +51,12 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Alertas administrativas generadas por servidor ────────────────────
+    match /kiosk_alerts/{alertId} {
+      allow read: if request.auth != null && isAdmin();
+      allow create, update, delete: if false;
+    }
+
     // ── Asignaciones ───────────────────────────────────────────────────────
     match /assignments/{assignmentId} {
       allow read: if request.auth != null;

@@ -1,4 +1,10 @@
-import { KioskEmployee, KioskRequestItem, KioskRequestStatus, PPECatalogItem } from "./kiosk-types";
+import {
+  KioskEarlyReplacementAlert,
+  KioskEmployee,
+  KioskRequestItem,
+  KioskRequestStatus,
+  PPECatalogItem,
+} from "./kiosk-types";
 
 const EMPLOYEES_KEY = "assetguard.local.kiosk.employees";
 const CATALOG_KEY = "assetguard.local.kiosk.catalog";
@@ -11,8 +17,11 @@ type LocalKioskRequest = {
   id: string;
   employeeId: string;
   employeeName: string;
+  employeeArea?: string;
   items: KioskRequestItem[];
   status: KioskRequestStatus;
+  hasEarlyReplacementAlert?: boolean;
+  earlyReplacementWarnings?: KioskEarlyReplacementAlert[];
   createdAt: string;
   updatedAt: string;
   source: "local-kiosk";
@@ -126,6 +135,52 @@ function normalizeCatalogItem(item: PPECatalogItem): PPECatalogItem {
     available:
       item.available === true ||
       (typeof item.stock === "number" ? item.stock > 0 : sizeStock > 0),
+  };
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function addDaysDate(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function buildLocalEarlyReplacementAlert(
+  item: KioskRequestItem,
+  assignment: LocalAssignmentRecord | undefined
+): KioskEarlyReplacementAlert | null {
+  if (!assignment) return null;
+
+  const assignedAt = new Date(assignment.assignedAt);
+  if (Number.isNaN(assignedAt.getTime())) return null;
+
+  const replacementDays = Number(item.replacementDays || 0);
+  if (!Number.isFinite(replacementDays) || replacementDays <= 0) return null;
+
+  const now = new Date();
+  const nextEligibleAt = assignment.nextReplacementAt
+    ? new Date(assignment.nextReplacementAt)
+    : addDaysDate(assignedAt, replacementDays);
+
+  if (Number.isNaN(nextEligibleAt.getTime())) return null;
+
+  const daysUsed = Math.max(0, Math.floor((now.getTime() - assignedAt.getTime()) / DAY_MS));
+  const daysRemaining = Math.max(0, Math.ceil((nextEligibleAt.getTime() - now.getTime()) / DAY_MS));
+  if (daysRemaining <= 0 || daysUsed >= replacementDays) return null;
+
+  return {
+    itemId: item.itemId,
+    itemName: item.itemName,
+    sku: item.sku,
+    size: item.size,
+    replacementDays,
+    daysUsed,
+    daysRemaining,
+    assignedAt: assignedAt.toISOString(),
+    nextEligibleAt: nextEligibleAt.toISOString(),
+    previousAssignmentId: assignment.id,
+    severity: daysUsed < Math.ceil(replacementDays * 0.5) ? "critical" : "warning",
   };
 }
 
@@ -432,14 +487,36 @@ export function createLocalKioskRequest(input: {
 }) {
   ensureLocalKioskSeed();
   const requests = readJson<LocalKioskRequest[]>(REQUESTS_KEY, []);
+  const employees = readJson<Record<string, KioskEmployee>>(EMPLOYEES_KEY, DEFAULT_EMPLOYEES);
+  const activeAssignments = readLocalAssignments().filter((assignment) => (
+    assignment.employeeId === input.employeeId && assignment.status === "active"
+  ));
+  const warnings = input.items
+    .map((item) => buildLocalEarlyReplacementAlert(
+      item,
+      activeAssignments.find((assignment) => assignment.sku === item.sku || assignment.itemId === item.itemId)
+    ))
+    .filter((warning): warning is KioskEarlyReplacementAlert => warning !== null);
+  const items = input.items.map((item) => {
+    const warning = warnings.find((candidate) => (
+      candidate.itemId === item.itemId &&
+      candidate.sku === item.sku &&
+      candidate.size === item.size
+    ));
+    return warning ? { ...item, earlyReplacementAlert: warning } : item;
+  });
   const now = new Date().toISOString();
   const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const employee = employees[input.employeeId];
   requests.unshift({
     id,
     employeeId: input.employeeId,
     employeeName: input.employeeName,
-    items: input.items,
+    employeeArea: employee?.area ?? employee?.personnelArea ?? employee?.plantArea,
+    items,
     status: "pending",
+    hasEarlyReplacementAlert: warnings.length > 0,
+    earlyReplacementWarnings: warnings,
     createdAt: now,
     updatedAt: now,
     source: "local-kiosk",
@@ -464,8 +541,11 @@ export function listLocalKioskRequests(status: KioskRequestStatus, max: number) 
       id: request.id,
       employeeId: request.employeeId,
       employeeName: request.employeeName,
+      employeeArea: request.employeeArea,
       items: request.items,
       status: request.status,
+      hasEarlyReplacementAlert: request.hasEarlyReplacementAlert === true,
+      earlyReplacementWarnings: request.earlyReplacementWarnings ?? [],
       createdAt: new Date(request.createdAt),
     }));
 }

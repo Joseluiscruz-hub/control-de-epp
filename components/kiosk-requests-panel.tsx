@@ -14,14 +14,39 @@ const REASON_LABELS: Record<string, string> = {
   extravio: "Pérdida/robo/mal uso",
 };
 
+const REFRESH_MS = 15_000;
+
+function alertDateLabel(value: unknown) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function buildAlertSummary(request: AdminKioskRequest) {
+  const warnings = request.earlyReplacementWarnings ?? [];
+  if (warnings.length === 0) return "La solicitud tiene EPP antes de cumplir vida util.";
+  return warnings
+    .slice(0, 3)
+    .map((warning) => `${warning.itemName}: faltan ${warning.daysRemaining} dias`)
+    .join(" | ");
+}
+
 export function KioskRequestsPanel() {
   const [requests, setRequests] = useState<AdminKioskRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const warnedRequestIds = useRef(new Set<string>());
+  const refreshInFlight = useRef(false);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
     setLoadError(false);
     try {
       const data = await listAdminKioskRequests("pending", 20);
@@ -31,16 +56,21 @@ export function KioskRequestsPanel() {
       ));
       if (newEarlyAlerts.length > 0) {
         newEarlyAlerts.forEach((request) => warnedRequestIds.current.add(request.id));
-        toast.warning(
-          `${newEarlyAlerts.length} solicitud(es) de kiosko llegaron antes de cumplir vigencia.`
-        );
+        const first = newEarlyAlerts[0];
+        toast.warning("Alerta de vida util en kiosko", {
+          description: `${first.employeeName}: ${buildAlertSummary(first)}${
+            newEarlyAlerts.length > 1 ? ` (+${newEarlyAlerts.length - 1} mas)` : ""
+          }`,
+          duration: 9000,
+        });
       }
     } catch (error) {
       console.error("[Kiosk requests load error]", error);
       setLoadError(true);
-      toast.error("No se pudieron cargar las solicitudes de kiosko.");
+      if (!silent) toast.error("No se pudieron cargar las solicitudes de kiosko.");
     } finally {
       setLoading(false);
+      refreshInFlight.current = false;
     }
   }, []);
 
@@ -48,10 +78,24 @@ export function KioskRequestsPanel() {
     const timeout = window.setTimeout(() => {
       void refresh();
     }, 0);
-    return () => window.clearTimeout(timeout);
+    const interval = window.setInterval(() => {
+      void refresh(true);
+    }, REFRESH_MS);
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(interval);
+    };
   }, [refresh]);
 
-  const resolve = async (requestId: string, status: "approved" | "rejected") => {
+  const resolve = async (request: AdminKioskRequest, status: "approved" | "rejected") => {
+    if (status === "approved" && request.hasEarlyReplacementAlert) {
+      const confirmed = window.confirm(
+        `Esta solicitud tiene alerta de vida util.\n\n${buildAlertSummary(request)}\n\n¿Deseas aprobarla de todos modos?`
+      );
+      if (!confirmed) return;
+    }
+
+    const requestId = request.id;
     setUpdatingId(requestId);
     try {
       await updateKioskRequestStatus(requestId, status);
@@ -64,6 +108,11 @@ export function KioskRequestsPanel() {
       setUpdatingId(null);
     }
   };
+
+  const earlyAlertCount = requests.filter((request) => request.hasEarlyReplacementAlert).length;
+  const criticalAlertCount = requests.filter((request) => (
+    request.earlyReplacementWarnings?.some((warning) => warning.severity === "critical")
+  )).length;
 
   return (
     <Card className="enterprise-panel gap-0 py-0">
@@ -78,7 +127,19 @@ export function KioskRequestsPanel() {
               <p className="section-eyebrow mt-0.5">Flujo de aprobación</p>
             </div>
           </div>
-          <Badge className="rounded-md border border-amber-400/20 bg-amber-400/10 text-amber-300">{requests.length} pendientes</Badge>
+          <div className="flex flex-wrap justify-end gap-2">
+            {earlyAlertCount > 0 && (
+              <Badge className="rounded-md border border-red-400/25 bg-red-500/10 text-red-200">
+                {earlyAlertCount} vida util
+              </Badge>
+            )}
+            {criticalAlertCount > 0 && (
+              <Badge className="rounded-md border border-red-400/35 bg-red-600/15 text-red-200">
+                {criticalAlertCount} criticas
+              </Badge>
+            )}
+            <Badge className="rounded-md border border-amber-400/20 bg-amber-400/10 text-amber-300">{requests.length} pendientes</Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="p-5">
@@ -122,15 +183,20 @@ export function KioskRequestsPanel() {
                 )}
                 {request.hasEarlyReplacementAlert && (
                   <div className="mt-3 rounded-lg border border-amber-400/25 bg-amber-500/10 p-3 text-sm font-semibold text-amber-100">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 text-amber-50">
                       <AlertTriangle className="h-4 w-4 text-amber-300" />
-                      Solicitud anticipada: revisar antes de aprobar.
+                      Alerta admin: EPP solicitado antes de cumplir vida util.
                     </div>
                     <div className="mt-2 space-y-1 text-xs font-medium text-amber-100/75">
                       {(request.earlyReplacementWarnings ?? []).map((warning) => (
                         <p key={`${warning.itemId}-${warning.sku}-${warning.size}`}>
+                          <span className={warning.severity === "critical" ? "text-red-200" : "text-amber-100"}>
+                            {warning.severity === "critical" ? "Critica" : "Preventiva"}
+                          </span>
+                          {" · "}
                           {warning.itemName}: usado {warning.daysUsed} de {warning.replacementDays} dias,
-                          faltan {warning.daysRemaining} dias.
+                          faltan {warning.daysRemaining} dias
+                          {warning.nextEligibleAt ? ` (libre desde ${alertDateLabel(warning.nextEligibleAt)})` : ""}.
                         </p>
                       ))}
                     </div>
@@ -154,17 +220,17 @@ export function KioskRequestsPanel() {
                     size="sm"
                     className="rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white"
                     disabled={updatingId === request.id}
-                    onClick={() => resolve(request.id, "approved")}
+                    onClick={() => resolve(request, "approved")}
                   >
                     {updatingId === request.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                    Aprobar
+                    {request.hasEarlyReplacementAlert ? "Aprobar con alerta" : "Aprobar"}
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     className="rounded-lg border-red-400/25 bg-red-400/10 text-red-300 hover:bg-red-400/15 hover:text-red-200"
                     disabled={updatingId === request.id}
-                    onClick={() => resolve(request.id, "rejected")}
+                    onClick={() => resolve(request, "rejected")}
                   >
                     <X className="h-4 w-4" />
                     Rechazar

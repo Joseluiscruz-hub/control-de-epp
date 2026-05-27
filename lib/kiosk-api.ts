@@ -414,6 +414,35 @@ export interface AdminKioskRequest {
   createdAt?: Date;
   hasEarlyReplacementAlert?: boolean;
   earlyReplacementWarnings?: KioskEarlyReplacementAlert[];
+  earlyReplacementAlertIds?: string[];
+}
+
+function normalizeEarlyReplacementAlert(input: unknown): KioskEarlyReplacementAlert | null {
+  if (!input || typeof input !== "object") return null;
+  const data = input as Record<string, unknown>;
+  const toDateValue = (value: unknown) => {
+    if (!value) return undefined;
+    if (value instanceof Date) return value;
+    if (typeof value === "string") return value;
+    if (typeof value === "object" && "toDate" in value && typeof value.toDate === "function") {
+      return (value.toDate() as Date).toISOString();
+    }
+    return undefined;
+  };
+
+  return {
+    itemId: String(data.itemId ?? ""),
+    itemName: String(data.itemName ?? ""),
+    sku: String(data.sku ?? ""),
+    size: String(data.size ?? ""),
+    replacementDays: Number(data.replacementDays ?? 0),
+    daysUsed: Number(data.daysUsed ?? 0),
+    daysRemaining: Number(data.daysRemaining ?? 0),
+    assignedAt: toDateValue(data.assignedAt),
+    nextEligibleAt: toDateValue(data.nextEligibleAt),
+    previousAssignmentId: typeof data.previousAssignmentId === "string" ? data.previousAssignmentId : undefined,
+    severity: data.severity === "critical" ? "critical" : "warning",
+  };
 }
 
 export async function listAdminKioskRequests(status: KioskRequestStatus = "pending", max = 25): Promise<AdminKioskRequest[]> {
@@ -441,7 +470,12 @@ export async function listAdminKioskRequests(status: KioskRequestStatus = "pendi
         createdAt: data.createdAt?.toDate?.(),
         hasEarlyReplacementAlert: data.hasEarlyReplacementAlert === true,
         earlyReplacementWarnings: Array.isArray(data.earlyReplacementWarnings)
-          ? (data.earlyReplacementWarnings as KioskEarlyReplacementAlert[])
+          ? data.earlyReplacementWarnings
+              .map(normalizeEarlyReplacementAlert)
+              .filter((alert): alert is KioskEarlyReplacementAlert => alert !== null)
+          : [],
+        earlyReplacementAlertIds: Array.isArray(data.earlyReplacementAlertIds)
+          ? data.earlyReplacementAlertIds.filter((id: unknown): id is string => typeof id === "string")
           : [],
       };
     });

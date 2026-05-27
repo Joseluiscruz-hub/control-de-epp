@@ -12,6 +12,7 @@ export const runtime = "nodejs";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const VALID_REASONS = new Set(["vida_util", "desgaste", "extravio"]);
+const ALERT_COLLECTION = "kiosk_alerts";
 
 class KioskRequestError extends Error {
   status: number;
@@ -222,6 +223,7 @@ export async function POST(req: NextRequest) {
     const requestRef = db.collection("kiosk_requests").doc();
     const statusRef = db.collection("kiosk_request_status").doc(requestRef.id);
     const employeeArea = readText(employee.area) || readText(employee.personnelArea) || readText(employee.plantArea);
+    const alertRefs = warnings.map(() => db.collection(ALERT_COLLECTION).doc());
 
     const batch = db.batch();
     batch.set(requestRef, {
@@ -232,6 +234,7 @@ export async function POST(req: NextRequest) {
       status: "pending",
       hasEarlyReplacementAlert: warnings.length > 0,
       earlyReplacementWarnings: warnings,
+      earlyReplacementAlertIds: alertRefs.map((ref) => ref.id),
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
       source: "kiosk",
@@ -244,12 +247,39 @@ export async function POST(req: NextRequest) {
       updatedAt: FieldValue.serverTimestamp(),
     });
 
+    warnings.forEach((warning, index) => {
+      batch.set(alertRefs[index], {
+        type: "early_epp_request",
+        status: "open",
+        severity: warning.severity,
+        requestId: requestRef.id,
+        employeeId,
+        employeeName,
+        employeeArea,
+        itemId: warning.itemId,
+        itemName: warning.itemName,
+        sku: warning.sku,
+        size: warning.size,
+        replacementDays: warning.replacementDays,
+        daysUsed: warning.daysUsed,
+        daysRemaining: warning.daysRemaining,
+        assignedAt: warning.assignedAt ?? null,
+        nextEligibleAt: warning.nextEligibleAt ?? null,
+        previousAssignmentId: warning.previousAssignmentId ?? null,
+        message: `${employeeName} solicito ${warning.itemName} antes de cumplir vida util; faltan ${warning.daysRemaining} dias.`,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        source: "kiosk",
+      });
+    });
+
     await batch.commit();
 
     return Response.json({
       requestId: requestRef.id,
       hasEarlyReplacementAlert: warnings.length > 0,
       earlyReplacementWarnings: warnings.length,
+      earlyReplacementAlertIds: alertRefs.map((ref) => ref.id),
     });
   } catch (error) {
     if (error instanceof KioskRequestError) {
@@ -296,6 +326,22 @@ export async function PATCH(req: NextRequest) {
       },
       { merge: true }
     );
+
+    const alertsSnap = await db
+      .collection(ALERT_COLLECTION)
+      .where("requestId", "==", requestId)
+      .limit(50)
+      .get();
+
+    alertsSnap.docs.forEach((alertDoc) => {
+      batch.update(alertDoc.ref, {
+        status: status === "approved" ? "acknowledged" : "dismissed",
+        requestStatus: status,
+        resolvedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+
     await batch.commit();
 
     return Response.json({ success: true, requestId, status });
