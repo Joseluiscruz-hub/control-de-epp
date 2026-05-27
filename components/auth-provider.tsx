@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { ShieldCheck, Fingerprint, Lock, ArrowRight, HardHat } from 'lucide-react';
 import { motion } from 'motion/react';
+import { toast } from 'sonner';
 
 // Lista de administradores — configurable por variable de entorno
 // En GitHub Variables → ADMIN_EMAILS (separados por comas)
@@ -69,10 +70,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (window.localStorage.getItem(OFFLINE_SESSION_KEY) === 'true') {
-      const timeout = window.setTimeout(() => {
-        startOfflineSession();
-      }, 0);
-      return () => window.clearTimeout(timeout);
+      if (navigator.onLine !== false) {
+        window.localStorage.removeItem(OFFLINE_SESSION_KEY);
+      } else {
+        const timeout = window.setTimeout(() => {
+          startOfflineSession();
+        }, 0);
+        return () => window.clearTimeout(timeout);
+      }
     }
 
     const authTimeout = window.setTimeout(() => {
@@ -120,6 +125,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async () => {
     const provider = new GoogleAuthProvider();
+    window.localStorage.removeItem(OFFLINE_SESSION_KEY);
+    setIsOfflineSession(false);
     try {
       await signInWithPopup(auth, provider);
     } catch (error) {
@@ -164,6 +171,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading, signIn, signInOffline, isAdmin, logOut } = useAuth();
   const pathname = usePathname();
+
+  const handleOnlineSignIn = async () => {
+    try {
+      await signIn();
+    } catch (error) {
+      console.error('[Online sign in error]', error);
+      const code =
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        typeof (error as { code?: unknown }).code === 'string'
+          ? (error as { code: string }).code
+          : '';
+
+      if (code === 'auth/popup-blocked') {
+        toast.error('El navegador bloqueó la ventana de Google. Permite popups para iniciar sesión.');
+      } else if (code === 'auth/unauthorized-domain') {
+        toast.error('Este dominio no está autorizado en Firebase Auth.');
+      } else {
+        toast.error('No se pudo iniciar sesión en modo online. Intenta de nuevo.');
+      }
+    }
+  };
 
   // Permitir acceso total al portal público y kiosko
   if (pathname?.startsWith('/portal') || pathname?.startsWith('/kiosko')) {
@@ -243,7 +273,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
               </div>
 
               <Button 
-                onClick={signIn} 
+                onClick={() => void handleOnlineSignIn()} 
                 className="w-full h-16 rounded-lg bg-[#F40009] hover:bg-red-700 shadow-xl shadow-red-950/30 transition-all duration-300 text-white font-black uppercase tracking-widest text-xs gap-4 group active:scale-[0.98]"
               >
                 <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
