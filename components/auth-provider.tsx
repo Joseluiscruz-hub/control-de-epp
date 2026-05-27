@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, ensureFirebaseReady } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { ShieldCheck, Fingerprint, Lock, ArrowRight, HardHat } from 'lucide-react';
@@ -69,6 +69,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    let unavailableTimeout: number | undefined;
+
     if (window.localStorage.getItem(OFFLINE_SESSION_KEY) === 'true') {
       if (navigator.onLine !== false) {
         window.localStorage.removeItem(OFFLINE_SESSION_KEY);
@@ -81,45 +85,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const authTimeout = window.setTimeout(() => {
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }, 5000);
 
-    try {
-      const unsubscribe = onAuthStateChanged(auth, (u) => {
-        window.clearTimeout(authTimeout);
-        setIsOfflineSession(false);
-        setUser(u);
-        // Validar admin contra la lista de emails autorizados
-        if (u?.email) {
-          const userEmail = u.email.toLowerCase();
-          setIsAdmin(ADMIN_EMAILS.includes(userEmail));
-        } else {
+    const initializeAuthListener = async () => {
+      try {
+        await ensureFirebaseReady();
+        if (cancelled) return;
+
+        unsubscribe = onAuthStateChanged(auth, (u) => {
+          window.clearTimeout(authTimeout);
+          setIsOfflineSession(false);
+          setUser(u);
+          // Validar admin contra la lista de emails autorizados
+          if (u?.email) {
+            const userEmail = u.email.toLowerCase();
+            setIsAdmin(ADMIN_EMAILS.includes(userEmail));
+          } else {
+            setIsAdmin(false);
+          }
+          setLoading(false);
+        }, (error) => {
+          window.clearTimeout(authTimeout);
+          console.error('[Auth state error]', error);
+          setUser(null);
           setIsAdmin(false);
-        }
-        setLoading(false);
-      }, (error) => {
+          setIsOfflineSession(false);
+          setLoading(false);
+        });
+      } catch (error) {
         window.clearTimeout(authTimeout);
-        console.error('[Auth state error]', error);
-        setUser(null);
-        setIsAdmin(false);
-        setIsOfflineSession(false);
-        setLoading(false);
-      });
-      return () => {
-        window.clearTimeout(authTimeout);
-        unsubscribe();
-      };
-    } catch (error) {
+        console.warn('[Auth unavailable, offline mode can be used]', error);
+        unavailableTimeout = window.setTimeout(() => {
+          if (cancelled) return;
+          setUser(null);
+          setIsAdmin(false);
+          setIsOfflineSession(false);
+          setLoading(false);
+        }, 0);
+      }
+    };
+
+    void initializeAuthListener();
+
+    return () => {
+      cancelled = true;
       window.clearTimeout(authTimeout);
-      console.warn('[Auth unavailable, offline mode can be used]', error);
-      const timeout = window.setTimeout(() => {
-        setUser(null);
-        setIsAdmin(false);
-        setIsOfflineSession(false);
-        setLoading(false);
-      }, 0);
-      return () => window.clearTimeout(timeout);
-    }
+      if (unavailableTimeout) window.clearTimeout(unavailableTimeout);
+      unsubscribe?.();
+    };
   }, []);
 
 
@@ -128,6 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.removeItem(OFFLINE_SESSION_KEY);
     setIsOfflineSession(false);
     try {
+      await ensureFirebaseReady();
       await signInWithPopup(auth, provider);
     } catch (error) {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -152,6 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      await ensureFirebaseReady();
       await signOut(auth);
     } catch (error) {
       console.warn('[Sign out skipped because Firebase auth is unavailable]', error);
