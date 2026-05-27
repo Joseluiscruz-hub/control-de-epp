@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getEmployeeById } from "@/lib/kiosk-api";
 import { Loader2, HardHat, ShieldCheck } from "lucide-react";
-import { clearKioskSession } from "@/lib/kiosk-session";
-import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
+import { clearKioskSession, setKioskSessionBusy } from "@/lib/kiosk-session";
 
 function getKioskConnectionErrorMessage(error: unknown) {
   const code =
@@ -33,21 +32,10 @@ export default function KioskoHomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleTimeout = useCallback(() => {
-    clearKioskSession();
-    setEmpId("");
-    setError("");
-    router.replace("/kiosko");
-  }, [router]);
-
-  useKioskInactivityTimeout({
-    timeoutMs: 2 * 60 * 1000,
-    onTimeout: handleTimeout,
-  });
-
   const handleContinue = async () => {
     if (!empId.trim()) return;
     setLoading(true);
+    setKioskSessionBusy(true);
     setError("");
     try {
       const emp = await getEmployeeById(empId.trim());
@@ -78,6 +66,8 @@ export default function KioskoHomePage() {
       console.error("[Kiosko employee lookup error]", error);
       setError(getKioskConnectionErrorMessage(error));
       setLoading(false);
+    } finally {
+      setKioskSessionBusy(false);
     }
   };
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { dispenseEPP } from "@/lib/kiosk-api";
+import { clearKioskSession, setKioskSessionBusy } from "@/lib/kiosk-session";
 import { CheckCircle2, AlertTriangle, Clock, Loader2, HardHat } from "lucide-react";
 
 export default function KioskoConfirmacionPage() {
@@ -31,6 +32,7 @@ export default function KioskoConfirmacionPage() {
   const handleConfirm = async () => {
     if (!solicitud) return;
     setStep("loading");
+    setKioskSessionBusy(true);
     try {
       await dispenseEPP({
         employeeId: solicitud.employeeId,
@@ -52,11 +54,13 @@ export default function KioskoConfirmacionPage() {
       const t = setInterval(() => {
         c--;
         setCountdown(c);
-        if (c <= 0) { clearInterval(t); sessionStorage.clear(); router.push("/kiosko"); }
+        if (c <= 0) { clearInterval(t); clearKioskSession(); router.push("/kiosko"); }
       }, 1000);
     } catch (e: any) {
       setErrorMsg(e?.message ?? "Error al procesar. Llama al supervisor.");
       setStep("error");
+    } finally {
+      setKioskSessionBusy(false);
     }
   };
 
@@ -126,7 +130,7 @@ export default function KioskoConfirmacionPage() {
         Regresando al inicio en <strong className="text-amber-400">{countdown}s</strong>
       </div>
       <button
-        onClick={() => { sessionStorage.clear(); router.push("/kiosko"); }}
+        onClick={() => { clearKioskSession(); router.push("/kiosko"); }}
         className="px-8 py-4 bg-white/10 hover:bg-white/15 rounded-lg text-white font-semibold transition-colors"
       >
         Finalizar ahora

@@ -7,6 +7,7 @@ const KIOSK_SESSION_KEYS = [
   "kiosk_selected_item",
   "kiosk_solicitud",
   "kiosk_request_id",
+  "kiosk_operation_in_progress",
 ];
 
 /**
@@ -18,4 +19,18 @@ export function clearKioskSession() {
   for (const key of KIOSK_SESSION_KEYS) {
     sessionStorage.removeItem(key);
   }
+}
+
+export function setKioskSessionBusy(isBusy: boolean) {
+  if (typeof window === "undefined") return;
+  if (isBusy) {
+    sessionStorage.setItem("kiosk_operation_in_progress", "true");
+    return;
+  }
+  sessionStorage.removeItem("kiosk_operation_in_progress");
+}
+
+export function isKioskSessionBusy() {
+  if (typeof window === "undefined") return false;
+  return sessionStorage.getItem("kiosk_operation_in_progress") === "true";
 }

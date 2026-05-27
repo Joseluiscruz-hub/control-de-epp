@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "../../app/globals.css";
+import { KioskInactivityGuard } from "@/components/kiosk-inactivity-guard";
 import { KioskoClock } from "./kiosko-clock";
 
 export const metadata: Metadata = {
@@ -26,9 +27,11 @@ export default function KioskoLayout({ children }: { children: React.ReactNode }
         </div>
         <KioskoClock />
       </header>
-      <main className="flex-1 flex flex-col">
-        {children}
-      </main>
+      <KioskInactivityGuard>
+        <main className="flex-1 flex flex-col">
+          {children}
+        </main>
+      </KioskInactivityGuard>
     </div>
   );
 }

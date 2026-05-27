@@ -6,8 +6,7 @@ import { createKioskRequest, getPPECatalog } from "@/lib/kiosk-api";
 import { KioskRequestItem, PPECatalogItem, ReplacementReason } from "@/lib/kiosk-types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle, CheckCircle2, DollarSign, Footprints, Glasses, Hand, HardHat, Headphones, Loader2, Package, Search, Shirt, Wind } from "lucide-react";
-import { clearKioskSession } from "@/lib/kiosk-session";
-import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
+import { clearKioskSession, setKioskSessionBusy } from "@/lib/kiosk-session";
 
 const CATEGORY_ICONS: Record<string, ReactNode> = {
   Guantes: <Hand className="h-5 w-5" />,
@@ -75,11 +74,6 @@ export default function KioskoCatalogoPage() {
     clearKioskSession();
     router.replace("/kiosko");
   }, [router]);
-
-  useKioskInactivityTimeout({
-    timeoutMs: 2 * 60 * 1000,
-    onTimeout: returnToLogin,
-  });
 
   useEffect(() => {
     const verified = sessionStorage.getItem("kiosk_pin_verified");
@@ -157,6 +151,7 @@ export default function KioskoCatalogoPage() {
     }
 
     setSubmitting(true);
+    setKioskSessionBusy(true);
     setSubmitError("");
     setReasonDialogOpen(false);
     try {
@@ -173,6 +168,7 @@ export default function KioskoCatalogoPage() {
     } catch {
       setSubmitError("No se pudo enviar la solicitud. Intenta nuevamente.");
     } finally {
+      setKioskSessionBusy(false);
       setSubmitting(false);
     }
   };

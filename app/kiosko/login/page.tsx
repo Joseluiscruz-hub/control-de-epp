@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { validateEmployeePin } from "@/lib/kiosk-api";
+import { setKioskSessionBusy } from "@/lib/kiosk-session";
 import { Lock, Loader2 } from "lucide-react";
 
 export default function KioskoLoginPage() {
@@ -33,21 +34,42 @@ export default function KioskoLoginPage() {
     if (k === "✓") {
       if (pin.length < 6) { setError("Ingresa los 6 dígitos."); return; }
       setLoading(true);
-      const valid = await validateEmployeePin(employeeId, pin);
-      if (valid) {
-        sessionStorage.setItem("kiosk_pin_verified", "true");
-        router.push("/kiosko/catalogo");
-      } else {
-        const next = attempts + 1;
-        setAttempts(next);
-        setPin("");
-        if (next >= MAX_ATTEMPTS) {
-          setError("Demasiados intentos fallidos. Contacta a tu supervisor.");
+      setKioskSessionBusy(true);
+      try {
+        const valid = await validateEmployeePin(employeeId, pin);
+        if (valid) {
+          sessionStorage.setItem("kiosk_pin_verified", "true");
+          router.push("/kiosko/catalogo");
         } else {
-          setError(`PIN incorrecto. Te quedan ${MAX_ATTEMPTS - next} intento(s).`);
+          const next = attempts + 1;
+          setAttempts(next);
+          setPin("");
+          if (next >= MAX_ATTEMPTS) {
+            setError("Demasiados intentos fallidos. Contacta a tu supervisor.");
+          } else {
+            setError(`PIN incorrecto. Te quedan ${MAX_ATTEMPTS - next} intento(s).`);
+          }
         }
+      } catch (error) {
+        const status =
+          typeof error === "object" &&
+          error !== null &&
+          "status" in error &&
+          typeof (error as { status?: unknown }).status === "number"
+            ? (error as { status: number }).status
+            : 0;
+
+        setPin("");
+        if (status === 429) {
+          setAttempts(MAX_ATTEMPTS);
+          setError(error instanceof Error ? error.message : "Demasiados intentos fallidos. Intenta mas tarde.");
+        } else {
+          setError(error instanceof Error ? error.message : "No se pudo validar el PIN.");
+        }
+      } finally {
+        setKioskSessionBusy(false);
+        setLoading(false);
       }
-      setLoading(false);
       return;
     }
     if (pin.length < 6) setPin(p => p + k);

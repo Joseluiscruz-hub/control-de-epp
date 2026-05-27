@@ -2,49 +2,17 @@ import bcrypt from "bcryptjs";
 import { FieldValue } from "firebase-admin/firestore";
 import { NextRequest } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
+import {
+  assertKioskPinRateLimit,
+  clearKioskPinFailures,
+  getKioskPinClientRateLimitKey,
+  getKioskPinRateLimitKey,
+  kioskPinRateLimitResponse,
+  registerKioskPinFailure,
+} from "@/lib/kiosk-pin-rate-limit";
 import { isSixDigitPin, legacyHashPin } from "@/lib/pin-utils";
 
 export const runtime = "nodejs";
-
-const MAX_ATTEMPTS = 5;
-const WINDOW_MS = 10 * 60 * 1000;
-const attempts = new Map<string, { count: number; resetAt: number }>();
-
-function getAttemptKey(req: NextRequest, employeeId: string) {
-  const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const realIp = req.headers.get("x-real-ip")?.trim();
-  return `${forwardedFor || realIp || "unknown"}:${employeeId}`;
-}
-
-function assertNotLocked(key: string) {
-  const now = Date.now();
-  const current = attempts.get(key);
-
-  if (!current || current.resetAt <= now) {
-    attempts.delete(key);
-    return;
-  }
-
-  if (current.count >= MAX_ATTEMPTS) {
-    const seconds = Math.ceil((current.resetAt - now) / 1000);
-    return Response.json(
-      { valid: false, error: `Demasiados intentos. Espera ${seconds} segundos.` },
-      { status: 429 }
-    );
-  }
-}
-
-function registerFailure(key: string) {
-  const now = Date.now();
-  const current = attempts.get(key);
-
-  if (!current || current.resetAt <= now) {
-    attempts.set(key, { count: 1, resetAt: now + WINDOW_MS });
-    return;
-  }
-
-  attempts.set(key, { ...current, count: current.count + 1 });
-}
 
 async function comparePin(pin: string, storedPin: string) {
   if (storedPin.startsWith("$2a$") || storedPin.startsWith("$2b$") || storedPin.startsWith("$2y$")) {
@@ -52,6 +20,14 @@ async function comparePin(pin: string, storedPin: string) {
   }
 
   return storedPin === legacyHashPin(pin);
+}
+
+async function registerFailure(db: ReturnType<typeof getAdminDb>, employeeKey: string, clientKey: string) {
+  const [employeeStatus, clientStatus] = await Promise.all([
+    registerKioskPinFailure(db, employeeKey, "verify", "employee"),
+    registerKioskPinFailure(db, clientKey, "verify", "client"),
+  ]);
+  return employeeStatus.blocked ? employeeStatus : clientStatus;
 }
 
 export async function POST(req: NextRequest) {
@@ -64,27 +40,35 @@ export async function POST(req: NextRequest) {
       return Response.json({ valid: false, error: "Empleado y PIN de 6 digitos requeridos." }, { status: 400 });
     }
 
-    const attemptKey = getAttemptKey(req, employeeId);
-    const lockResponse = assertNotLocked(attemptKey);
-    if (lockResponse) return lockResponse;
+    const db = getAdminDb();
+    const attemptKey = getKioskPinRateLimitKey(req, employeeId, "verify");
+    const clientAttemptKey = getKioskPinClientRateLimitKey(req, "verify");
+    const [rateLimit, clientRateLimit] = await Promise.all([
+      assertKioskPinRateLimit(db, attemptKey, "employee"),
+      assertKioskPinRateLimit(db, clientAttemptKey, "client"),
+    ]);
+    if (rateLimit.blocked) return kioskPinRateLimitResponse(rateLimit, true);
+    if (clientRateLimit.blocked) return kioskPinRateLimitResponse(clientRateLimit, true);
 
-    const employeeRef = getAdminDb().collection("kiosk_employees").doc(employeeId);
+    const employeeRef = db.collection("kiosk_employees").doc(employeeId);
     const snapshot = await employeeRef.get();
     const employee = snapshot.data();
     const storedPin = typeof employee?.pin === "string" ? employee.pin : "";
 
     if (!snapshot.exists || employee?.active !== true || !storedPin) {
-      registerFailure(attemptKey);
+      const nextRateLimit = await registerFailure(db, attemptKey, clientAttemptKey);
+      if (nextRateLimit.blocked) return kioskPinRateLimitResponse(nextRateLimit, true);
       return Response.json({ valid: false, error: "PIN incorrecto." }, { status: 401 });
     }
 
     const valid = await comparePin(pin, storedPin);
     if (!valid) {
-      registerFailure(attemptKey);
+      const nextRateLimit = await registerFailure(db, attemptKey, clientAttemptKey);
+      if (nextRateLimit.blocked) return kioskPinRateLimitResponse(nextRateLimit, true);
       return Response.json({ valid: false, error: "PIN incorrecto." }, { status: 401 });
     }
 
-    attempts.delete(attemptKey);
+    await clearKioskPinFailures(db, attemptKey);
 
     if (!storedPin.startsWith("$2")) {
       const upgradedHash = await bcrypt.hash(pin, 12);

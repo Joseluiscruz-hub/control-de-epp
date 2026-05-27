@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Clock3, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { getKioskRequestStatus } from "@/lib/kiosk-api";
 import { clearKioskSession } from "@/lib/kiosk-session";
-import { useKioskInactivityTimeout } from "@/hooks/use-kiosk-inactivity-timeout";
 
 type ViewStatus = "pending" | "approved" | "rejected";
 // Balancea refresco percibido por usuario y carga de lecturas en Firestore.
@@ -23,11 +22,6 @@ export default function KioskoEsperaPage() {
     clearKioskSession();
     router.replace("/kiosko");
   }, [router]);
-
-  useKioskInactivityTimeout({
-    timeoutMs: 2 * 60 * 1000,
-    onTimeout: returnToLogin,
-  });
 
   useEffect(() => {
     const requestId = sessionStorage.getItem("kiosk_request_id");
