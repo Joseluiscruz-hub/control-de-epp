@@ -82,7 +82,6 @@ service cloud.firestore {
       // Lista de administradores autorizados
       // Para agregar admins: añade el email de Google del usuario a esta lista
       return request.auth != null
-        && request.auth.token.email_verified == true
         && request.auth.token.email in [
           'mimonkb222@gmail.com',
           'malvamora23@gmail.com'
