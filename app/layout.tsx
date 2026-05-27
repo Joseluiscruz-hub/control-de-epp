@@ -1,4 +1,5 @@
 import type {Metadata} from 'next';
+import Script from 'next/script';
 import './globals.css';
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -15,33 +16,6 @@ const inter = Inter({
   variable: '--font-sans',
   display: 'swap',
 });
-
-function getRuntimeFirebaseConfig() {
-  const measurementId =
-    process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID ||
-    process.env.FIREBASE_MEASUREMENT_ID ||
-    "";
-
-  return {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || "",
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || "",
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || "",
-    storageBucket:
-      process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-      process.env.FIREBASE_STORAGE_BUCKET ||
-      "",
-    messagingSenderId:
-      process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ||
-      process.env.FIREBASE_MESSAGING_SENDER_ID ||
-      "",
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || "",
-    ...(measurementId ? { measurementId } : {}),
-    firestoreDatabaseId:
-      process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID ||
-      process.env.FIREBASE_DATABASE_ID ||
-      "(default)",
-  };
-}
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://assetguard.local'),
@@ -67,16 +41,10 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
-  const runtimeFirebaseConfig = getRuntimeFirebaseConfig();
-
   return (
     <html lang="es" className={cn("font-sans", inter.variable)}>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `window.__ASSETGUARD_FIREBASE_CONFIG__=${JSON.stringify(runtimeFirebaseConfig).replace(/</g, "\\u003c")};`,
-          }}
-        />
+        <Script src="/firebase-config.js" strategy="beforeInteractive" />
         <meta name="theme-color" content="#040813" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

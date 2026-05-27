@@ -1,4 +1,4 @@
-const CACHE_VERSION = "assetguard-pwa-v3";
+const CACHE_VERSION = "assetguard-pwa-v4";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
