@@ -6,16 +6,41 @@ type FirebaseAppConfig = FirebaseOptions & {
   firestoreDatabaseId: string;
 };
 
+type RuntimeFirebaseConfig = Partial<FirebaseOptions> & {
+  firestoreDatabaseId?: string;
+};
+
+declare global {
+  interface Window {
+    __ASSETGUARD_FIREBASE_CONFIG__?: RuntimeFirebaseConfig;
+  }
+}
+
+function getRuntimeConfig() {
+  if (typeof window === 'undefined') return undefined;
+  return window.__ASSETGUARD_FIREBASE_CONFIG__;
+}
+
 function getFirebaseConfig(): FirebaseAppConfig {
-  const measurementId = process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID ?? '';
-  const firestoreDatabaseId = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID;
+  const runtimeConfig = getRuntimeConfig();
+  const measurementId =
+    process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID ??
+    runtimeConfig?.measurementId ??
+    '';
+  const firestoreDatabaseId =
+    process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID ??
+    runtimeConfig?.firestoreDatabaseId;
+
   return {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? '',
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '',
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? '',
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '',
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? '',
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? '',
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? runtimeConfig?.apiKey ?? '',
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? runtimeConfig?.authDomain ?? '',
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? runtimeConfig?.projectId ?? '',
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? runtimeConfig?.storageBucket ?? '',
+    messagingSenderId:
+      process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ??
+      runtimeConfig?.messagingSenderId ??
+      '',
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? runtimeConfig?.appId ?? '',
     ...(measurementId ? { measurementId } : {}),
     firestoreDatabaseId:
       firestoreDatabaseId && firestoreDatabaseId !== '(default)'

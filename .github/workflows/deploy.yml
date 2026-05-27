@@ -76,10 +76,18 @@ jobs:
 
           runtime_vars = {
             "NODE_ENV": "production",
+            "FIREBASE_API_KEY": os.environ["FIREBASE_API_KEY"],
+            "FIREBASE_AUTH_DOMAIN": os.environ["FIREBASE_AUTH_DOMAIN"],
             "FIREBASE_PROJECT_ID": os.environ["FIREBASE_PROJECT_ID"],
+            "FIREBASE_STORAGE_BUCKET": os.environ["FIREBASE_STORAGE_BUCKET"],
+            "FIREBASE_MESSAGING_SENDER_ID": os.environ["FIREBASE_MESSAGING_SENDER_ID"],
+            "FIREBASE_APP_ID": os.environ["FIREBASE_APP_ID"],
             "FIREBASE_DATABASE_ID": os.environ["FIREBASE_DATABASE_ID"],
             "ADMIN_EMAILS": os.environ["ADMIN_EMAILS"],
           }
+
+          if measurement_id:
+            runtime_vars["FIREBASE_MEASUREMENT_ID"] = measurement_id
 
           def write_yaml(path, values):
             with open(path, "w", encoding="utf-8") as f:
