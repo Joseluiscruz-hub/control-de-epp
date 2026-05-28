@@ -58,8 +58,8 @@ export function NavBar() {
           ? 'navbar-glass shadow-xl shadow-black/30'
           : 'bg-transparent'
       }`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between gap-4">
+        <div className="w-full px-3 sm:px-4 lg:px-6">
+          <div className="flex h-16 items-center justify-between gap-2 lg:gap-3">
 
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group relative shrink-0" aria-label="Ir al dashboard de AssetGuard">
@@ -77,10 +77,10 @@ export function NavBar() {
               </div>
             </Link>
 
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="flex items-center gap-1.5 lg:gap-2 min-w-0 overflow-hidden">
 
               {/* Desktop Nav */}
-              <nav className="hidden lg:flex items-center gap-1 p-1 rounded-lg" style={{background:'rgba(255,255,255,0.055)', border:'1px solid rgba(255,255,255,0.1)'}} aria-label="Navegación principal">
+              <nav className="hidden lg:flex items-center gap-0.5 p-1 rounded-lg" style={{background:'rgba(255,255,255,0.055)', border:'1px solid rgba(255,255,255,0.1)'}} aria-label="Navegación principal">
                 {NAV_LINKS.map(link => {
                   const isActive = pathname === link.href;
                   return (
@@ -88,7 +88,7 @@ export function NavBar() {
                       key={link.href}
                       href={link.href}
                       aria-current={isActive ? 'page' : undefined}
-                      className={`relative flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all duration-300 ${
+                      className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all duration-300 whitespace-nowrap ${
                         isActive
                           ? 'text-white shadow-lg'
                           : 'text-white/40 hover:text-white/80 hover:bg-white/5'
@@ -111,58 +111,58 @@ export function NavBar() {
                 })}
               </nav>
 
-              <div className="hidden xl:block">
+              <div className="hidden 2xl:block">
                 <PlantContextSwitcher />
               </div>
 
               {/* External links */}
               <Link href="/portal" target="_blank">
-                <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-1.5 text-white/40 hover:text-white/75 hover:bg-white/5 rounded-lg font-semibold transition-all text-xs">
+                <Button variant="ghost" size="sm" className="hidden xl:flex items-center gap-1.5 text-white/40 hover:text-white/75 hover:bg-white/5 rounded-lg font-semibold transition-all text-xs">
                   <ExternalLink className="h-3.5 w-3.5" />
                   Portal
                 </Button>
               </Link>
 
               <Link href="/kiosko" target="_blank">
-                <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-1.5 text-white/40 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg font-semibold transition-all text-xs">
+                <Button variant="ghost" size="sm" className="hidden xl:flex items-center gap-1.5 text-white/40 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg font-semibold transition-all text-xs">
                   <HardHat className="h-3.5 w-3.5" />
                   Kiosko
                 </Button>
               </Link>
 
-              {/* ARIA status */}
-              <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{background:'rgba(212,160,23,0.09)', border:'1px solid rgba(212,160,23,0.18)'}}>
-                <div className="relative">
-                  <Bot className="h-3.5 w-3.5" style={{color:'#D4A017'}} />
-                  <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-emerald-500 rounded-full border border-[#040813]" />
+              {/* ARIA + Live combined indicator */}
+              <div className="hidden lg:flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md" style={{background:'rgba(212,160,23,0.09)', border:'1px solid rgba(212,160,23,0.18)'}}>
+                  <div className="relative">
+                    <Bot className="h-3 w-3" style={{color:'#D4A017'}} />
+                    <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-emerald-500 rounded-full border border-[#040813]" />
+                  </div>
+                  <span className="text-[9px] font-bold uppercase tracking-wider hidden xl:inline" style={{color:'#D4A017'}}>ARIA</span>
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider" style={{color:'#D4A017'}}>ARIA</span>
-              </div>
-
-              {/* Live indicator */}
-              <div
-                className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
-                style={{
-                  background: online && !isOfflineSession ? 'rgba(16,185,129,0.06)' : 'rgba(245,158,11,0.08)',
-                  border: online && !isOfflineSession ? '1px solid rgba(16,185,129,0.12)' : '1px solid rgba(245,158,11,0.18)',
-                }}
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${online && !isOfflineSession ? 'bg-emerald-400' : 'bg-amber-400'} opacity-50`}></span>
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${online && !isOfflineSession ? 'bg-emerald-500' : 'bg-amber-400'}`}></span>
-                </span>
-                <span className={`text-[9px] font-black uppercase tracking-widest ${online && !isOfflineSession ? 'text-emerald-400' : 'text-amber-300'}`}>
-                  {online && !isOfflineSession ? 'Live' : 'Offline'}
-                </span>
+                <div
+                  className="flex items-center gap-1 px-2 py-1 rounded-md"
+                  style={{
+                    background: online && !isOfflineSession ? 'rgba(16,185,129,0.06)' : 'rgba(245,158,11,0.08)',
+                    border: online && !isOfflineSession ? '1px solid rgba(16,185,129,0.12)' : '1px solid rgba(245,158,11,0.18)',
+                  }}
+                >
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${online && !isOfflineSession ? 'bg-emerald-400' : 'bg-amber-400'} opacity-50`}></span>
+                    <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${online && !isOfflineSession ? 'bg-emerald-500' : 'bg-amber-400'}`}></span>
+                  </span>
+                  <span className={`text-[8px] font-black uppercase tracking-widest ${online && !isOfflineSession ? 'text-emerald-400' : 'text-amber-300'}`}>
+                    {online && !isOfflineSession ? 'Live' : 'Off'}
+                  </span>
+                </div>
               </div>
 
               {/* User profile */}
-              <div className="hidden sm:flex items-center gap-2 pl-1">
-                <div className="hidden xl:flex flex-col items-end">
-                  <span className="text-xs font-semibold text-white/70 truncate max-w-[100px]">
+              <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+                <div className="hidden 2xl:flex flex-col items-end">
+                  <span className="text-[11px] font-semibold text-white/70 truncate max-w-[80px]">
                     {authUser?.displayName?.split(' ')[0] || 'Admin'}
                   </span>
-                  <span className="text-[9px] font-bold uppercase tracking-wider" style={{color:'rgba(16,185,129,0.8)'}}>
+                  <span className="text-[8px] font-bold uppercase tracking-wider" style={{color:'rgba(16,185,129,0.8)'}}>
                     {isGlobalAdmin ? 'Global' : isAdmin ? 'Local' : 'Editor'}
                   </span>
                 </div>
@@ -170,23 +170,23 @@ export function NavBar() {
                   <img
                     src={authUser.photoURL}
                     alt="Perfil"
-                    className="h-8 w-8 rounded-full ring-2 ring-white/10 hover:ring-red-500/40 transition-all"
+                    className="h-7 w-7 rounded-full ring-2 ring-white/10 hover:ring-red-500/40 transition-all shrink-0"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ring-2 ring-white/10" style={{background:'rgba(244,0,9,0.15)', color:'#F40009'}}>
+                  <div className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold ring-2 ring-white/10 shrink-0" style={{background:'rgba(244,0,9,0.15)', color:'#F40009'}}>
                     {authUser?.email?.charAt(0).toUpperCase() || 'A'}
                   </div>
                 )}
-                <div className="h-6 w-px mx-1" style={{background:'rgba(255,255,255,0.08)'}} />
+                <div className="h-5 w-px" style={{background:'rgba(255,255,255,0.08)'}} />
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={logOut}
                   aria-label="Cerrar sesión"
-                  className="h-8 w-8 text-white/35 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                  className="h-7 w-7 text-white/35 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all shrink-0"
                 >
-                  <LogOut className="h-4 w-4" />
+                  <LogOut className="h-3.5 w-3.5" />
                 </Button>
               </div>
 
