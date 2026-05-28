@@ -28,6 +28,7 @@ import {
 } from "./kiosk-local-store";
 import { calcNextReplacementDate } from "./replacement-logic";
 import { legacyHashPin } from "./pin-utils";
+import type { ActivePlantId } from "./plants";
 
 class KioskApiError extends Error {
   status: number;
@@ -326,6 +327,7 @@ export async function dispenseEPP(params: DispenseParams): Promise<string> {
 export async function createKioskRequest(input: {
   employeeId: string;
   employeeName: string;
+  plantaId?: string;
   items: KioskRequestItem[];
 }): Promise<string> {
   try {
@@ -358,6 +360,7 @@ export async function createKioskRequest(input: {
     batch.set(ref, {
       employeeId: input.employeeId,
       employeeName: input.employeeName,
+      ...(input.plantaId ? { plantaId: input.plantaId } : {}),
       items: input.items,
       status: "pending",
       createdAt: serverTimestamp(),
@@ -368,6 +371,7 @@ export async function createKioskRequest(input: {
     batch.set(doc(db, "kiosk_request_status", ref.id), {
       requestId: ref.id,
       status: "pending",
+      ...(input.plantaId ? { plantaId: input.plantaId } : {}),
       source: "kiosk",
       updatedAt: serverTimestamp(),
     });
@@ -409,6 +413,7 @@ export interface AdminKioskRequest {
   employeeId: string;
   employeeName: string;
   employeeArea?: string;
+  plantaId?: string;
   items: KioskRequestItem[];
   status: KioskRequestStatus;
   createdAt?: Date;
@@ -446,16 +451,26 @@ function normalizeEarlyReplacementAlert(input: unknown): KioskEarlyReplacementAl
   };
 }
 
-export async function listAdminKioskRequests(status: KioskRequestStatus = "pending", max = 25): Promise<AdminKioskRequest[]> {
+export async function listAdminKioskRequests(
+  status: KioskRequestStatus = "pending",
+  max = 25,
+  activePlantId: ActivePlantId = "todas"
+): Promise<AdminKioskRequest[]> {
   const localRequests = listLocalKioskRequests(status, max);
 
   try {
     await ensureFirebaseReady();
+    const constraints = activePlantId === "todas"
+      ? [where("status", "==", status), limit(Math.max(1, Math.min(max, 50)))]
+      : [
+          where("status", "==", status),
+          where("plantaId", "==", activePlantId),
+          limit(Math.max(1, Math.min(max, 50))),
+        ];
     const snap = await getDocs(
       query(
         collection(db, "kiosk_requests"),
-        where("status", "==", status),
-        limit(Math.max(1, Math.min(max, 50)))
+        ...constraints
       )
     );
 
@@ -466,6 +481,7 @@ export async function listAdminKioskRequests(status: KioskRequestStatus = "pendi
         employeeId: data.employeeId ?? "",
         employeeName: data.employeeName ?? "",
         employeeArea: data.employeeArea ?? "",
+        plantaId: data.plantaId ?? "",
         items: Array.isArray(data.items) ? (data.items as KioskRequestItem[]) : [],
         status: data.status as KioskRequestStatus,
         createdAt: data.createdAt?.toDate?.(),

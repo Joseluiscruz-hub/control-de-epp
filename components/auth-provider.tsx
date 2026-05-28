@@ -2,12 +2,15 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { auth, ensureFirebaseReady } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db, ensureFirebaseReady } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { ShieldCheck, Fingerprint, Lock, ArrowRight, HardHat } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
+import { canUseAdminProfile, isGlobalProfile, type AdminRole, type UserProfile } from '@/lib/admin-profile';
+import { isPlantId, type PlantScope } from '@/lib/plants';
 
 // Lista de administradores — configurable por variable de entorno
 // En GitHub Variables → ADMIN_EMAILS (separados por comas)
@@ -34,8 +37,10 @@ const OFFLINE_ADMIN_USER = {
 
 interface AuthContextType {
   user: User | null;
+  profile: UserProfile | null;
   loading: boolean;
   isAdmin: boolean;
+  isGlobalAdmin: boolean;
   isOfflineSession: boolean;
   signIn: () => Promise<void>;
   signInOffline: () => Promise<void>;
@@ -44,8 +49,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  profile: null,
   loading: true,
   isAdmin: false,
+  isGlobalAdmin: false,
   isOfflineSession: false,
   signIn: async () => {},
   signInOffline: async () => {},
@@ -54,16 +61,85 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
+function isConfiguredAdminEmail(email: string | null | undefined) {
+  return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
+function normalizeUserProfile(uid: string, fallbackEmail: string, data: Record<string, unknown>): UserProfile | null {
+  const role = data.role === 'admin_local' || data.role === 'admin_global'
+    ? data.role as AdminRole
+    : null;
+  if (!role) return null;
+
+  const rawPlant = typeof data.plantaId === 'string' ? data.plantaId : '';
+  const plantaId: PlantScope = role === 'admin_global'
+    ? (rawPlant === 'nacional' || isPlantId(rawPlant) ? rawPlant : 'nacional')
+    : isPlantId(rawPlant)
+      ? rawPlant
+      : 'cuautitlan';
+
+  return {
+    uid,
+    email: typeof data.email === 'string' && data.email ? data.email.toLowerCase() : fallbackEmail,
+    role,
+    plantaId,
+    displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
+    active: data.active !== false,
+  };
+}
+
+function fallbackAdminProfile(user: User): UserProfile | null {
+  const email = user.email?.toLowerCase();
+  if (!email || !isConfiguredAdminEmail(email)) return null;
+
+  return {
+    uid: user.uid,
+    email,
+    role: 'admin_global',
+    plantaId: 'nacional',
+    displayName: user.displayName ?? undefined,
+    active: true,
+  };
+}
+
+async function resolveUserProfile(user: User) {
+  const fallback = fallbackAdminProfile(user);
+  const email = user.email?.toLowerCase() ?? fallback?.email ?? '';
+
+  try {
+    const snap = await getDoc(doc(db, 'users', user.uid));
+    if (snap.exists()) {
+      return normalizeUserProfile(user.uid, email, snap.data()) ?? fallback;
+    }
+  } catch (error) {
+    console.warn('[Admin profile unavailable, using fallback permissions]', error);
+  }
+
+  return fallback;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
   const [isOfflineSession, setIsOfflineSession] = useState(false);
 
   const startOfflineSession = () => {
+    const offlineProfile: UserProfile = {
+      uid: OFFLINE_ADMIN_USER.uid,
+      email: OFFLINE_ADMIN_USER.email ?? 'offline@assetguard.local',
+      role: 'admin_global',
+      plantaId: 'nacional',
+      displayName: OFFLINE_ADMIN_USER.displayName ?? 'Admin Offline',
+      active: true,
+    };
     window.localStorage.setItem(OFFLINE_SESSION_KEY, 'true');
     setUser(OFFLINE_ADMIN_USER);
+    setProfile(offlineProfile);
     setIsAdmin(true);
+    setIsGlobalAdmin(true);
     setIsOfflineSession(true);
     setLoading(false);
   };
@@ -95,21 +171,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         unsubscribe = onAuthStateChanged(auth, (u) => {
           window.clearTimeout(authTimeout);
-          setIsOfflineSession(false);
-          setUser(u);
-          // Validar admin contra la lista de emails autorizados
-          if (u?.email) {
-            const userEmail = u.email.toLowerCase();
-            setIsAdmin(ADMIN_EMAILS.includes(userEmail));
-          } else {
-            setIsAdmin(false);
-          }
-          setLoading(false);
+          void (async () => {
+            if (cancelled) return;
+            setIsOfflineSession(false);
+            setUser(u);
+
+            if (!u) {
+              setProfile(null);
+              setIsAdmin(false);
+              setIsGlobalAdmin(false);
+              setLoading(false);
+              return;
+            }
+
+            const resolvedProfile = await resolveUserProfile(u);
+            if (cancelled) return;
+            setProfile(resolvedProfile);
+            setIsAdmin(canUseAdminProfile(resolvedProfile));
+            setIsGlobalAdmin(isGlobalProfile(resolvedProfile));
+            setLoading(false);
+          })();
         }, (error) => {
           window.clearTimeout(authTimeout);
           console.error('[Auth state error]', error);
           setUser(null);
+          setProfile(null);
           setIsAdmin(false);
+          setIsGlobalAdmin(false);
           setIsOfflineSession(false);
           setLoading(false);
         });
@@ -119,7 +207,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         unavailableTimeout = window.setTimeout(() => {
           if (cancelled) return;
           setUser(null);
+          setProfile(null);
           setIsAdmin(false);
+          setIsGlobalAdmin(false);
           setIsOfflineSession(false);
           setLoading(false);
         }, 0);
@@ -161,7 +251,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.removeItem(OFFLINE_SESSION_KEY);
     if (isOfflineSession || user?.uid === OFFLINE_ADMIN_USER.uid) {
       setUser(null);
+      setProfile(null);
       setIsAdmin(false);
+      setIsGlobalAdmin(false);
       setIsOfflineSession(false);
       return;
     }
@@ -172,13 +264,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.warn('[Sign out skipped because Firebase auth is unavailable]', error);
       setUser(null);
+      setProfile(null);
       setIsAdmin(false);
+      setIsGlobalAdmin(false);
       setIsOfflineSession(false);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, isOfflineSession, signIn, signInOffline, logOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, isAdmin, isGlobalAdmin, isOfflineSession, signIn, signInOffline, logOut }}>
       {children}
     </AuthContext.Provider>
   );

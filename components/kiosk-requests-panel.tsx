@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminKioskRequest, listAdminKioskRequests, updateKioskRequestStatus } from "@/lib/kiosk-api";
 import { toast } from "sonner";
+import { usePlantStore } from "@/store/usePlantStore";
 
 const REASON_LABELS: Record<string, string> = {
   vida_util: "Vida útil",
@@ -44,13 +45,14 @@ export function KioskRequestsPanel() {
   const [loadError, setLoadError] = useState(false);
   const warnedRequestIds = useRef(new Set<string>());
   const refreshInFlight = useRef(false);
+  const { activePlantId } = usePlantStore();
 
   const refresh = useCallback(async (silent = false) => {
     if (refreshInFlight.current) return;
     refreshInFlight.current = true;
     setLoadError(false);
     try {
-      const data = await listAdminKioskRequests("pending", 20);
+      const data = await listAdminKioskRequests("pending", 20, activePlantId);
       setRequests(data);
       const newEarlyAlerts = data.filter((request) => (
         request.hasEarlyReplacementAlert && !warnedRequestIds.current.has(request.id)
@@ -73,7 +75,7 @@ export function KioskRequestsPanel() {
       setLoading(false);
       refreshInFlight.current = false;
     }
-  }, []);
+  }, [activePlantId]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -113,7 +115,7 @@ export function KioskRequestsPanel() {
   const repairApprovedSync = async () => {
     setRepairingSync(true);
     try {
-      const approved = await listAdminKioskRequests("approved", 50);
+      const approved = await listAdminKioskRequests("approved", 50, activePlantId);
       const unsynced = approved.filter((request) => (request.assignmentIds?.length ?? 0) === 0);
 
       if (unsynced.length === 0) {

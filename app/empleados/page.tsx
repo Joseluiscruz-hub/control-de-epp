@@ -38,6 +38,8 @@ import {
   type ParsedPersonnelImport,
   type PersonnelRecord,
 } from '@/lib/personnel-import';
+import { normalizePlantId } from '@/lib/plants';
+import { usePlantStore } from '@/store/usePlantStore';
 
 interface Employee {
   docId: string;
@@ -48,6 +50,7 @@ interface Employee {
   plantArea?: string;
   position?: string;
   jobFunction?: string;
+  plantaId?: string;
   active: boolean;
   createdAt?: Date;
 }
@@ -79,6 +82,8 @@ export default function EmpleadosPage() {
   const [syncingKiosk, setSyncingKiosk] = useState(false);
   const [importingPersonnel, setImportingPersonnel] = useState(false);
   const [form, setForm] = useState({ id: '', name: '', area: '' });
+  const { activePlantId } = usePlantStore();
+  const writePlantId = normalizePlantId(activePlantId);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -94,7 +99,9 @@ export default function EmpleadosPage() {
 
   useEffect(() => {
     try {
-      const q = query(collection(db, 'employees'));
+      const q = activePlantId === 'todas'
+        ? query(collection(db, 'employees'))
+        : query(collection(db, 'employees'), where('plantaId', '==', activePlantId));
       const unsub = onSnapshot(q, (snap) => {
         const data = snap.docs.map(d => {
           const employee = d.data();
@@ -107,6 +114,7 @@ export default function EmpleadosPage() {
             plantArea: employee.plantArea,
             position: employee.position,
             jobFunction: employee.jobFunction,
+            plantaId: employee.plantaId,
             active: employee.active,
             createdAt: employee.createdAt?.toDate(),
           };
@@ -121,7 +129,7 @@ export default function EmpleadosPage() {
       }, 0);
       return () => window.clearTimeout(timeout);
     }
-  }, [loadLocalEmployees]);
+  }, [activePlantId, loadLocalEmployees]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,7 +161,7 @@ export default function EmpleadosPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ records: [record] }),
+        body: JSON.stringify({ records: [record], plantaId: writePlantId }),
       });
 
       const result = await response.json().catch(() => ({}));
@@ -235,7 +243,7 @@ export default function EmpleadosPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ records: importPreview.records }),
+        body: JSON.stringify({ records: importPreview.records, plantaId: writePlantId }),
       });
 
       const result = await response.json().catch(() => ({}));
@@ -270,6 +278,7 @@ export default function EmpleadosPage() {
         {
           name: emp.name,
           area: emp.area,
+          plantaId: emp.plantaId ?? writePlantId,
           personnelArea: emp.personnelArea ?? '',
           plantArea: emp.plantArea ?? emp.area,
           position: emp.position ?? '',
@@ -327,6 +336,7 @@ export default function EmpleadosPage() {
           position: emp.position ?? '',
           jobFunction: emp.jobFunction ?? '',
           active: emp.active,
+          plantaId: emp.plantaId ?? writePlantId,
           updatedAt: serverTimestamp(),
         };
 

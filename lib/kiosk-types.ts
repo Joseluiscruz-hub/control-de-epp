@@ -13,6 +13,7 @@ export interface KioskEmployee {
   firstLogin: boolean;
   source?: string;
   schemaVersion?: number;
+  plantaId?: string;
 }
 
 export interface PPESizeVariant {
@@ -45,6 +46,7 @@ export interface PPECatalogItem {
   minStock?: number;
   available?: boolean;
   imageUrl?: string;
+  plantaId?: string;
 }
 
 export type ReplacementReason = "vida_util" | "desgaste" | "extravio";

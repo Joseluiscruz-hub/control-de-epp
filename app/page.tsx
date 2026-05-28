@@ -22,6 +22,7 @@ import { useAuth } from '@/components/auth-provider';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import { getLocalDashboardSnapshot } from '@/lib/kiosk-local-store';
+import { usePlantStore } from '@/store/usePlantStore';
 
 // Animated counter hook
 function useAnimatedCounter(target: number, duration = 1400) {
@@ -116,6 +117,7 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const { user: authUser } = useAuth();
+  const { activePlantId } = usePlantStore();
   const [recentAssignments, setRecentAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
@@ -163,7 +165,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     try {
-      const q = query(collection(db, 'assignments'), orderBy('assignedAt', 'desc'), limit(10));
+      const q = activePlantId === 'todas'
+        ? query(collection(db, 'assignments'), orderBy('assignedAt', 'desc'), limit(10))
+        : query(collection(db, 'assignments'), where('plantaId', '==', activePlantId), limit(50));
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const assignments = snapshot.docs.map(doc => {
           const data = doc.data();
@@ -175,7 +179,7 @@ export default function DashboardPage() {
             nextReplacementAt: data.nextReplacementAt instanceof Timestamp ? data.nextReplacementAt.toDate() : undefined,
             status: data.status,
           };
-        });
+        }).sort((a, b) => b.assignedAt.getTime() - a.assignedAt.getTime()).slice(0, 10);
         setRecentAssignments(assignments);
         const todayCount = assignments.filter(a => isToday(a.assignedAt)).length;
         setStats(prev => ({ ...prev, todayAssignments: todayCount }));
@@ -200,7 +204,7 @@ export default function DashboardPage() {
       }, 0);
       return () => window.clearTimeout(timeout);
     }
-  }, [applyLocalDashboard]);
+  }, [activePlantId, applyLocalDashboard]);
 
   useEffect(() => {
     let activeEmployees: Array<{ id: string; area: string }> = [];
@@ -254,12 +258,17 @@ export default function DashboardPage() {
 
     try {
       const unsubscribeEmployees = onSnapshot(
-        query(collection(db, 'employees'), where('active', '==', true)),
+        activePlantId === 'todas'
+          ? query(collection(db, 'employees'), where('active', '==', true))
+          : query(collection(db, 'employees'), where('plantaId', '==', activePlantId)),
         (snapshot) => {
           activeEmployees = snapshot.docs.map((docSnap) => ({
             id: docSnap.id,
             area: String(docSnap.data().area ?? ''),
-          }));
+          })).filter((employee) => {
+            const source = snapshot.docs.find((docSnap) => docSnap.id === employee.id)?.data();
+            return source?.active === true;
+          });
           employeesReady = true;
           recomputeStats();
         },
@@ -270,7 +279,9 @@ export default function DashboardPage() {
       );
 
       const unsubscribeInventory = onSnapshot(
-        collection(db, 'ppe_catalog'),
+        activePlantId === 'todas'
+          ? collection(db, 'ppe_catalog')
+          : query(collection(db, 'ppe_catalog'), where('plantaId', '==', activePlantId)),
         (snapshot) => {
           inventoryItems = snapshot.docs.map((docSnap) => docSnap.data());
           inventoryReady = true;
@@ -283,7 +294,9 @@ export default function DashboardPage() {
       );
 
       const unsubscribeAssignments = onSnapshot(
-        query(collection(db, 'assignments'), orderBy('assignedAt', 'desc'), limit(200)),
+        activePlantId === 'todas'
+          ? query(collection(db, 'assignments'), orderBy('assignedAt', 'desc'), limit(200))
+          : query(collection(db, 'assignments'), where('plantaId', '==', activePlantId), limit(300)),
         (snapshot) => {
           assignmentItems = snapshot.docs.map((docSnap) => docSnap.data());
           assignmentsReady = true;
@@ -307,7 +320,7 @@ export default function DashboardPage() {
       }, 0);
       return () => window.clearTimeout(timeout);
     }
-  }, [applyLocalDashboard]);
+  }, [activePlantId, applyLocalDashboard]);
 
   const kpiCards = [
     {

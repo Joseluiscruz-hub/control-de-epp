@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   collection, onSnapshot, doc, getDoc,
-  serverTimestamp, query, writeBatch
+  serverTimestamp, query, where, writeBatch
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,8 @@ import {
 } from '@/lib/kiosk-local-store';
 import { PPECatalogItem } from '@/lib/kiosk-types';
 import { getEppDurationRulePayload, resolveEppReplacementDays } from '@/lib/epp-duration-rules';
+import { normalizePlantId } from '@/lib/plants';
+import { usePlantStore } from '@/store/usePlantStore';
 
 interface PpeSizeVariant {
   sku: string;
@@ -61,6 +63,7 @@ interface PpeItem {
   location?: string;
   unit?: string;
   unitCost?: number;
+  plantaId?: string;
   createdAt?: Date;
 }
 
@@ -99,6 +102,8 @@ export default function InventarioPage() {
   const [form, setForm] = useState({
     sku: '', name: '', category: '', replacementDays: '', stock: ''
   });
+  const { activePlantId } = usePlantStore();
+  const writePlantId = normalizePlantId(activePlantId);
 
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjustItem, setAdjustItem] = useState<PpeItem | null>(null);
@@ -114,7 +119,9 @@ export default function InventarioPage() {
 
   useEffect(() => {
     try {
-      const q = query(collection(db, 'ppe_catalog'));
+      const q = activePlantId === 'todas'
+        ? query(collection(db, 'ppe_catalog'))
+        : query(collection(db, 'ppe_catalog'), where('plantaId', '==', activePlantId));
       const unsub = onSnapshot(q, (snap) => {
         const data = snap.docs.map(d => {
           const item = d.data();
@@ -145,6 +152,7 @@ export default function InventarioPage() {
             location: item.location,
             unit: item.unit,
             unitCost: item.unitCost,
+            plantaId: item.plantaId,
             createdAt: item.createdAt?.toDate(),
           };
         });
@@ -158,7 +166,7 @@ export default function InventarioPage() {
       }, 0);
       return () => window.clearTimeout(timeout);
     }
-  }, [loadLocalInventory]);
+  }, [activePlantId, loadLocalInventory]);
 
   const handleInventoryFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -192,6 +200,7 @@ export default function InventarioPage() {
       upsertLocalCatalogItem({
         id: item.id,
         ...buildInventoryCatalogPayload(item),
+        plantaId: writePlantId,
       } as PPECatalogItem);
     });
     setItems(listLocalInventory());
@@ -232,6 +241,7 @@ export default function InventarioPage() {
           doc(db, 'ppe_catalog', item.id),
           {
             ...catalogPayload,
+            plantaId: writePlantId,
             ...(exists ? {} : { createdAt: serverTimestamp() }),
             updatedAt: serverTimestamp(),
           },
@@ -242,6 +252,7 @@ export default function InventarioPage() {
           doc(db, 'kiosk_catalog', item.id),
           {
             ...kioskPayload,
+            plantaId: writePlantId,
             ...(existingKioskCatalog.has(item.id) ? {} : { createdAt: serverTimestamp() }),
             updatedAt: serverTimestamp(),
           },
@@ -285,6 +296,7 @@ export default function InventarioPage() {
         category: form.category,
         replacementDays,
         ...rulePayload,
+        plantaId: writePlantId,
         stock: initialStock,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -295,6 +307,7 @@ export default function InventarioPage() {
         replacementDays,
         ...rulePayload,
         hasSizes: false,
+        plantaId: writePlantId,
         sku: form.sku,
         stock: initialStock,
         minStock: 2,
@@ -310,6 +323,7 @@ export default function InventarioPage() {
         category: form.category,
         replacementDays,
         ...rulePayload,
+        plantaId: writePlantId,
         stock: initialStock,
         minStock: 2,
         hasSizes: false,
@@ -331,6 +345,7 @@ export default function InventarioPage() {
         category: form.category,
         replacementDays,
         ...rulePayload,
+        plantaId: writePlantId,
         stock: initialStock,
         minStock: 2,
         hasSizes: false,
@@ -386,6 +401,7 @@ export default function InventarioPage() {
           category: adjustItem.category,
           replacementDays: adjustItem.replacementDays,
           hasSizes: true,
+          plantaId: adjustItem.plantaId ?? writePlantId,
           sizes: nextSizes,
           sku: adjustItem.sku,
           stock: nextTotalStock,
@@ -419,6 +435,7 @@ export default function InventarioPage() {
       batch.update(doc(db, 'ppe_catalog', adjustItem.docId), {
         stock: nextStock,
         available: nextStock > 0,
+        plantaId: adjustItem.plantaId ?? writePlantId,
         updatedAt: serverTimestamp(),
       });
       batch.set(
@@ -428,6 +445,7 @@ export default function InventarioPage() {
           category: adjustItem.category,
           replacementDays: adjustItem.replacementDays,
           hasSizes: false,
+          plantaId: adjustItem.plantaId ?? writePlantId,
           sku: adjustItem.sku,
           stock: nextStock,
           minStock: 2,

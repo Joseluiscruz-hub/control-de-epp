@@ -7,6 +7,7 @@ import {
   buildKioskEmployeeImportPayload,
   type PersonnelRecord,
 } from "@/lib/personnel-import";
+import { normalizePlantId } from "@/lib/plants";
 
 export const runtime = "nodejs";
 
@@ -88,6 +89,9 @@ export async function POST(req: NextRequest) {
     const adminUser = await requireAdminUser(req);
     const body = await req.json();
     const records = parsePersonnelRecords(body?.records);
+    const plantaId = adminUser.plantaId === "nacional"
+      ? normalizePlantId(body?.plantaId)
+      : normalizePlantId(adminUser.plantaId);
     const employeeIds = records.map((record) => record.id);
     const db = getAdminDb();
 
@@ -118,6 +122,7 @@ export async function POST(req: NextRequest) {
         db.collection("employees").doc(record.id),
         {
           ...employeePayload,
+          plantaId,
           ...(employeeExists ? {} : { firstLogin: true, termsAccepted: false, createdAt: FieldValue.serverTimestamp() }),
           updatedAt: FieldValue.serverTimestamp(),
         },
@@ -128,6 +133,7 @@ export async function POST(req: NextRequest) {
         db.collection("kiosk_employees").doc(record.id),
         {
           ...kioskPayload,
+          plantaId,
           ...(kioskEmployeeExists ? {} : { firstLogin: true, termsAccepted: false }),
           updatedAt: FieldValue.serverTimestamp(),
         },
@@ -146,6 +152,7 @@ export async function POST(req: NextRequest) {
     return Response.json({
       success: true,
       importedBy: adminUser.email,
+      plantaId,
       createdEmployees,
       updatedEmployees,
       kioskEmployees: records.length,

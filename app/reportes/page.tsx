@@ -6,6 +6,7 @@ import {
   getDocs,
   orderBy,
   query,
+  type QueryConstraint,
   Timestamp,
   where,
 } from "firebase/firestore";
@@ -46,6 +47,7 @@ import {
 } from "@/lib/kiosk-local-store";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { usePlantStore } from "@/store/usePlantStore";
 
 type EmployeeLookup = {
   id: string;
@@ -401,6 +403,7 @@ export default function ReportesPage() {
   const [areaFilter, setAreaFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [localMode, setLocalMode] = useState(false);
+  const { activePlantId } = usePlantStore();
 
   const activePeriod = useMemo(
     () => getPeriodRange({ mode: periodMode, selectedDate, selectedMonth, selectedYear, rangeStart, rangeEnd }),
@@ -452,17 +455,28 @@ export default function ReportesPage() {
     const { start, end } = activePeriod;
 
     try {
+      const assignmentConstraints: QueryConstraint[] = activePlantId === "todas" ? [
+        where("assignedAt", ">=", Timestamp.fromDate(start)),
+        where("assignedAt", "<=", Timestamp.fromDate(end)),
+        orderBy("assignedAt", "asc"),
+      ] : [
+        where("plantaId", "==", activePlantId),
+      ];
       const [assignmentsSnap, employeesSnap, catalogSnap] = await Promise.all([
         getDocs(
           query(
             collection(db, "assignments"),
-            where("assignedAt", ">=", Timestamp.fromDate(start)),
-            where("assignedAt", "<=", Timestamp.fromDate(end)),
-            orderBy("assignedAt", "asc")
+            ...assignmentConstraints
           )
         ),
-        getDocs(collection(db, "employees")),
-        getDocs(collection(db, "ppe_catalog")),
+        getDocs(activePlantId === "todas"
+          ? collection(db, "employees")
+          : query(collection(db, "employees"), where("plantaId", "==", activePlantId))
+        ),
+        getDocs(activePlantId === "todas"
+          ? collection(db, "ppe_catalog")
+          : query(collection(db, "ppe_catalog"), where("plantaId", "==", activePlantId))
+        ),
       ]);
 
       const employees = buildEmployeeIndex(
@@ -471,8 +485,14 @@ export default function ReportesPage() {
       const catalog = buildCatalogIndex(
         catalogSnap.docs.map((docSnap) => ({ id: docSnap.id, data: docSnap.data() }))
       );
+      const assignmentRecords = assignmentsSnap.docs
+        .map((docSnap) => ({ id: docSnap.id, data: docSnap.data() }))
+        .filter((record) => {
+          const assignedAt = toDate(record.data.assignedAt);
+          return assignedAt >= start && assignedAt <= end;
+        });
       const nextRows = buildRows({
-        assignments: assignmentsSnap.docs.map((docSnap) => ({ id: docSnap.id, data: docSnap.data() })),
+        assignments: assignmentRecords,
         employees,
         catalog,
       });
@@ -504,7 +524,7 @@ export default function ReportesPage() {
     } finally {
       setLoading(false);
     }
-  }, [activePeriod]);
+  }, [activePeriod, activePlantId]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {

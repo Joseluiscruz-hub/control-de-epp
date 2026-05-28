@@ -7,6 +7,7 @@ import {
   resolveEppReplacementDays,
 } from "@/lib/epp-duration-rules";
 import { KioskEarlyReplacementAlert, KioskRequestItem, ReplacementReason } from "@/lib/kiosk-types";
+import { normalizePlantId } from "@/lib/plants";
 
 export const runtime = "nodejs";
 
@@ -170,6 +171,7 @@ async function fulfillApprovedKioskRequest(params: {
     const employeeId = readText(requestData.employeeId);
     const employeeName = readText(requestData.employeeName);
     const employeeArea = readText(requestData.employeeArea);
+    const plantaId = normalizePlantId(requestData.plantaId);
     const items = normalizeFulfillableItems(requestData.items);
     const existingAssignmentIds = Array.isArray(requestData.assignmentIds)
       ? requestData.assignmentIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
@@ -189,6 +191,7 @@ async function fulfillApprovedKioskRequest(params: {
       transaction.update(requestRef, {
         status: "approved",
         assignmentIds: alreadyFulfilledIds,
+        plantaId,
         syncedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -197,6 +200,7 @@ async function fulfillApprovedKioskRequest(params: {
         {
           requestId,
           status: "approved",
+          plantaId,
           source: "kiosk",
           updatedAt: FieldValue.serverTimestamp(),
         },
@@ -242,6 +246,7 @@ async function fulfillApprovedKioskRequest(params: {
         employeeId,
         employeeName,
         employeeArea,
+        plantaId,
         sku: item.sku,
         itemId: item.itemId,
         itemName: item.itemName,
@@ -280,6 +285,7 @@ async function fulfillApprovedKioskRequest(params: {
     transaction.update(requestRef, {
       status: "approved",
       assignmentIds,
+      plantaId,
       approvedAt: FieldValue.serverTimestamp(),
       approvedByUserId,
       approvedByEmail,
@@ -291,6 +297,7 @@ async function fulfillApprovedKioskRequest(params: {
       {
         requestId,
         status: "approved",
+        plantaId,
         source: "kiosk",
         updatedAt: FieldValue.serverTimestamp(),
       },
@@ -320,12 +327,14 @@ async function rejectKioskRequest(params: {
 
     const requestData = requestSnap.data() ?? {};
     const currentStatus = readText(requestData.status) || "pending";
+    const plantaId = normalizePlantId(requestData.plantaId);
     if (currentStatus !== "pending" && currentStatus !== "rejected") {
       throw new KioskRequestError(`La solicitud ya esta ${currentStatus}.`, 409);
     }
 
     transaction.update(requestRef, {
       status: "rejected",
+      plantaId,
       rejectedAt: FieldValue.serverTimestamp(),
       rejectedByUserId,
       rejectedByEmail,
@@ -336,6 +345,7 @@ async function rejectKioskRequest(params: {
       {
         requestId,
         status: "rejected",
+        plantaId,
         source: "kiosk",
         updatedAt: FieldValue.serverTimestamp(),
       },
@@ -462,6 +472,7 @@ export async function POST(req: NextRequest) {
     }
 
     const employee = employeeSnap.data() ?? {};
+    const plantaId = normalizePlantId(employee.plantaId);
     if (employee.active !== true) {
       throw new KioskRequestError("Empleado inactivo para kiosko.", 403);
     }
@@ -508,6 +519,7 @@ export async function POST(req: NextRequest) {
       employeeId,
       employeeName,
       employeeArea,
+      plantaId,
       items,
       status: "pending",
       hasEarlyReplacementAlert: warnings.length > 0,
@@ -521,6 +533,7 @@ export async function POST(req: NextRequest) {
     batch.set(statusRef, {
       requestId: requestRef.id,
       status: "pending",
+      plantaId,
       source: "kiosk",
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -534,6 +547,7 @@ export async function POST(req: NextRequest) {
         employeeId,
         employeeName,
         employeeArea,
+        plantaId,
         itemId: warning.itemId,
         itemName: warning.itemName,
         sku: warning.sku,

@@ -4,9 +4,9 @@ service cloud.firestore {
 
     // ── Empleados ──────────────────────────────────────────────────────────
     match /employees/{employeeId} {
-      allow read: if request.auth != null && isAdmin();
-      allow create: if request.auth != null && isAdmin() && isValidEmployee(request.resource.data);
-      allow update: if request.auth != null && isAdmin() && isValidEmployee(request.resource.data);
+      allow read: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
+      allow create: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && isValidEmployee(request.resource.data);
+      allow update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && isValidEmployee(request.resource.data);
       allow delete: if false;
     }
 
@@ -14,31 +14,31 @@ service cloud.firestore {
     match /kiosk_employees/{employeeId} {
       allow get: if true;
       allow list: if false;
-      allow create: if request.auth != null && isAdmin() && isValidKioskEmployeeSnapshot(request.resource.data);
-      allow update: if request.auth != null && isAdmin() && isValidKioskEmployeeSnapshot(request.resource.data);
+      allow create: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && isValidKioskEmployeeSnapshot(request.resource.data);
+      allow update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && isValidKioskEmployeeSnapshot(request.resource.data);
       allow delete: if false;
     }
 
     // ── Catálogo EPP ───────────────────────────────────────────────────────
     match /ppe_catalog/{itemId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null && isAdmin();
+      allow read: if request.auth != null && hasPlantAccess(resource.data);
+      allow create, update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data);
       allow delete: if false;
     }
 
     // ── Catálogo público seguro para kiosko ────────────────────────────────
     match /kiosk_catalog/{itemId} {
       allow read: if true;
-      allow create, update: if request.auth != null && isAdmin();
+      allow create, update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data);
       allow delete: if false;
     }
 
     // ── Solicitudes Kiosko ─────────────────────────────────────────────────
     match /kiosk_requests/{requestId} {
-      allow get: if request.auth != null;
-      allow list: if request.auth != null;
+      allow get: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
+      allow list: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
       allow create: if isValidKioskRequest(request.resource.data);
-      allow update: if request.auth != null && isAdmin() && onlyAdminUpdatingKioskRequestStatus(request.resource.data, resource.data);
+      allow update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && onlyAdminUpdatingKioskRequestStatus(request.resource.data, resource.data);
       allow delete: if false;
     }
 
@@ -47,22 +47,22 @@ service cloud.firestore {
       allow get: if true;
       allow list: if false;
       allow create: if isValidKioskRequestStatus(request.resource.data, requestId);
-      allow update: if request.auth != null && isAdmin() && isValidKioskRequestStatus(request.resource.data, requestId);
+      allow update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && isValidKioskRequestStatus(request.resource.data, requestId);
       allow delete: if false;
     }
 
     // ── Alertas administrativas generadas por servidor ────────────────────
     match /kiosk_alerts/{alertId} {
-      allow read: if request.auth != null && isAdmin();
+      allow read: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
       allow create, update, delete: if false;
     }
 
     // ── Asignaciones ───────────────────────────────────────────────────────
     match /assignments/{assignmentId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && isValidAssignment(request.resource.data);
+      allow read: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
+      allow create: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && isValidAssignment(request.resource.data);
       allow update: if request.auth != null && (
-        isAdmin() ||
+        (isAdmin() && canWritePlant(request.resource.data)) ||
         // Solo se puede cambiar status de pending_review a active/cancelled
         onlyUpdatingStatus(request.resource.data, resource.data)
       );
@@ -71,9 +71,9 @@ service cloud.firestore {
 
     // ── Cobros por Extravío ─────────────────────────────────────────────────
     match /loss_charges/{chargeId} {
-      allow read: if request.auth != null && isAdmin();
-      allow create: if request.auth != null && isValidLossCharge(request.resource.data);
-      allow update: if request.auth != null && isAdmin();
+      allow read: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
+      allow create: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && isValidLossCharge(request.resource.data);
+      allow update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data);
       allow delete: if false;
     }
 
@@ -82,11 +82,23 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // ── Perfiles administrativos multi-planta ─────────────────────────────
+    match /users/{userId} {
+      allow get: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow list: if request.auth != null && isGlobalAdmin();
+      allow create, update: if request.auth != null && isGlobalAdmin() && isValidUserProfile(request.resource.data, userId);
+      allow delete: if false;
+    }
+
+    // ── Auditoria de rescate administrativo ───────────────────────────────
+    match /admin_rescue_events/{eventId} {
+      allow read: if request.auth != null && isGlobalAdmin();
+      allow create, update, delete: if false;
+    }
+
     // ── Funciones helper ───────────────────────────────────────────────────
 
-    function isAdmin() {
-      // Lista de administradores autorizados
-      // Para agregar admins: añade el email de Google del usuario a esta lista
+    function isEmailAdmin() {
       return request.auth != null
         && request.auth.token.email in [
           'mimonkb222@gmail.com',
@@ -95,12 +107,74 @@ service cloud.firestore {
         ];
     }
 
+    function userProfilePath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function hasUserProfile() {
+      return request.auth != null && exists(userProfilePath());
+    }
+
+    function getUserData() {
+      return get(userProfilePath()).data;
+    }
+
+    function isGlobalAdmin() {
+      return isEmailAdmin()
+        || (hasUserProfile()
+          && getUserData().active != false
+          && getUserData().role == "admin_global");
+    }
+
+    function isLocalAdmin() {
+      return hasUserProfile()
+        && getUserData().active != false
+        && getUserData().role == "admin_local"
+        && getUserData().plantaId in ["cuautitlan", "toluca"];
+    }
+
+    function isAdmin() {
+      return isGlobalAdmin() || isLocalAdmin();
+    }
+
+    function activeAdminPlant() {
+      return isLocalAdmin() ? getUserData().plantaId : "nacional";
+    }
+
+    function hasPlantAccess(data) {
+      return isGlobalAdmin()
+        || (isLocalAdmin() && (data.plantaId == null || data.plantaId == activeAdminPlant()));
+    }
+
+    function canWritePlant(data) {
+      return isGlobalAdmin()
+        || (isLocalAdmin() && data.plantaId == activeAdminPlant());
+    }
+
+    function isValidPlantScope(value) {
+      return value in ["cuautitlan", "toluca", "nacional"];
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasOnly(["uid", "email", "role", "plantaId", "displayName", "active", "createdAt", "updatedAt"])
+        && data.keys().hasAll(["uid", "email", "role", "plantaId", "active"])
+        && data.uid == userId
+        && data.email is string && data.email.size() > 3
+        && data.role in ["admin_local", "admin_global"]
+        && isValidPlantScope(data.plantaId)
+        && (data.role == "admin_global" || data.plantaId in ["cuautitlan", "toluca"])
+        && data.active is bool
+        && optionalString(data.displayName)
+        && (data.createdAt == null || data.createdAt is timestamp)
+        && (data.updatedAt == null || data.updatedAt is timestamp);
+    }
+
     function isValidEmployee(data) {
       return data.keys().hasOnly([
           "id", "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt",
           "createdAt", "updatedAt", "division", "personnelArea", "plantArea", "costCenter",
           "positionId", "position", "jobFunction", "hireDate", "sex", "source", "schemaVersion",
-          "rfc", "imss", "curp"
+          "rfc", "imss", "curp", "plantaId"
         ])
         && data.keys().hasAll(["id", "name", "area", "active", "createdAt", "updatedAt"])
         && data.id is string && data.id.size() > 0
@@ -122,6 +196,7 @@ service cloud.firestore {
         && optionalString(data.hireDate)
         && optionalString(data.sex)
         && optionalString(data.source)
+        && (data.plantaId == null || data.plantaId in ["cuautitlan", "toluca"])
         && optionalString(data.rfc)
         && optionalString(data.imss)
         && optionalString(data.curp)
@@ -132,7 +207,7 @@ service cloud.firestore {
       return data.keys().hasOnly([
           "id", "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt", "pin",
           "createdAt",
-          "updatedAt", "personnelArea", "plantArea", "position", "jobFunction", "source", "schemaVersion"
+          "updatedAt", "personnelArea", "plantArea", "position", "jobFunction", "source", "schemaVersion", "plantaId"
         ])
         && data.keys().hasAll(["name", "active", "updatedAt"])
         && data.name is string && data.name.size() > 0
@@ -148,6 +223,7 @@ service cloud.firestore {
         && optionalString(data.position)
         && optionalString(data.jobFunction)
         && optionalString(data.source)
+        && (data.plantaId == null || data.plantaId in ["cuautitlan", "toluca"])
         && (data.pin == null || (data.pin is string && data.pin.size() >= 8))
         && (data.termsAcceptedAt == null || data.termsAcceptedAt is timestamp)
         && (data.schemaVersion == null || data.schemaVersion is int);
@@ -160,6 +236,7 @@ service cloud.firestore {
     function isValidAssignment(data) {
       return data.keys().hasAll(["employeeId", "sku", "size", "assignedAt", "nextReplacementAt", "status", "issuedByUserId"])
         && data.status in ["active", "pending_review", "replaced", "returned"]
+        && (data.plantaId == null || data.plantaId in ["cuautitlan", "toluca"])
         && (data.replacementReason == null || data.replacementReason in ["vida_util", "desgaste", "extravio"])
         && (data.chargeAmount == null || (data.chargeAmount is number && data.chargeAmount >= 0));
     }
@@ -172,14 +249,21 @@ service cloud.firestore {
     function isValidLossCharge(data) {
       return data.keys().hasAll(["assignmentId", "employeeId", "sku", "chargeAmount", "createdAt", "status"])
         && data.chargeAmount is number && data.chargeAmount > 0
+        && (data.plantaId == null || data.plantaId in ["cuautitlan", "toluca"])
         && data.status in ["pending_payroll", "applied", "cancelled"];
     }
 
     function isValidKioskRequest(data) {
-      return data.keys().hasOnly(["employeeId", "employeeName", "items", "status", "createdAt", "updatedAt", "source"])
+      return data.keys().hasOnly([
+          "employeeId", "employeeName", "employeeArea", "plantaId", "items", "status",
+          "createdAt", "updatedAt", "source", "hasEarlyReplacementAlert",
+          "earlyReplacementWarnings", "earlyReplacementAlertIds"
+        ])
         && data.keys().hasAll(["employeeId", "employeeName", "items", "status", "createdAt", "updatedAt", "source"])
         && data.employeeId is string && data.employeeId.size() > 0
         && data.employeeName is string && data.employeeName.size() > 0
+        && optionalString(data.employeeArea)
+        && (data.plantaId == null || data.plantaId in ["cuautitlan", "toluca"])
         && exists(/databases/$(database)/documents/kiosk_employees/$(data.employeeId))
         && get(/databases/$(database)/documents/kiosk_employees/$(data.employeeId)).data.active == true
         && get(/databases/$(database)/documents/kiosk_employees/$(data.employeeId)).data.name == data.employeeName
@@ -190,6 +274,9 @@ service cloud.firestore {
         && data.status == "pending"
         && data.createdAt is timestamp
         && data.updatedAt is timestamp
+        && (data.hasEarlyReplacementAlert == null || data.hasEarlyReplacementAlert is bool)
+        && (data.earlyReplacementWarnings == null || data.earlyReplacementWarnings is list)
+        && (data.earlyReplacementAlertIds == null || data.earlyReplacementAlertIds is list)
         && data.source == "kiosk";
     }
 
@@ -208,26 +295,38 @@ service cloud.firestore {
 
     function isValidKioskRequestItem(item) {
       return item is map
-        && item.keys().hasOnly(["itemId", "itemName", "sku", "size", "replacementDays", "replacementReason"])
+        && item.keys().hasOnly([
+          "itemId", "itemName", "sku", "size", "replacementDays", "replacementReason",
+          "durationRuleId", "durationRuleSource", "durationRuleSku", "durationRuleSapMaterial",
+          "requiredQuantity", "requiredUnit", "earlyReplacementAlert"
+        ])
         && item.itemId is string && item.itemId.size() > 0
         && item.itemName is string && item.itemName.size() > 0
         && item.sku is string && item.sku.size() > 0
         && item.size is string && item.size.size() > 0
         && item.replacementDays is int && item.replacementDays > 0
+        && optionalString(item.durationRuleId)
+        && optionalString(item.durationRuleSource)
+        && optionalString(item.durationRuleSku)
+        && optionalString(item.durationRuleSapMaterial)
+        && (item.requiredQuantity == null || item.requiredQuantity is number)
+        && optionalString(item.requiredUnit)
+        && (item.earlyReplacementAlert == null || item.earlyReplacementAlert is map)
         && (item.replacementReason == null || item.replacementReason in ["vida_util", "desgaste", "extravio"]);
     }
 
     function onlyAdminUpdatingKioskRequestStatus(newData, oldData) {
       let changedFields = newData.diff(oldData).affectedKeys();
-      return changedFields.hasOnly(["status", "updatedAt"])
+      return changedFields.hasOnly(["status", "updatedAt", "plantaId"])
         && newData.status in ["pending", "approved", "rejected"];
     }
 
     function isValidKioskRequestStatus(data, requestId) {
-      return data.keys().hasOnly(["requestId", "status", "source", "updatedAt"])
+      return data.keys().hasOnly(["requestId", "status", "source", "updatedAt", "plantaId"])
         && data.keys().hasAll(["requestId", "status", "source", "updatedAt"])
         && data.requestId == requestId
         && data.status in ["pending", "approved", "rejected"]
+        && (data.plantaId == null || data.plantaId in ["cuautitlan", "toluca"])
         && data.source == "kiosk"
         && data.updatedAt is timestamp;
     }

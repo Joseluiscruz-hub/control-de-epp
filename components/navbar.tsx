@@ -3,20 +3,23 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { Button } from './ui/button';
-import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X, HardHat, FileSpreadsheet } from 'lucide-react';
+import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X, HardHat, FileSpreadsheet, RadioTower, UserCog } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
+import { PlantContextSwitcher } from './plant-context-switcher';
 
 const NAV_LINKS = [
   { href: '/', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
+  { href: '/monitoreo', label: 'Monitoreo', icon: <RadioTower className="h-4 w-4" /> },
   { href: '/empleados', label: 'Empleados', icon: <Users className="h-4 w-4" /> },
   { href: '/inventario', label: 'Inventario', icon: <Package className="h-4 w-4" /> },
   { href: '/reportes', label: 'Reportes', icon: <FileSpreadsheet className="h-4 w-4" /> },
+  { href: '/administradores', label: 'Admins', icon: <UserCog className="h-4 w-4" /> },
 ];
 
 export function NavBar() {
-  const { user: authUser, logOut, isAdmin, isOfflineSession } = useAuth();
+  const { user: authUser, logOut, isAdmin, isGlobalAdmin, isOfflineSession } = useAuth();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -108,6 +111,10 @@ export function NavBar() {
                 })}
               </nav>
 
+              <div className="hidden xl:block">
+                <PlantContextSwitcher />
+              </div>
+
               {/* External links */}
               <Link href="/portal" target="_blank">
                 <Button variant="ghost" size="sm" className="hidden md:flex items-center gap-1.5 text-white/40 hover:text-white/75 hover:bg-white/5 rounded-lg font-semibold transition-all text-xs">
@@ -156,7 +163,7 @@ export function NavBar() {
                     {authUser?.displayName?.split(' ')[0] || 'Admin'}
                   </span>
                   <span className="text-[9px] font-bold uppercase tracking-wider" style={{color:'rgba(16,185,129,0.8)'}}>
-                    {isAdmin ? 'Admin' : 'Editor'}
+                    {isGlobalAdmin ? 'Global' : isAdmin ? 'Local' : 'Editor'}
                   </span>
                 </div>
                 {authUser?.photoURL ? (
@@ -221,6 +228,9 @@ export function NavBar() {
               onClick={e => e.stopPropagation()}
             >
               <nav className="space-y-1" aria-label="Navegación móvil">
+                <div className="px-1 pb-3">
+                  <PlantContextSwitcher compact />
+                </div>
                 {NAV_LINKS.map(link => {
                   const isActive = pathname === link.href;
                   return (
@@ -261,7 +271,7 @@ export function NavBar() {
                   )}
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-white/80 truncate">{authUser?.displayName || 'Admin'}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider" style={{color:'rgba(16,185,129,0.7)'}}>{isAdmin ? 'Admin' : 'Editor'}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider" style={{color:'rgba(16,185,129,0.7)'}}>{isGlobalAdmin ? 'Global' : isAdmin ? 'Local' : 'Editor'}</p>
                   </div>
                 </div>
                 <Button variant="ghost" size="sm" onClick={logOut} className="text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg shrink-0 text-xs">

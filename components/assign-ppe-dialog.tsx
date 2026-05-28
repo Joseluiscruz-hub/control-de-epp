@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,31 +9,49 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowRight, Loader2, HardHat, UserCheck, ShieldCheck } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "./auth-provider";
-import { collection, query, getDocs, doc, serverTimestamp, runTransaction, Timestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, serverTimestamp, runTransaction, Timestamp } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-error";
 import { toast } from "sonner";
 import { addDays } from "date-fns";
 import { motion } from "motion/react";
 import { createLocalAssignment, listLocalEmployees, listLocalInventory } from "@/lib/kiosk-local-store";
 import { resolveEppReplacementDays } from "@/lib/epp-duration-rules";
+import { normalizePlantId } from "@/lib/plants";
+import { usePlantStore } from "@/store/usePlantStore";
+
+type EmployeeOption = { id: string; name: string; area?: string; plantaId?: string };
+type ItemOption = { id: string; name: string; stock: number; replacementDays: number; plantaId?: string };
 
 export function AssignPpeDialog() {
   const { user: authUser } = useAuth();
+  const { activePlantId } = usePlantStore();
+  const writePlantId = normalizePlantId(activePlantId);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  const [employees, setEmployees] = useState<{id: string, name: string}[]>([]);
-  const [items, setItems] = useState<{id: string, name: string, stock: number, replacementDays: number}[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [items, setItems] = useState<ItemOption[]>([]);
 
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedItem, setSelectedItem] = useState("");
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const empSnap = await getDocs(query(collection(db, 'employees')));
-      setEmployees(empSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+      const empSnap = await getDocs(activePlantId === 'todas'
+        ? query(collection(db, 'employees'))
+        : query(collection(db, 'employees'), where('plantaId', '==', activePlantId))
+      );
+      setEmployees(empSnap.docs.map(d => ({
+        id: d.id,
+        name: d.data().name,
+        area: d.data().area,
+        plantaId: d.data().plantaId,
+      })));
 
-      const itemSnap = await getDocs(query(collection(db, 'ppe_catalog')));
+      const itemSnap = await getDocs(activePlantId === 'todas'
+        ? query(collection(db, 'ppe_catalog'))
+        : query(collection(db, 'ppe_catalog'), where('plantaId', '==', activePlantId))
+      );
       setItems(itemSnap.docs.map(d => {
         const data = d.data();
         return {
@@ -49,6 +67,8 @@ export function AssignPpeDialog() {
           },
           Number(data.replacementDays ?? 365)
         )
+        ,
+        plantaId: data.plantaId,
       };
       }));
     } catch (err) {
@@ -61,7 +81,7 @@ export function AssignPpeDialog() {
         replacementDays: Number(item.replacementDays ?? 365),
       })));
     }
-  };
+  }, [activePlantId]);
 
   useEffect(() => {
     if (!open) return;
@@ -69,7 +89,7 @@ export function AssignPpeDialog() {
     void (async () => {
       await fetchData();
     })();
-  }, [open]);
+  }, [fetchData, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +98,7 @@ export function AssignPpeDialog() {
     setLoading(true);
     try {
       const itemRecord = items.find(i => i.id === selectedItem);
+      const employeeRecord = employees.find(employee => employee.id === selectedEmployee);
       if (!itemRecord) throw new Error("Item no encontrado");
 
       if (itemRecord.stock <= 0) {
@@ -120,6 +141,9 @@ export function AssignPpeDialog() {
 
         transaction.set(doc(db, 'assignments', assignmentId), {
           employeeId: selectedEmployee,
+          employeeName: employeeRecord?.name ?? '',
+          employeeArea: employeeRecord?.area ?? '',
+          plantaId: normalizePlantId(employeeRecord?.plantaId ?? itemData.plantaId ?? writePlantId),
           sku: assignmentSku,
           itemId: selectedItem,
           itemName: itemData.name ?? itemRecord.name,
@@ -133,6 +157,7 @@ export function AssignPpeDialog() {
 
         transaction.update(itemRef, {
           stock: nextStock,
+          plantaId: normalizePlantId(itemData.plantaId ?? writePlantId),
           updatedAt: serverTimestamp()
         });
 
@@ -140,6 +165,7 @@ export function AssignPpeDialog() {
           transaction.update(kioskItemRef, {
             stock: nextStock,
             available: nextStock > 0,
+            plantaId: normalizePlantId(itemData.plantaId ?? writePlantId),
             updatedAt: serverTimestamp()
           });
         }
