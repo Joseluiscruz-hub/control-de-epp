@@ -7,9 +7,12 @@ import {
   onSnapshot,
   query,
   where,
+  orderBy,
+  limit,
   type CollectionReference,
   type DocumentData,
   type Query,
+  type QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DEFAULT_PLANT_ID, plantLabel, type ActivePlantId } from "@/lib/plants";
@@ -79,9 +82,21 @@ function docPlant(data: Record<string, unknown>) {
   return text(data.plantaId, DEFAULT_PLANT_ID);
 }
 
-function scopedQuery(ref: CollectionReference<DocumentData>, activePlantId: ActivePlantId): Query<DocumentData> {
-  if (activePlantId === "todas") return query(ref);
-  return query(ref, where("plantaId", "==", activePlantId));
+function scopedQuery(
+  ref: CollectionReference<DocumentData>,
+  activePlantId: ActivePlantId,
+  ...extra: QueryConstraint[]
+): Query<DocumentData> {
+  const constraints: QueryConstraint[] =
+    activePlantId === "todas" ? [] : [where("plantaId", "==", activePlantId)];
+  return query(ref, ...constraints, ...extra);
+}
+
+function daysAgo(days: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 function isToday(date: Date) {
@@ -138,9 +153,10 @@ export function useLiveDashboard(): LiveDashboardState {
 
       const attach = (
         ref: CollectionReference<DocumentData>,
-        setter: Dispatch<SetStateAction<LiveDoc[]>>
+        setter: Dispatch<SetStateAction<LiveDoc[]>>,
+        ...extra: QueryConstraint[]
       ) => onSnapshot(
-        scopedQuery(ref, activePlantId),
+        scopedQuery(ref, activePlantId, ...extra),
         (snapshot) => {
           setter(snapshot.docs.map((docSnap) => ({ id: docSnap.id, data: docSnap.data() })));
           setPendingListeners((current) => Math.max(0, current - 1));
@@ -152,11 +168,16 @@ export function useLiveDashboard(): LiveDashboardState {
         }
       );
 
+      const thirtyDaysAgo = daysAgo(30);
+
       unsubscribers = [
-        attach(collection(db, "kiosk_requests"), setRequests),
-        attach(collection(db, "assignments"), setAssignments),
+        attach(collection(db, "kiosk_requests"), setRequests,
+          where("createdAt", ">=", thirtyDaysAgo), orderBy("createdAt", "desc"), limit(200)),
+        attach(collection(db, "assignments"), setAssignments,
+          where("assignedAt", ">=", thirtyDaysAgo), orderBy("assignedAt", "desc"), limit(500)),
         attach(collection(db, "ppe_catalog"), setInventory),
-        attach(collection(db, "kiosk_alerts"), setAlerts),
+        attach(collection(db, "kiosk_alerts"), setAlerts,
+          where("createdAt", ">=", thirtyDaysAgo), orderBy("createdAt", "desc"), limit(100)),
       ];
     }, 0);
 
