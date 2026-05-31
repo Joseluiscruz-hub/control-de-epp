@@ -64,6 +64,8 @@ export interface KioskRequestItem {
   requiredQuantity?: number;
   requiredUnit?: string;
   replacementReason?: ReplacementReason;
+  chargeAmount?: number;
+  signatureDataUrl?: string | null;
   earlyReplacementAlert?: KioskEarlyReplacementAlert;
 }
 

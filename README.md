@@ -248,6 +248,7 @@ Principios:
 - Los permisos administrativos salen de `users/{uid}` o de un bootstrap temporal controlado por bandera.
 - Firestore Rules validan esquemas antes de permitir escritura.
 - Las escrituras críticas de inventario pasan por APIs server-side con auditoría.
+- `ppe_catalog`, `kiosk_catalog`, `assignments`, `kiosk_requests` y `kiosk_request_status` no aceptan escrituras directas desde cliente.
 - `employees` no es público.
 - `kiosk_employees` permite `get` exacto, no `list`.
 - `kiosk_catalog` permite lectura pública controlada.

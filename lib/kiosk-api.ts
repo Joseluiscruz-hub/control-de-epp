@@ -1,6 +1,5 @@
 import {
-  doc, getDoc, collection, serverTimestamp, query, where, getDocs, limit, writeBatch,
-  runTransaction, Timestamp
+  doc, getDoc, collection, query, where, getDocs, limit
 } from "firebase/firestore";
 import { auth, db, ensureFirebaseReady, getAppCheckTokenForRequest } from "./firebase";
 import { resolveEppReplacementDays, getEppDurationRulePayload } from "./epp-duration-rules";
@@ -14,7 +13,6 @@ import {
 } from "./kiosk-types";
 import {
   canUseLocalFallback,
-  createLocalAssignment,
   createLocalKioskRequest,
   getLocalActiveAssignment,
   getLocalKioskEmployee,
@@ -26,7 +24,6 @@ import {
   saveLocalKioskEmployeePin,
   updateLocalKioskRequestStatus,
 } from "./kiosk-local-store";
-import { calcNextReplacementDate } from "./replacement-logic";
 import { legacyHashPin } from "./pin-utils";
 import type { ActivePlantId } from "./plants";
 
@@ -197,127 +194,46 @@ export interface DispenseParams {
 }
 
 export async function dispenseEPP(params: DispenseParams): Promise<string> {
-  const nextReplacement = calcNextReplacementDate(params.replacementDays);
   try {
-    await ensureFirebaseReady();
-    const prev = await getActiveAssignment(params.employeeId, params.sku);
-    const assignmentRef = doc(collection(db, "assignments"));
-    const chargeRef = params.chargeAmount && params.chargeAmount > 0
-      ? doc(collection(db, "loss_charges"))
-      : null;
+    const employee = await getEmployeeById(params.employeeId);
+    const employeeName =
+      employee?.name ||
+      (typeof window !== "undefined" ? sessionStorage.getItem("kiosk_employee_name") ?? "" : "");
 
-    await runTransaction(db, async (transaction) => {
-      const catalogRef = doc(db, "ppe_catalog", params.itemId);
-      const kioskCatalogRef = doc(db, "kiosk_catalog", params.itemId);
-      const [catalogSnap, kioskCatalogSnap] = await Promise.all([
-        transaction.get(catalogRef),
-        transaction.get(kioskCatalogRef),
-      ]);
+    if (!employeeName) {
+      throw new KioskApiError("No se pudo identificar al colaborador para crear la solicitud.", 409);
+    }
 
-      if (!catalogSnap.exists()) {
-        throw new Error("item_not_found");
-      }
-
-      const catalogData = catalogSnap.data() as Record<string, unknown>;
-      const catalogUpdates: Record<string, unknown> = {
-        updatedAt: serverTimestamp(),
-      };
-      const kioskUpdates: Record<string, unknown> = {
-        updatedAt: serverTimestamp(),
-      };
-
-      let currentStock = 0;
-      if (params.size && params.size !== "N/A") {
-        const sizes = catalogData.sizes as Record<string, { stock?: unknown }> | undefined;
-        const currentVariant = sizes?.[params.size];
-        currentStock = Number(currentVariant?.stock ?? 0);
-
-        if (!Number.isFinite(currentStock) || currentStock <= 0) {
-          throw new Error("out_of_stock");
-        }
-
-        const nextStock = currentStock - 1;
-        catalogUpdates[`sizes.${params.size}.stock`] = nextStock;
-        catalogUpdates[`sizes.${params.size}.available`] = nextStock > 0;
-        kioskUpdates[`sizes.${params.size}.stock`] = nextStock;
-        kioskUpdates[`sizes.${params.size}.available`] = nextStock > 0;
-
-        if (typeof catalogData.stock === "number") {
-          const aggregateStock = Math.max(0, catalogData.stock - 1);
-          catalogUpdates.stock = aggregateStock;
-          kioskUpdates.stock = aggregateStock;
-          kioskUpdates.available = aggregateStock > 0;
-        }
-      } else {
-        currentStock = Number(catalogData.stock ?? 0);
-        if (!Number.isFinite(currentStock) || currentStock <= 0) {
-          throw new Error("out_of_stock");
-        }
-
-        const nextStock = currentStock - 1;
-        catalogUpdates.stock = nextStock;
-        kioskUpdates.stock = nextStock;
-        kioskUpdates.available = nextStock > 0;
-      }
-
-      transaction.set(assignmentRef, {
-        employeeId: params.employeeId,
-        sku: params.sku,
+    return await createKioskRequest({
+      employeeId: params.employeeId,
+      employeeName,
+      items: [{
         itemId: params.itemId,
-        replacementDays: params.replacementDays,
+        itemName: params.itemId,
+        sku: params.sku,
         size: params.size || "N/A",
-        assignedAt: serverTimestamp(),
-        nextReplacementAt: Timestamp.fromDate(nextReplacement),
-        status: "active",
+        replacementDays: params.replacementDays,
         replacementReason: params.reason,
         chargeAmount: params.chargeAmount ?? 0,
-        chargeApproved: params.chargeAmount ? false : true,
         signatureDataUrl: params.signatureDataUrl ?? null,
-        issuedByKiosk: params.issuedByKiosk,
-        issuedByUserId: "kiosk",
-      });
-
-      transaction.update(catalogRef, catalogUpdates);
-
-      if (kioskCatalogSnap.exists()) {
-        transaction.update(kioskCatalogRef, kioskUpdates);
-      }
-
-      if (prev && prev.id !== assignmentRef.id) {
-        transaction.update(doc(db, "assignments", prev.id), {
-          status: "replaced",
-          updatedAt: serverTimestamp(),
-        });
-      }
-
-      if (chargeRef) {
-        transaction.set(chargeRef, {
-          assignmentId: assignmentRef.id,
-          employeeId: params.employeeId,
-          sku: params.sku,
-          chargeAmount: params.chargeAmount,
-          signatureDataUrl: params.signatureDataUrl ?? null,
-          createdAt: serverTimestamp(),
-          status: "pending_payroll",
-        });
-      }
+      }],
     });
-
-    return assignmentRef.id;
   } catch (error) {
     if (!canFallbackToLocal(error)) throw error;
-    console.warn("[Kiosko] Dispensando EPP en modo local.", error);
-    return createLocalAssignment({
+    console.warn("[Kiosko] API de solicitud no disponible; creando solicitud local.", error);
+    return createLocalKioskRequest({
       employeeId: params.employeeId,
-      sku: params.sku,
-      size: params.size || "N/A",
-      itemId: params.itemId,
-      replacementDays: params.replacementDays,
-      replacementReason: params.reason,
-      chargeAmount: params.chargeAmount ?? 0,
-      signatureDataUrl: params.signatureDataUrl ?? null,
-      issuedByKiosk: params.issuedByKiosk,
-      issuedByUserId: "kiosk",
+      employeeName: typeof window !== "undefined" ? sessionStorage.getItem("kiosk_employee_name") ?? "" : "",
+      items: [{
+        itemId: params.itemId,
+        itemName: params.itemId,
+        sku: params.sku,
+        size: params.size || "N/A",
+        replacementDays: params.replacementDays,
+        replacementReason: params.reason,
+        chargeAmount: params.chargeAmount ?? 0,
+        signatureDataUrl: params.signatureDataUrl ?? null,
+      }],
     });
   }
 }
@@ -348,37 +264,7 @@ export async function createKioskRequest(input: {
     if (typeof data?.requestId === "string") return data.requestId;
     throw new KioskApiError("Respuesta invalida del servidor.", 500);
   } catch (error) {
-    if (error instanceof KioskApiError && error.status < 500) throw error;
-    console.warn("[Kiosko] API de solicitudes no disponible; usando respaldo local/directo.", error);
-  }
-
-  try {
-    await ensureFirebaseReady();
-    const ref = doc(collection(db, "kiosk_requests"));
-    const batch = writeBatch(db);
-
-    batch.set(ref, {
-      employeeId: input.employeeId,
-      employeeName: input.employeeName,
-      ...(input.plantaId ? { plantaId: input.plantaId } : {}),
-      items: input.items,
-      status: "pending",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      source: "kiosk",
-    });
-
-    batch.set(doc(db, "kiosk_request_status", ref.id), {
-      requestId: ref.id,
-      status: "pending",
-      ...(input.plantaId ? { plantaId: input.plantaId } : {}),
-      source: "kiosk",
-      updatedAt: serverTimestamp(),
-    });
-
-    await batch.commit();
-    return ref.id;
-  } catch (error) {
+    if (!canFallbackToLocal(error)) throw error;
     console.warn("[Kiosko] Creando solicitud en modo local.", error);
     return createLocalKioskRequest(input);
   }

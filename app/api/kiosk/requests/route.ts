@@ -466,6 +466,8 @@ async function sanitizeRequestItem(db: FirebaseFirestore.Firestore, input: Reque
     size,
     replacementDays,
     ...(replacementReason ? { replacementReason } : {}),
+    ...(readNumber(input.chargeAmount) > 0 ? { chargeAmount: readNumber(input.chargeAmount) } : {}),
+    ...(typeof input.signatureDataUrl === "string" ? { signatureDataUrl: input.signatureDataUrl } : {}),
     ...getEppDurationRulePayload(ruleInput),
   };
 }
@@ -617,6 +619,19 @@ export async function POST(req: NextRequest) {
         source: "kiosk",
       });
     });
+    batch.set(db.collection("audit_events").doc(), buildAuditEvent({
+      type: "kiosk.request.create",
+      targetCollection: "kiosk_requests",
+      targetId: requestRef.id,
+      after: { status: "pending", itemCount: items.length },
+      metadata: {
+        employeeId,
+        employeeName,
+        employeeArea,
+        plantaId,
+        warningCount: warnings.length,
+      },
+    }, req));
 
     await batch.commit();
 

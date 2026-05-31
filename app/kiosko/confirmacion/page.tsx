@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { dispenseEPP } from "@/lib/kiosk-api";
+import { createKioskRequest } from "@/lib/kiosk-api";
+import { KioskRequestItem } from "@/lib/kiosk-types";
 import { clearKioskSession, setKioskSessionBusy } from "@/lib/kiosk-session";
 import { CheckCircle2, AlertTriangle, Clock, Loader2, HardHat } from "lucide-react";
 
@@ -34,28 +35,24 @@ export default function KioskoConfirmacionPage() {
     setStep("loading");
     setKioskSessionBusy(true);
     try {
-      await dispenseEPP({
+      const requestId = await createKioskRequest({
         employeeId: solicitud.employeeId,
-        sku: solicitud.sku,
-        size: solicitud.size,
-        itemId: solicitud.itemId,
-        replacementDays: solicitud.replacementDays,
-        reason: solicitud.reason,
-        chargeAmount: solicitud.chargeAmount ?? 0,
-        signatureDataUrl: solicitud.signatureDataUrl ?? undefined,
-        issuedByKiosk: true,
+        employeeName,
+        items: [{
+          itemId: solicitud.itemId,
+          itemName: solicitud.itemName ?? solicitud.sku ?? solicitud.itemId,
+          sku: solicitud.sku,
+          size: solicitud.size || "N/A",
+          replacementDays: Number(solicitud.replacementDays ?? 365),
+          replacementReason: solicitud.reason,
+          chargeAmount: solicitud.chargeAmount ?? 0,
+          signatureDataUrl: solicitud.signatureDataUrl ?? null,
+        } satisfies KioskRequestItem],
       });
-      setStep("done");
+      sessionStorage.setItem("kiosk_request_id", requestId);
       sessionStorage.removeItem("kiosk_solicitud");
       sessionStorage.removeItem("kiosk_selected_item");
-
-      // Countdown para regresar
-      let c = 10;
-      const t = setInterval(() => {
-        c--;
-        setCountdown(c);
-        if (c <= 0) { clearInterval(t); clearKioskSession(); router.push("/kiosko"); }
-      }, 1000);
+      router.push("/kiosko/espera");
     } catch (e: any) {
       setErrorMsg(e?.message ?? "Error al procesar. Llama al supervisor.");
       setStep("error");

@@ -22,33 +22,27 @@ service cloud.firestore {
     // ── Catálogo EPP ───────────────────────────────────────────────────────
     match /ppe_catalog/{itemId} {
       allow read: if request.auth != null && hasPlantAccess(resource.data);
-      allow create, update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data);
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     // ── Catálogo público seguro para kiosko ────────────────────────────────
     match /kiosk_catalog/{itemId} {
       allow read: if true;
-      allow create, update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data);
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     // ── Solicitudes Kiosko ─────────────────────────────────────────────────
     match /kiosk_requests/{requestId} {
       allow get: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
       allow list: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
-      allow create: if isValidKioskRequest(request.resource.data);
-      allow update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && onlyAdminUpdatingKioskRequestStatus(request.resource.data, resource.data);
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     // ── Estado público mínimo de solicitud para kiosko ─────────────────────
     match /kiosk_request_status/{requestId} {
       allow get: if true;
       allow list: if false;
-      allow create: if isValidKioskRequestStatus(request.resource.data, requestId);
-      allow update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && isValidKioskRequestStatus(request.resource.data, requestId);
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     // ── Alertas administrativas generadas por servidor ────────────────────
@@ -66,21 +60,13 @@ service cloud.firestore {
     // ── Asignaciones ───────────────────────────────────────────────────────
     match /assignments/{assignmentId} {
       allow read: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
-      allow create: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && isValidAssignment(request.resource.data);
-      allow update: if request.auth != null && (
-        (isAdmin() && canWritePlant(request.resource.data)) ||
-        // Solo se puede cambiar status de pending_review a active/cancelled
-        onlyUpdatingStatus(request.resource.data, resource.data)
-      );
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     // ── Cobros por Extravío ─────────────────────────────────────────────────
     match /loss_charges/{chargeId} {
       allow read: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
-      allow create: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && isValidLossCharge(request.resource.data);
-      allow update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data);
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     // ── Sesiones Kiosko ─────────────────────────────────────────────────────
@@ -308,7 +294,7 @@ service cloud.firestore {
         && item.keys().hasOnly([
           "itemId", "itemName", "sku", "size", "replacementDays", "replacementReason",
           "durationRuleId", "durationRuleSource", "durationRuleSku", "durationRuleSapMaterial",
-          "requiredQuantity", "requiredUnit", "earlyReplacementAlert"
+          "requiredQuantity", "requiredUnit", "chargeAmount", "signatureDataUrl", "earlyReplacementAlert"
         ])
         && item.itemId is string && item.itemId.size() > 0
         && item.itemName is string && item.itemName.size() > 0
@@ -321,6 +307,8 @@ service cloud.firestore {
         && optionalString(item.durationRuleSapMaterial)
         && (item.requiredQuantity == null || item.requiredQuantity is number)
         && optionalString(item.requiredUnit)
+        && (item.chargeAmount == null || (item.chargeAmount is number && item.chargeAmount >= 0))
+        && optionalString(item.signatureDataUrl)
         && (item.earlyReplacementAlert == null || item.earlyReplacementAlert is map)
         && (item.replacementReason == null || item.replacementReason in ["vida_util", "desgaste", "extravio"]);
     }
