@@ -7,6 +7,7 @@ import { KioskRequestItem, PPECatalogItem, ReplacementReason } from "@/lib/kiosk
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle, CheckCircle2, DollarSign, Footprints, Glasses, Hand, HardHat, Headphones, Loader2, Package, Search, Shirt, Wind } from "lucide-react";
 import { clearKioskSession, setKioskSessionBusy } from "@/lib/kiosk-session";
+import { useKioskSessionSnapshot } from "../use-kiosk-session-snapshot";
 
 const CATEGORY_ICONS: Record<string, ReactNode> = {
   Guantes: <Hand className="h-5 w-5" />,
@@ -54,6 +55,7 @@ type CatalogAvailabilityStatus = "ok" | "empty" | "unauthorized";
 
 export default function KioskoCatalogoPage() {
   const router = useRouter();
+  const { ready, employeeId, employeeName, pinVerified } = useKioskSessionSnapshot();
   const [items, setItems] = useState<PPECatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -62,12 +64,6 @@ export default function KioskoCatalogoPage() {
   const [submitError, setSubmitError] = useState("");
   const [reasonDialogOpen, setReasonDialogOpen] = useState(false);
   const [requestReason, setRequestReason] = useState<ReplacementReason | null>(null);
-  const [employeeName] = useState(() =>
-    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_name") ?? ""
-  );
-  const [employeeId] = useState(() =>
-    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_id") ?? ""
-  );
   const [selectedByItem, setSelectedByItem] = useState<Record<string, SelectedVariant>>({});
   const [sizeByItem, setSizeByItem] = useState<Record<string, string>>({});
   const selectedCount = Object.keys(selectedByItem).length;
@@ -78,8 +74,8 @@ export default function KioskoCatalogoPage() {
   }, [router]);
 
   useEffect(() => {
-    const verified = sessionStorage.getItem("kiosk_pin_verified");
-    if (!employeeId || verified !== "true") {
+    if (!ready) return;
+    if (!employeeId || !pinVerified) {
       router.replace("/kiosko");
       return;
     }
@@ -95,7 +91,7 @@ export default function KioskoCatalogoPage() {
     return () => {
       cancelled = true;
     };
-  }, [employeeId, router]);
+  }, [employeeId, pinVerified, ready, router]);
 
   const isVariantAvailable = (variant?: { available?: boolean; stock?: number }) => (
     Boolean(variant) && (variant?.available === true || Number(variant?.stock ?? 0) > 0)
@@ -124,6 +120,14 @@ export default function KioskoCatalogoPage() {
       }),
     [items, category, search]
   );
+
+  if (!ready || !employeeId || !pinVerified) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-amber-400" />
+      </div>
+    );
+  }
 
   const toggleSelection = (item: PPECatalogItem) => {
     const status = getItemStatus(item);

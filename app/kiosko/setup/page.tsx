@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { saveEmployeePin } from "@/lib/kiosk-api";
 import { setKioskSessionBusy } from "@/lib/kiosk-session";
+import { useKioskSessionSnapshot } from "../use-kiosk-session-snapshot";
 import { Shield, Check, ChevronDown, Loader2 } from "lucide-react";
 
 const TERMS_TEXT = `
@@ -32,12 +33,7 @@ Al aceptar estos términos, el empleado reconoce haber leído, entendido y acept
 
 export default function KioskoSetupPage() {
   const router = useRouter();
-  const [employeeName] = useState(() =>
-    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_name") ?? ""
-  );
-  const [employeeId] = useState(() =>
-    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_id") ?? ""
-  );
+  const { ready, employeeId, employeeName } = useKioskSessionSnapshot();
   const [step, setStep] = useState<"terms" | "pin">("terms");
   const [termsScrolled, setTermsScrolled] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -48,10 +44,11 @@ export default function KioskoSetupPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!ready) return;
     if (!employeeId) {
       router.push("/kiosko");
     }
-  }, [employeeId, router]);
+  }, [employeeId, ready, router]);
 
   const handleTermsScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -111,6 +108,14 @@ export default function KioskoSetupPage() {
 
   const keys = ["1","2","3","4","5","6","7","8","9","⌫","0","✓"];
   const currentPin = pinStep === "enter" ? pin : pinConfirm;
+
+  if (!ready || !employeeId) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-amber-400" />
+      </div>
+    );
+  }
 
   if (step === "terms") {
     return (

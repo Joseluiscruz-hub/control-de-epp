@@ -4,16 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { validateEmployeePin } from "@/lib/kiosk-api";
 import { setKioskSessionBusy } from "@/lib/kiosk-session";
+import { useKioskSessionSnapshot } from "../use-kiosk-session-snapshot";
 import { Lock, Loader2 } from "lucide-react";
 
 export default function KioskoLoginPage() {
   const router = useRouter();
-  const [employeeName] = useState(() =>
-    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_name") ?? ""
-  );
-  const [employeeId] = useState(() =>
-    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_id") ?? ""
-  );
+  const { ready, employeeId, employeeName } = useKioskSessionSnapshot();
   const [pin, setPin] = useState("");
   const [attempts, setAttempts] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -21,10 +17,11 @@ export default function KioskoLoginPage() {
   const MAX_ATTEMPTS = 5;
 
   useEffect(() => {
+    if (!ready) return;
     if (!employeeId) {
       router.push("/kiosko");
     }
-  }, [employeeId, router]);
+  }, [employeeId, ready, router]);
 
   const handleKey = async (k: string) => {
     if (loading || attempts >= MAX_ATTEMPTS) return;
@@ -76,6 +73,14 @@ export default function KioskoLoginPage() {
   };
 
   const keys = ["1","2","3","4","5","6","7","8","9","⌫","0","✓"];
+
+  if (!ready || !employeeId) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-amber-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6 py-8 max-w-sm mx-auto w-full">

@@ -1,34 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createKioskRequest } from "@/lib/kiosk-api";
 import { KioskRequestItem } from "@/lib/kiosk-types";
 import { clearKioskSession, setKioskSessionBusy } from "@/lib/kiosk-session";
+import { parseKioskSessionJson, useKioskSessionSnapshot } from "../use-kiosk-session-snapshot";
 import { CheckCircle2, AlertTriangle, Clock, Loader2, HardHat } from "lucide-react";
 
 export default function KioskoConfirmacionPage() {
   const router = useRouter();
+  const { ready, employeeId, employeeName, pinVerified, solicitudRaw } = useKioskSessionSnapshot();
   const [step, setStep] = useState<"confirm" | "loading" | "done" | "error">("confirm");
-  const [solicitud] = useState<any>(() => {
-    if (typeof window === "undefined") return null;
-    const raw = sessionStorage.getItem("kiosk_solicitud");
-    const employeeId = sessionStorage.getItem("kiosk_employee_id");
-    if (!raw || !employeeId) return null;
-    return { ...JSON.parse(raw), employeeId };
-  });
+  const solicitud = useMemo(() => {
+    const parsed = parseKioskSessionJson<any>(solicitudRaw);
+    return parsed && employeeId ? { ...parsed, employeeId } : null;
+  }, [employeeId, solicitudRaw]);
   const [errorMsg, setErrorMsg] = useState("");
   const [countdown, setCountdown] = useState(10);
-  const [employeeName] = useState(() =>
-    typeof window === "undefined" ? "" : sessionStorage.getItem("kiosk_employee_name") ?? ""
-  );
 
   useEffect(() => {
-    const verified = sessionStorage.getItem("kiosk_pin_verified");
-    if (!solicitud || verified !== "true") {
+    if (!ready) return;
+    if (!solicitud || !pinVerified) {
       router.push("/kiosko");
     }
-  }, [router, solicitud]);
+  }, [pinVerified, ready, router, solicitud]);
 
   const handleConfirm = async () => {
     if (!solicitud) return;
@@ -83,7 +79,7 @@ export default function KioskoConfirmacionPage() {
 
   const msg = solicitud ? REASON_MSGS[solicitud.reason] : null;
 
-  if (!solicitud) return (
+  if (!ready || !solicitud || !pinVerified) return (
     <div className="flex-1 flex items-center justify-center">
       <Loader2 size={32} className="animate-spin text-amber-400" />
     </div>

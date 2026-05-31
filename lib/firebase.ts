@@ -62,6 +62,7 @@ let _initialized = false;
 let _initPromise: Promise<void> | null = null;
 let _firestoreDatabaseId = '(default)';
 let _appCheck: AppCheck | null = null;
+let _appCheckTokenWarningShown = false;
 
 function hasRequiredConfig(config: FirebaseAppConfig) {
   return Boolean(config.apiKey && config.authDomain && config.projectId && config.appId);
@@ -170,8 +171,16 @@ function getFirebaseAppCheck() {
 export async function getAppCheckTokenForRequest() {
   const appCheck = getFirebaseAppCheck();
   if (!appCheck) return undefined;
-  const result = await getToken(appCheck, false);
-  return result.token;
+  try {
+    const result = await getToken(appCheck, false);
+    return result.token;
+  } catch (error) {
+    if (!_appCheckTokenWarningShown) {
+      console.warn("[App Check] Token unavailable; request will continue without App Check while monitoring is disabled.", error);
+      _appCheckTokenWarningShown = true;
+    }
+    return undefined;
+  }
 }
 
 function initializeFromStaticConfig() {

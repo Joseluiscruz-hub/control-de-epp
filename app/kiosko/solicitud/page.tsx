@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getActiveAssignment } from "@/lib/kiosk-api";
 import { PPECatalogItem, ReplacementReason } from "@/lib/kiosk-types";
 import { evaluateReplacement, getStockStatus } from "@/lib/replacement-logic";
+import { parseKioskSessionJson, useKioskSessionSnapshot } from "../use-kiosk-session-snapshot";
 import {
   ArrowLeft, AlertTriangle, CheckCircle2,
   PenLine, DollarSign, RotateCcw, Loader2,
@@ -19,45 +20,56 @@ const REASON_LABELS: Record<ReplacementReason, { label: string; icon: ReactNode;
 
 export default function KioskoSolicitudPage() {
   const router = useRouter();
-  const employeeId = typeof window !== "undefined" ? sessionStorage.getItem("kiosk_employee_id") ?? "" : "";
-  const [item] = useState<PPECatalogItem | null>(() => {
-    if (typeof window === "undefined") return null;
-    const raw = sessionStorage.getItem("kiosk_selected_item");
-    return raw ? (JSON.parse(raw) as PPECatalogItem) : null;
-  });
-  const [selectedSize, setSelectedSize] = useState<string | null>(() =>
-    item && !item.hasSizes && item.sku ? "N/A" : null
+  const { ready, employeeId, pinVerified, selectedItemRaw } = useKioskSessionSnapshot();
+  const item = useMemo(
+    () => parseKioskSessionJson<PPECatalogItem>(selectedItemRaw),
+    [selectedItemRaw]
   );
-  const [selectedSku, setSelectedSku] = useState<string | null>(() =>
-    item && !item.hasSizes ? item.sku ?? null : null
-  );
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [reason, setReason] = useState<ReplacementReason | null>(null);
   const [lastAssignment, setLastAssignment] = useState<any>(null);
-  const [loadingAssignment, setLoadingAssignment] = useState(() => Boolean(item && !item.hasSizes && item.sku && employeeId));
+  const [loadingAssignment, setLoadingAssignment] = useState(false);
   const [signatureDone, setSignatureDone] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
   useEffect(() => {
-    const verified = sessionStorage.getItem("kiosk_pin_verified");
-    if (!item || verified !== "true") {
+    if (!ready) return;
+    if (!item || !pinVerified) {
       router.push("/kiosko");
     }
-  }, [item, router]);
+  }, [item, pinVerified, ready, router]);
+
+  useEffect(() => {
+    if (!item || item.hasSizes || !item.sku) return;
+    const timeout = window.setTimeout(() => {
+      setSelectedSize("N/A");
+      setSelectedSku(item.sku ?? null);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [item]);
 
   // Cargar asignación activa cuando se selecciona SKU
   useEffect(() => {
     if (!selectedSku || !employeeId) return;
     let cancelled = false;
+    const loadingTimeout = window.setTimeout(() => {
+      if (!cancelled) setLoadingAssignment(true);
+    }, 0);
 
     void getActiveAssignment(employeeId, selectedSku).then((assignment) => {
       if (cancelled) return;
       setLastAssignment(assignment);
-      setLoadingAssignment(false);
+    }).catch(() => {
+      if (!cancelled) setLastAssignment(null);
+    }).finally(() => {
+      if (!cancelled) setLoadingAssignment(false);
     });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(loadingTimeout);
     };
   }, [employeeId, selectedSku]);
 
@@ -141,7 +153,7 @@ export default function KioskoSolicitudPage() {
     setSignatureDone(false);
   };
 
-  if (!item) return (
+  if (!ready || !item || !pinVerified) return (
     <div className="flex-1 flex items-center justify-center">
       <Loader2 size={32} className="animate-spin text-amber-400" />
     </div>
