@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
 import { FieldValue } from "firebase-admin/firestore";
 import { NextRequest } from "next/server";
+import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
+import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
 import {
   assertKioskPinRateLimit,
@@ -10,7 +12,7 @@ import {
   kioskPinRateLimitResponse,
   registerKioskPinFailure,
 } from "@/lib/kiosk-pin-rate-limit";
-import { isSixDigitPin } from "@/lib/pin-utils";
+import { isSixDigitPin, isWeakPin } from "@/lib/pin-utils";
 
 export const runtime = "nodejs";
 
@@ -34,12 +36,17 @@ async function registerFailure(db: ReturnType<typeof getAdminDb>, employeeKey: s
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAppCheck(req);
+
     const body = await req.json();
     const employeeId = typeof body?.employeeId === "string" ? body.employeeId.trim() : "";
     const pin = typeof body?.pin === "string" ? body.pin.trim() : "";
 
     if (!employeeId || !isSixDigitPin(pin)) {
       return Response.json({ error: "Empleado y PIN de 6 digitos requeridos." }, { status: 400 });
+    }
+    if (isWeakPin(pin)) {
+      return Response.json({ error: "Elige un PIN menos predecible." }, { status: 400 });
     }
 
     const db = getAdminDb();
@@ -73,9 +80,11 @@ export async function POST(req: NextRequest) {
 
         transaction.update(employeeRef, {
           pin: pinHash,
+          pinVersion: 2,
           firstLogin: false,
           termsAccepted: true,
           termsAcceptedAt: FieldValue.serverTimestamp(),
+          lastPinChangeAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         });
       });
@@ -89,10 +98,22 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
-    await clearKioskPinFailures(db, attemptKey);
+    await Promise.all([
+      clearKioskPinFailures(db, attemptKey),
+      clearKioskPinFailures(db, clientAttemptKey),
+      db.collection("audit_events").add(buildAuditEvent({
+        type: "kiosk.pin.setup",
+        targetCollection: "kiosk_employees",
+        targetId: employeeId,
+        metadata: { source: "kiosk", pinVersion: 2 },
+      }, req)),
+    ]);
 
     return Response.json({ success: true });
   } catch (error) {
+    if (error instanceof AppCheckHttpError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error("[Kiosk PIN setup error]:", error);
     return Response.json({ error: "No se pudo configurar el PIN." }, { status: 500 });
   }

@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "local:start": "next start -H 127.0.0.1 -p 3000",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "clean": "next clean"
   },

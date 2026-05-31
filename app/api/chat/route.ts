@@ -1,7 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest } from 'next/server';
+import { buildAuditEvent } from '@/lib/audit-events';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { AuthHttpError, requireAdminUser } from '@/lib/server-auth';
+import { AuthHttpError, requireAdminUser, type AdminSession } from '@/lib/server-auth';
 
 export const runtime = 'nodejs';
 
@@ -25,12 +26,45 @@ function serializeFirestoreValue(value: unknown): unknown {
   );
 }
 
-async function readPlantContext() {
+function readText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function readNumber(value: unknown, fallback = 0) {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function incrementGroupedCounter(
+  target: Record<string, Record<string, unknown>>,
+  key: string,
+  patch: Record<string, unknown>,
+  amount = 1
+) {
+  const current = target[key] ?? { total: 0 };
+  target[key] = {
+    ...current,
+    ...patch,
+    total: readNumber(current.total) + amount,
+  };
+}
+
+async function readPlantContext(adminUser: AdminSession) {
   const db = getAdminDb();
+  const plantFilter = adminUser.role === 'admin_global' ? null : adminUser.plantaId;
+  const inventoryQuery = plantFilter
+    ? db.collection('ppe_catalog').where('plantaId', '==', plantFilter).limit(500)
+    : db.collection('ppe_catalog').limit(500);
+  const employeesQuery = plantFilter
+    ? db.collection('employees').where('active', '==', true).where('plantaId', '==', plantFilter).limit(1000)
+    : db.collection('employees').where('active', '==', true).limit(1000);
+  const assignmentsQuery = plantFilter
+    ? db.collection('assignments').where('plantaId', '==', plantFilter).limit(300)
+    : db.collection('assignments').orderBy('assignedAt', 'desc').limit(300);
   const [inventorySnap, employeesSnap, assignmentsSnap] = await Promise.all([
-    db.collection('ppe_catalog').limit(500).get(),
-    db.collection('employees').where('active', '==', true).limit(500).get(),
-    db.collection('assignments').orderBy('assignedAt', 'desc').limit(50).get(),
+    inventoryQuery.get(),
+    employeesQuery.get(),
+    assignmentsQuery.get(),
   ]);
 
   const inventory: Array<Record<string, unknown>> = inventorySnap.docs.map((docSnap) => ({
@@ -38,15 +72,25 @@ async function readPlantContext() {
     ...(serializeFirestoreValue(docSnap.data()) as Record<string, unknown>),
   }));
 
-  const employees: Array<Record<string, unknown>> = employeesSnap.docs.map((docSnap) => ({
-    _id: docSnap.id,
-    ...(serializeFirestoreValue(docSnap.data()) as Record<string, unknown>),
-  }));
+  const employeesByArea: Record<string, Record<string, unknown>> = {};
+  employeesSnap.docs.forEach((docSnap) => {
+    const employee = docSnap.data();
+    const area = readText(employee.area) || readText(employee.personnelArea) || 'SIN AREA';
+    const plantaId = readText(employee.plantaId) || 'sin_planta';
+    incrementGroupedCounter(employeesByArea, `${plantaId}:${area}`, { area, plantaId });
+  });
 
-  const assignments: Array<Record<string, unknown>> = assignmentsSnap.docs.map((docSnap) => ({
-    _id: docSnap.id,
-    ...(serializeFirestoreValue(docSnap.data()) as Record<string, unknown>),
-  }));
+  const consumptionBySku: Record<string, Record<string, unknown>> = {};
+  const consumptionByArea: Record<string, Record<string, unknown>> = {};
+  assignmentsSnap.docs.forEach((docSnap) => {
+    const assignment = docSnap.data();
+    const sku = readText(assignment.sku) || readText(assignment.itemId) || 'SIN SKU';
+    const itemName = readText(assignment.itemName) || sku;
+    const area = readText(assignment.employeeArea) || 'SIN AREA';
+    const plantaId = readText(assignment.plantaId) || 'sin_planta';
+    incrementGroupedCounter(consumptionBySku, `${plantaId}:${sku}`, { sku, itemName, plantaId });
+    incrementGroupedCounter(consumptionByArea, `${plantaId}:${area}`, { area, plantaId });
+  });
 
   const alerts = inventory
     .filter((item) => {
@@ -65,9 +109,19 @@ async function readPlantContext() {
 
   return {
     inventory,
-    employees,
-    assignments,
+    employeesSummary: Object.values(employeesByArea),
+    consumptionSummary: {
+      bySku: Object.values(consumptionBySku),
+      byArea: Object.values(consumptionByArea),
+      sampledAssignments: assignmentsSnap.size,
+    },
     alerts,
+    totals: {
+      inventoryItems: inventorySnap.size,
+      activeEmployees: employeesSnap.size,
+      assignmentsSampled: assignmentsSnap.size,
+      plantScope: plantFilter ?? 'todas',
+    },
     currentDate: new Date().toISOString(),
   };
 }
@@ -82,7 +136,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await requireAdminUser(req);
+    const adminUser = await requireAdminUser(req);
 
     const body = await req.json();
     const message = typeof body?.message === 'string' ? body.message.trim() : '';
@@ -91,7 +145,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'Mensaje requerido de maximo 2000 caracteres.' }, { status: 400 });
     }
 
-    const context = await readPlantContext();
+    const context = await readPlantContext(adminUser);
     const ai = new GoogleGenAI({ apiKey });
 
     const systemInstruction = `
@@ -108,11 +162,11 @@ Tienes acceso a los datos en tiempo real de la planta:
 ### Inventario EPP (ppe_catalog):
 ${JSON.stringify(context?.inventory ?? [], null, 2)}
 
-### Empleados Activos:
-${JSON.stringify(context?.employees ?? [], null, 2)}
+### Empleados Activos (agregado por area, sin nombres):
+${JSON.stringify(context?.employeesSummary ?? [], null, 2)}
 
-### Últimas 50 Asignaciones (assignments):
-${JSON.stringify(context?.assignments ?? [], null, 2)}
+### Consumo de EPP (agregado, sin nombres de colaboradores):
+${JSON.stringify(context?.consumptionSummary ?? {}, null, 2)}
 
 ### Alertas Activas:
 ${JSON.stringify(context?.alerts ?? [], null, 2)}
@@ -147,6 +201,20 @@ ${JSON.stringify(context?.alerts ?? [], null, 2)}
     });
 
     const text = response.text;
+    await getAdminDb().collection('audit_events').add(buildAuditEvent({
+      type: 'aria.query',
+      actorUid: adminUser.uid,
+      actorEmail: adminUser.email,
+      targetCollection: 'ai_queries',
+      targetId: adminUser.uid,
+      metadata: {
+        messageLength: message.length,
+        plantScope: context.totals.plantScope,
+        inventoryItems: context.totals.inventoryItems,
+        activeEmployees: context.totals.activeEmployees,
+        assignmentsSampled: context.totals.assignmentsSampled,
+      },
+    }, req));
 
     return Response.json({ text, success: true });
   } catch (error: unknown) {

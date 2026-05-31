@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
 import { FieldValue } from "firebase-admin/firestore";
 import { NextRequest } from "next/server";
+import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
+import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
 import {
   assertKioskPinRateLimit,
@@ -32,6 +34,8 @@ async function registerFailure(db: ReturnType<typeof getAdminDb>, employeeKey: s
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAppCheck(req);
+
     const body = await req.json();
     const employeeId = typeof body?.employeeId === "string" ? body.employeeId.trim() : "";
     const pin = typeof body?.pin === "string" ? body.pin.trim() : "";
@@ -68,18 +72,34 @@ export async function POST(req: NextRequest) {
       return Response.json({ valid: false, error: "PIN incorrecto." }, { status: 401 });
     }
 
-    await clearKioskPinFailures(db, attemptKey);
+    await Promise.all([
+      clearKioskPinFailures(db, attemptKey),
+      clearKioskPinFailures(db, clientAttemptKey),
+    ]);
 
     if (!storedPin.startsWith("$2")) {
       const upgradedHash = await bcrypt.hash(pin, 12);
-      await employeeRef.update({
+      await Promise.all([
+        employeeRef.update({
         pin: upgradedHash,
+        pinVersion: 2,
+        legacyPinMigratedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
-      });
+        }),
+        db.collection("audit_events").add(buildAuditEvent({
+          type: "kiosk.pin.legacy_migrated",
+          targetCollection: "kiosk_employees",
+          targetId: employeeId,
+          metadata: { source: "kiosk", pinVersion: 2 },
+        }, req)),
+      ]);
     }
 
     return Response.json({ valid: true });
   } catch (error) {
+    if (error instanceof AppCheckHttpError) {
+      return Response.json({ valid: false, error: error.message }, { status: error.status });
+    }
     console.error("[Kiosk PIN verify error]:", error);
     return Response.json({ valid: false, error: "No se pudo validar el PIN." }, { status: 500 });
   }

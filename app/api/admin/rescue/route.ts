@@ -1,5 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { NextRequest } from "next/server";
+import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin";
 import { AuthHttpError, requireGlobalAdminUser } from "@/lib/server-auth";
 
@@ -40,7 +41,8 @@ export async function POST(req: NextRequest) {
       await auth.revokeRefreshTokens(targetUid);
     }
 
-    await db.collection("admin_rescue_events").add({
+    const batch = db.batch();
+    batch.set(db.collection("admin_rescue_events").doc(), {
       action,
       targetUid,
       targetEmail: targetUser.email ?? null,
@@ -48,6 +50,17 @@ export async function POST(req: NextRequest) {
       performedByEmail: adminUser.email,
       createdAt: FieldValue.serverTimestamp(),
     });
+    batch.set(db.collection("audit_events").doc(), buildAuditEvent({
+      type: `admin.rescue.${action}`,
+      actorUid: adminUser.uid,
+      actorEmail: adminUser.email,
+      targetCollection: "users",
+      targetId: targetUid,
+      metadata: {
+        targetEmail: targetUser.email ?? null,
+      },
+    }, req));
+    await batch.commit();
 
     return Response.json({
       success: true,

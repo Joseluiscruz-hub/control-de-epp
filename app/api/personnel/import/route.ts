@@ -1,5 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { NextRequest } from "next/server";
+import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
 import {
@@ -147,6 +148,23 @@ export async function POST(req: NextRequest) {
       await commitIfNeeded();
     }
 
+    batch.set(
+      db.collection("audit_events").doc(),
+      buildAuditEvent({
+        type: "personnel.import",
+        actorUid: adminUser.uid,
+        actorEmail: adminUser.email,
+        targetCollection: "employees",
+        targetId: plantaId,
+        metadata: {
+          plantaId,
+          createdEmployees,
+          updatedEmployees,
+          kioskEmployees: records.length,
+        },
+      }, req)
+    );
+    writes++;
     await commitIfNeeded(true);
 
     return Response.json({

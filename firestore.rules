@@ -57,6 +57,12 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // ── Bitácora de movimientos de inventario ─────────────────────────────
+    match /inventory_movements/{movementId} {
+      allow read: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
+      allow create, update, delete: if false;
+    }
+
     // ── Asignaciones ───────────────────────────────────────────────────────
     match /assignments/{assignmentId} {
       allow read: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
@@ -96,15 +102,16 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // ── Auditoría central generada por servidor ───────────────────────────
+    match /audit_events/{eventId} {
+      allow read: if request.auth != null && isGlobalAdmin();
+      allow create, update, delete: if false;
+    }
+
     // ── Funciones helper ───────────────────────────────────────────────────
 
-    function isEmailAdmin() {
-      return request.auth != null
-        && request.auth.token.email in [
-          'mimonkb222@gmail.com',
-          'malvamora23@gmail.com'
-          // Agrega más emails separados por comas
-        ];
+    function isBootstrapAdmin() {
+      return request.auth != null && request.auth.token.bootstrapAdmin == true;
     }
 
     function userProfilePath() {
@@ -120,7 +127,7 @@ service cloud.firestore {
     }
 
     function isGlobalAdmin() {
-      return isEmailAdmin()
+      return isBootstrapAdmin()
         || (hasUserProfile()
           && getUserData().active != false
           && getUserData().role == "admin_global");
@@ -206,7 +213,7 @@ service cloud.firestore {
     function isValidKioskEmployeeSnapshot(data) {
       return data.keys().hasOnly([
           "id", "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt", "pin",
-          "createdAt",
+          "pinVersion", "lastPinChangeAt", "legacyPinMigratedAt", "createdAt",
           "updatedAt", "personnelArea", "plantArea", "position", "jobFunction", "source", "schemaVersion", "plantaId"
         ])
         && data.keys().hasAll(["name", "active", "updatedAt"])
@@ -225,6 +232,9 @@ service cloud.firestore {
         && optionalString(data.source)
         && (data.plantaId == null || data.plantaId in ["cuautitlan", "toluca"])
         && (data.pin == null || (data.pin is string && data.pin.size() >= 8))
+        && (data.pinVersion == null || data.pinVersion is int)
+        && (data.lastPinChangeAt == null || data.lastPinChangeAt is timestamp)
+        && (data.legacyPinMigratedAt == null || data.legacyPinMigratedAt is timestamp)
         && (data.termsAcceptedAt == null || data.termsAcceptedAt is timestamp)
         && (data.schemaVersion == null || data.schemaVersion is int);
     }

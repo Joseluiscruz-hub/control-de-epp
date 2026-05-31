@@ -13,15 +13,22 @@ export class AuthHttpError extends Error {
   }
 }
 
-function getConfiguredAdminEmails() {
-  const rawEmails = process.env.ADMIN_EMAILS || process.env.NEXT_PUBLIC_ADMIN_EMAILS || "";
-  const emails = rawEmails
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
+const ENABLE_BOOTSTRAP_ADMIN = process.env.ENABLE_BOOTSTRAP_ADMIN === "true";
+const BOOTSTRAP_ADMIN_EMAIL = (process.env.BOOTSTRAP_ADMIN_EMAIL || process.env.NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL || "")
+  .trim()
+  .toLowerCase();
 
-  return emails.length > 0 ? emails : ["mimonkb222@gmail.com", "malvamora23@gmail.com"];
+function isBootstrapAdminEmail(email: string) {
+  return ENABLE_BOOTSTRAP_ADMIN && !!BOOTSTRAP_ADMIN_EMAIL && email === BOOTSTRAP_ADMIN_EMAIL;
 }
+
+export type AdminSession = {
+  uid: string;
+  email: string;
+  role: AdminRole;
+  plantaId: PlantScope;
+  profile: UserProfile;
+};
 
 function getBearerToken(req: NextRequest) {
   const header = req.headers.get("authorization") || "";
@@ -93,10 +100,10 @@ export async function requireAdminUser(req: NextRequest) {
       role: profile.role,
       plantaId: profile.plantaId,
       profile,
-    };
+    } satisfies AdminSession;
   }
 
-  if (!getConfiguredAdminEmails().includes(email)) {
+  if (!isBootstrapAdminEmail(email)) {
     throw new AuthHttpError("Cuenta sin permisos administrativos.", 403);
   }
 
@@ -112,7 +119,7 @@ export async function requireAdminUser(req: NextRequest) {
       plantaId: "nacional" as const,
       active: true,
     },
-  };
+  } satisfies AdminSession;
 }
 
 export async function requireGlobalAdminUser(req: NextRequest) {
@@ -121,4 +128,8 @@ export async function requireGlobalAdminUser(req: NextRequest) {
     throw new AuthHttpError("Solo un administrador global puede realizar esta accion.", 403);
   }
   return adminUser;
+}
+
+export function canAdminUsePlant(adminUser: AdminSession, plantaId: string | null | undefined) {
+  return adminUser.role === "admin_global" || !plantaId || adminUser.plantaId === plantaId;
 }

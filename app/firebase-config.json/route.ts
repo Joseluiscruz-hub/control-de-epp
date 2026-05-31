@@ -28,6 +28,7 @@ function getFirebaseConfig() {
     ...(measurementId ? { measurementId } : {}),
     firestoreDatabaseId:
       getOptionalEnv("NEXT_PUBLIC_FIREBASE_DATABASE_ID", "FIREBASE_DATABASE_ID") || "(default)",
+    appCheckSiteKey: getOptionalEnv("NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY", "FIREBASE_APPCHECK_SITE_KEY"),
   };
 }
 

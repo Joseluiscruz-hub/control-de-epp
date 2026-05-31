@@ -1,5 +1,7 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { NextRequest } from "next/server";
+import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
+import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
 import {
@@ -8,6 +10,7 @@ import {
 } from "@/lib/epp-duration-rules";
 import { KioskEarlyReplacementAlert, KioskRequestItem, ReplacementReason } from "@/lib/kiosk-types";
 import { normalizePlantId } from "@/lib/plants";
+import { buildInventoryMovement } from "@/app/api/inventory/_lib";
 
 export const runtime = "nodejs";
 
@@ -29,6 +32,15 @@ type RequestItemInput = Partial<KioskRequestItem>;
 type FulfillableKioskItem = KioskRequestItem & {
   chargeAmount?: number;
   signatureDataUrl?: string | null;
+};
+
+type StockUpdateResult = {
+  updates: Record<string, unknown>;
+  size: string;
+  previousStock: number;
+  newStock: number;
+  aggregatePreviousStock: number;
+  aggregateNewStock: number;
 };
 
 function readText(value: unknown) {
@@ -109,7 +121,7 @@ function isCatalogItemAvailable(data: FirebaseFirestore.DocumentData, size: stri
 function buildStockUpdates(
   catalogData: FirebaseFirestore.DocumentData,
   item: FulfillableKioskItem
-) {
+): StockUpdateResult {
   const updates: Record<string, unknown> = {
     updatedAt: FieldValue.serverTimestamp(),
   };
@@ -118,24 +130,29 @@ function buildStockUpdates(
     const sizes = getSizes(catalogData);
     const currentVariant = sizes?.[item.size];
     const currentStock = readNumber(currentVariant?.stock);
+    const aggregatePreviousStock = typeof catalogData.stock === "number"
+      ? readNumber(catalogData.stock)
+      : Object.values(sizes ?? {}).reduce((sum, variant) => sum + readNumber(variant.stock), 0);
 
     if (!currentVariant || currentStock <= 0) {
       throw new KioskRequestError(`Sin stock disponible para ${item.itemName} talla ${item.size}.`, 409);
     }
 
     const nextVariantStock = currentStock - 1;
-    const aggregateStock = Math.max(
-      0,
-      typeof catalogData.stock === "number"
-        ? readNumber(catalogData.stock) - 1
-        : Object.values(sizes ?? {}).reduce((sum, variant) => sum + readNumber(variant.stock), 0) - 1
-    );
+    const aggregateStock = Math.max(0, aggregatePreviousStock - 1);
 
     updates[`sizes.${item.size}.stock`] = nextVariantStock;
     updates[`sizes.${item.size}.available`] = nextVariantStock > 0;
     updates.stock = aggregateStock;
     updates.available = aggregateStock > 0;
-    return updates;
+    return {
+      updates,
+      size: item.size,
+      previousStock: currentStock,
+      newStock: nextVariantStock,
+      aggregatePreviousStock,
+      aggregateNewStock: aggregateStock,
+    };
   }
 
   const currentStock = readNumber(catalogData.stock);
@@ -146,7 +163,14 @@ function buildStockUpdates(
   const nextStock = currentStock - 1;
   updates.stock = nextStock;
   updates.available = nextStock > 0;
-  return updates;
+  return {
+    updates,
+    size: "N/A",
+    previousStock: currentStock,
+    newStock: nextStock,
+    aggregatePreviousStock: currentStock,
+    aggregateNewStock: nextStock,
+  };
 }
 
 async function fulfillApprovedKioskRequest(params: {
@@ -206,7 +230,7 @@ async function fulfillApprovedKioskRequest(params: {
         },
         { merge: true }
       );
-      return { assignmentIds: alreadyFulfilledIds, fulfilled: false };
+      return { assignmentIds: alreadyFulfilledIds, fulfilled: false, plantaId };
     }
 
     if (currentStatus !== "pending" && currentStatus !== "approved") {
@@ -238,7 +262,8 @@ async function fulfillApprovedKioskRequest(params: {
         throw new KioskRequestError(`Material ${item.itemName} no encontrado en inventario.`, 404);
       }
 
-      const stockUpdates = buildStockUpdates(catalogSnap.data() ?? {}, item);
+      const catalogData = catalogSnap.data() ?? {};
+      const stockChange = buildStockUpdates(catalogData, item);
       const assignmentRef = db.collection("assignments").doc();
       assignmentRefs.push(assignmentRef);
 
@@ -265,10 +290,36 @@ async function fulfillApprovedKioskRequest(params: {
         kioskRequestId: requestId,
       });
 
-      transaction.update(catalogRefs[index], stockUpdates);
+      transaction.update(catalogRefs[index], stockChange.updates);
       if (kioskCatalogSnaps[index].exists) {
-        transaction.update(kioskCatalogRefs[index], stockUpdates);
+        transaction.update(kioskCatalogRefs[index], stockChange.updates);
       }
+
+      transaction.set(
+        db.collection("inventory_movements").doc(),
+        buildInventoryMovement({
+          itemId: item.itemId,
+          sku: item.sku,
+          size: stockChange.size,
+          type: "assignment",
+          previousStock: stockChange.previousStock,
+          newStock: stockChange.newStock,
+          reason: `Asignacion por solicitud kiosko ${requestId}`,
+          source: "kiosk",
+          plantaId,
+          performedByUid: approvedByUserId,
+          performedByEmail: approvedByEmail,
+          metadata: {
+            requestId,
+            assignmentId: assignmentRef.id,
+            employeeId,
+            employeeName,
+            itemName: item.itemName,
+            aggregatePreviousStock: stockChange.aggregatePreviousStock,
+            aggregateNewStock: stockChange.aggregateNewStock,
+          },
+        })
+      );
 
       previousAssignmentSnaps[index].docs.forEach((previousDoc) => {
         if (previousDoc.id === assignmentRef.id) return;
@@ -304,7 +355,7 @@ async function fulfillApprovedKioskRequest(params: {
       { merge: true }
     );
 
-    return { assignmentIds, fulfilled: true };
+    return { assignmentIds, fulfilled: true, plantaId };
   });
 }
 
@@ -352,7 +403,7 @@ async function rejectKioskRequest(params: {
       { merge: true }
     );
 
-    return { assignmentIds: [], fulfilled: false };
+    return { assignmentIds: [], fulfilled: false, plantaId };
   });
 }
 
@@ -456,6 +507,8 @@ function buildEarlyReplacementAlert(
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAppCheck(req);
+
     const body = await req.json();
     const employeeId = readText(body?.employeeId);
     const employeeName = readText(body?.employeeName);
@@ -574,6 +627,9 @@ export async function POST(req: NextRequest) {
       earlyReplacementAlertIds: alertRefs.map((ref) => ref.id),
     });
   } catch (error) {
+    if (error instanceof AppCheckHttpError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     if (error instanceof KioskRequestError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
@@ -624,6 +680,19 @@ export async function PATCH(req: NextRequest) {
         updatedAt: FieldValue.serverTimestamp(),
       });
     });
+    batch.set(db.collection("audit_events").doc(), buildAuditEvent({
+      type: status === "approved" ? "kiosk.request.approve" : "kiosk.request.reject",
+      actorUid: adminUser.uid,
+      actorEmail: adminUser.email,
+      targetCollection: "kiosk_requests",
+      targetId: requestId,
+      after: { status, assignmentIds: result.assignmentIds },
+      metadata: {
+        plantaId: result.plantaId,
+        fulfilled: result.fulfilled,
+        alertCount: alertsSnap.size,
+      },
+    }, req));
 
     await batch.commit();
 

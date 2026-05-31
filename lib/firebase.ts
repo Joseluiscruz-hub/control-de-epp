@@ -1,4 +1,5 @@
 import { initializeApp, getApps, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
+import { getToken, initializeAppCheck, ReCaptchaV3Provider, type AppCheck } from 'firebase/app-check';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
@@ -8,6 +9,7 @@ type FirebaseAppConfig = FirebaseOptions & {
 
 type RuntimeFirebaseConfig = Partial<FirebaseOptions> & {
   firestoreDatabaseId?: string;
+  appCheckSiteKey?: string;
 };
 
 declare global {
@@ -59,6 +61,7 @@ function getFirebaseConfig(): FirebaseAppConfig {
 let _initialized = false;
 let _initPromise: Promise<void> | null = null;
 let _firestoreDatabaseId = '(default)';
+let _appCheck: AppCheck | null = null;
 
 function hasRequiredConfig(config: FirebaseAppConfig) {
   return Boolean(config.apiKey && config.authDomain && config.projectId && config.appId);
@@ -142,6 +145,33 @@ export function getFirebaseDb() {
   return _firestoreDatabaseId && _firestoreDatabaseId !== '(default)'
     ? getFirestore(app, _firestoreDatabaseId)
     : getFirestore(app);
+}
+
+function getAppCheckSiteKey() {
+  return firstNonEmpty(
+    process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY,
+    getRuntimeConfig()?.appCheckSiteKey
+  );
+}
+
+function getFirebaseAppCheck() {
+  if (typeof window === 'undefined') return null;
+  const siteKey = getAppCheckSiteKey();
+  if (!siteKey) return null;
+  if (_appCheck) return _appCheck;
+
+  _appCheck = initializeAppCheck(getFirebaseApp(), {
+    provider: new ReCaptchaV3Provider(siteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+  return _appCheck;
+}
+
+export async function getAppCheckTokenForRequest() {
+  const appCheck = getFirebaseAppCheck();
+  if (!appCheck) return undefined;
+  const result = await getToken(appCheck, false);
+  return result.token;
 }
 
 function initializeFromStaticConfig() {

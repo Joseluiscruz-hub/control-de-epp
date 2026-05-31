@@ -7,13 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowRight, Loader2, HardHat, UserCheck, ShieldCheck } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { useAuth } from "./auth-provider";
-import { collection, query, where, getDocs, doc, serverTimestamp, runTransaction, Timestamp } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-error";
 import { toast } from "sonner";
-import { addDays } from "date-fns";
-import { motion } from "motion/react";
 import { createLocalAssignment, listLocalEmployees, listLocalInventory } from "@/lib/kiosk-local-store";
 import { resolveEppReplacementDays } from "@/lib/epp-duration-rules";
 import { normalizePlantId } from "@/lib/plants";
@@ -107,69 +105,25 @@ export function AssignPpeDialog() {
         return;
       }
 
-      const assignmentId = doc(collection(db, 'assignments')).id;
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("missing_admin_session");
 
-      await runTransaction(db, async (transaction) => {
-        const itemRef = doc(db, 'ppe_catalog', selectedItem);
-        const kioskItemRef = doc(db, 'kiosk_catalog', selectedItem);
-        const [itemSnap, kioskItemSnap] = await Promise.all([
-          transaction.get(itemRef),
-          transaction.get(kioskItemRef),
-        ]);
-
-        if (!itemSnap.exists()) {
-          throw new Error('item_not_found');
-        }
-
-        const itemData = itemSnap.data();
-        const stock = Number(itemData.stock ?? 0);
-        if (!Number.isFinite(stock) || stock <= 0) {
-          throw new Error('out_of_stock');
-        }
-
-        const nextStock = stock - 1;
-        const assignmentSku = typeof itemData.sku === 'string' && itemData.sku ? itemData.sku : selectedItem;
-        const replacementDays = resolveEppReplacementDays(
-          {
-            sku: assignmentSku,
-            material: itemData.material,
-            name: itemData.name,
-            sizes: itemData.sizes,
-          },
-          Number(itemData.replacementDays ?? itemRecord.replacementDays ?? 365)
-        );
-
-        transaction.set(doc(db, 'assignments', assignmentId), {
+      const response = await fetch("/api/assignments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
           employeeId: selectedEmployee,
-          employeeName: employeeRecord?.name ?? '',
-          employeeArea: employeeRecord?.area ?? '',
-          plantaId: normalizePlantId(employeeRecord?.plantaId ?? itemData.plantaId ?? writePlantId),
-          sku: assignmentSku,
           itemId: selectedItem,
-          itemName: itemData.name ?? itemRecord.name,
-          replacementDays,
-          size: 'N/A',
-          assignedAt: serverTimestamp(),
-          nextReplacementAt: Timestamp.fromDate(addDays(new Date(), replacementDays)),
-          status: 'active',
-          issuedByUserId: authUser?.uid || 'unknown'
-        });
-
-        transaction.update(itemRef, {
-          stock: nextStock,
-          plantaId: normalizePlantId(itemData.plantaId ?? writePlantId),
-          updatedAt: serverTimestamp()
-        });
-
-        if (kioskItemSnap.exists()) {
-          transaction.update(kioskItemRef, {
-            stock: nextStock,
-            available: nextStock > 0,
-            plantaId: normalizePlantId(itemData.plantaId ?? writePlantId),
-            updatedAt: serverTimestamp()
-          });
-        }
+          plantaId: normalizePlantId(employeeRecord?.plantaId ?? itemRecord.plantaId ?? writePlantId),
+        }),
       });
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(typeof errorBody?.error === "string" ? errorBody.error : "assignment_failed");
+      }
 
       toast.success("EPP Asignado exitosamente");
       setOpen(false);

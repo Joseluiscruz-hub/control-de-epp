@@ -2,7 +2,7 @@ import {
   doc, getDoc, collection, serverTimestamp, query, where, getDocs, limit, writeBatch,
   runTransaction, Timestamp
 } from "firebase/firestore";
-import { auth, db, ensureFirebaseReady } from "./firebase";
+import { auth, db, ensureFirebaseReady, getAppCheckTokenForRequest } from "./firebase";
 import { resolveEppReplacementDays, getEppDurationRulePayload } from "./epp-duration-rules";
 import {
   KioskEarlyReplacementAlert,
@@ -94,7 +94,7 @@ export async function saveEmployeePin(employeeId: string, pin: string): Promise<
   try {
     const response = await fetch("/api/kiosk/pin/setup", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await kioskApiHeaders(),
       body: JSON.stringify({ employeeId, pin }),
     });
 
@@ -121,7 +121,7 @@ export async function validateEmployeePin(
   try {
     const response = await fetch("/api/kiosk/pin/verify", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await kioskApiHeaders(),
       body: JSON.stringify({ employeeId, pin }),
     });
 
@@ -333,7 +333,7 @@ export async function createKioskRequest(input: {
   try {
     const response = await fetch("/api/kiosk/requests", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await kioskApiHeaders(),
       body: JSON.stringify(input),
     });
 
@@ -421,6 +421,14 @@ export interface AdminKioskRequest {
   earlyReplacementWarnings?: KioskEarlyReplacementAlert[];
   earlyReplacementAlertIds?: string[];
   assignmentIds?: string[];
+}
+
+async function kioskApiHeaders() {
+  const appCheckToken = await getAppCheckTokenForRequest();
+  return {
+    "Content-Type": "application/json",
+    ...(appCheckToken ? { "X-Firebase-AppCheck": appCheckToken } : {}),
+  };
 }
 
 function normalizeEarlyReplacementAlert(input: unknown): KioskEarlyReplacementAlert | null {

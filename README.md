@@ -21,7 +21,7 @@ AssetGuard es una plataforma de seguridad industrial para administrar colaborado
 
 La aplicación ya cuenta con:
 
-- Panel administrativo con autenticación Google y lista explícita de administradores.
+- Panel administrativo con autenticación Google y perfiles `users/{uid}` por rol/planta.
 - Directorio de personal con importación masiva desde base operativa de planta.
 - Inventario EPP con importación masiva desde inventario real, tallas, stock y SKU temporales.
 - Portal público para consulta de colaborador por número de nómina.
@@ -245,19 +245,16 @@ La app usa una separación deliberada entre colecciones administrativas y snapsh
 Principios:
 
 - El panel admin requiere Google Auth.
-- Solo emails en `NEXT_PUBLIC_ADMIN_EMAILS` tienen acceso administrativo.
+- Los permisos administrativos salen de `users/{uid}` o de un bootstrap temporal controlado por bandera.
 - Firestore Rules validan esquemas antes de permitir escritura.
+- Las escrituras críticas de inventario pasan por APIs server-side con auditoría.
 - `employees` no es público.
 - `kiosk_employees` permite `get` exacto, no `list`.
 - `kiosk_catalog` permite lectura pública controlada.
-- ARIA usa `GEMINI_API_KEY` solo en servidor.
+- ARIA usa `GEMINI_API_KEY` solo en servidor y trabaja con datos agregados cuando consulta empleados/consumos.
 - Los importadores no escriben datos privados innecesarios.
 
-Administrador global configurado por defecto:
-
-```text
-mimonkb222@gmail.com
-```
+En producción `NEXT_PUBLIC_ENABLE_OFFLINE_MODE=false`. El bootstrap admin debe usarse sólo como emergencia temporal.
 
 ## Ejecución Local
 
@@ -324,7 +321,13 @@ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
 NEXT_PUBLIC_FIREBASE_DATABASE_ID=(default)
-NEXT_PUBLIC_ADMIN_EMAILS=mimonkb222@gmail.com
+NEXT_PUBLIC_ENABLE_OFFLINE_MODE=false
+ENABLE_BOOTSTRAP_ADMIN=false
+NEXT_PUBLIC_ENABLE_BOOTSTRAP_ADMIN=false
+BOOTSTRAP_ADMIN_EMAIL=
+NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL=
+NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY=
+FIREBASE_APP_CHECK_REQUIRED=false
 GEMINI_API_KEY=
 ```
 
@@ -334,7 +337,7 @@ La configuración real de Firebase no se versiona en el repositorio. Toda la ini
 
 ## Deploy
 
-El deploy se ejecuta automáticamente al hacer merge a `master`.
+El deploy se ejecuta automáticamente al hacer push o merge a `main`.
 
 Workflow:
 
@@ -345,7 +348,7 @@ Workflow:
 Flujo:
 
 1. Checkout del repo.
-2. Autenticación con `GCP_SA_KEY`.
+2. Autenticación con Workload Identity Federation si está configurado, o `GCP_SA_KEY` como fallback temporal.
 3. Setup de Google Cloud SDK.
 4. Deploy a Cloud Run con `gcloud run deploy --source .`.
 5. Inyección de variables públicas Firebase.
@@ -355,8 +358,15 @@ Flujo:
 Secrets requeridos:
 
 ```text
-GCP_SA_KEY
+GCP_WORKLOAD_IDENTITY_PROVIDER
+GCP_SERVICE_ACCOUNT
 FIREBASE_TOKEN
+```
+
+Fallback temporal:
+
+```text
+GCP_SA_KEY
 ```
 
 GitHub Variables requeridas:
@@ -372,12 +382,16 @@ FIREBASE_STORAGE_BUCKET
 FIREBASE_MESSAGING_SENDER_ID
 FIREBASE_APP_ID
 FIREBASE_DATABASE_ID
-ADMIN_EMAILS
+ENABLE_BOOTSTRAP_ADMIN
+BOOTSTRAP_ADMIN_EMAIL
+NEXT_PUBLIC_ENABLE_OFFLINE_MODE
+FIREBASE_APPCHECK_SITE_KEY
+FIREBASE_APP_CHECK_REQUIRED
 ```
 
 ## Operación Recomendada Después de Deploy
 
-1. Entrar al panel admin con una cuenta incluida en `ADMIN_EMAILS`.
+1. Crear o verificar el perfil admin en `users/{uid}`.
 2. Ir a `/empleados`.
 3. Cargar la base de personal.
 4. Revisar preview: registros, duplicados, errores y áreas detectadas.

@@ -12,21 +12,9 @@ import { toast } from 'sonner';
 import { canUseAdminProfile, isGlobalProfile, type AdminRole, type UserProfile } from '@/lib/admin-profile';
 import { isPlantId, type PlantScope } from '@/lib/plants';
 
-// Lista de administradores — configurable por variable de entorno
-// En GitHub Variables → ADMIN_EMAILS (separados por comas)
-// En .env.local → NEXT_PUBLIC_ADMIN_EMAILS=email1@gmail.com,email2@gmail.com
-const ADMIN_EMAILS: string[] = (() => {
-  const envEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS;
-  if (envEmails) {
-    return envEmails.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-  }
-  // Fallback para desarrollo local — REEMPLAZA con tu(s) email(s) real(es)
-  return [
-    'mimonkb222@gmail.com',
-    'malvamora23@gmail.com',
-  ];
-})();
-
+const ENABLE_OFFLINE_MODE = process.env.NEXT_PUBLIC_ENABLE_OFFLINE_MODE === 'true';
+const ENABLE_BOOTSTRAP_ADMIN = process.env.NEXT_PUBLIC_ENABLE_BOOTSTRAP_ADMIN === 'true';
+const BOOTSTRAP_ADMIN_EMAIL = (process.env.NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase();
 const OFFLINE_SESSION_KEY = 'assetguard.offline.adminSession';
 const OFFLINE_ADMIN_USER = {
   uid: 'offline-admin',
@@ -62,7 +50,7 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 function isConfiguredAdminEmail(email: string | null | undefined) {
-  return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
+  return ENABLE_BOOTSTRAP_ADMIN && !!email && !!BOOTSTRAP_ADMIN_EMAIL && email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL;
 }
 
 function normalizeUserProfile(uid: string, fallbackEmail: string, data: Record<string, unknown>): UserProfile | null {
@@ -127,6 +115,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isOfflineSession, setIsOfflineSession] = useState(false);
 
   const startOfflineSession = () => {
+    if (!ENABLE_OFFLINE_MODE) {
+      window.localStorage.removeItem(OFFLINE_SESSION_KEY);
+      toast.error('El modo offline admin esta deshabilitado en este ambiente.');
+      return;
+    }
+
     const offlineProfile: UserProfile = {
       uid: OFFLINE_ADMIN_USER.uid,
       email: OFFLINE_ADMIN_USER.email ?? 'offline@assetguard.local',
@@ -149,7 +143,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let unsubscribe: (() => void) | undefined;
     let unavailableTimeout: number | undefined;
 
-    if (window.localStorage.getItem(OFFLINE_SESSION_KEY) === 'true') {
+    if (!ENABLE_OFFLINE_MODE) {
+      window.localStorage.removeItem(OFFLINE_SESSION_KEY);
+    } else if (window.localStorage.getItem(OFFLINE_SESSION_KEY) === 'true') {
       if (navigator.onLine !== false) {
         window.localStorage.removeItem(OFFLINE_SESSION_KEY);
       } else {
@@ -235,7 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await ensureFirebaseReady();
       await signInWithPopup(auth, provider);
     } catch (error) {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      if (ENABLE_OFFLINE_MODE && typeof navigator !== 'undefined' && navigator.onLine === false) {
         startOfflineSession();
         return;
       }
@@ -244,6 +240,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInOffline = async () => {
+    if (!ENABLE_OFFLINE_MODE) {
+      toast.error('El modo offline admin esta deshabilitado en este ambiente.');
+      return;
+    }
     startOfflineSession();
   };
 
@@ -392,14 +392,16 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
                 Continuar con Google
                 <ArrowRight className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
               </Button>
-              <Button
-                type="button"
-                onClick={signInOffline}
-                className="w-full h-14 rounded-lg border border-amber-300/25 bg-amber-500/10 hover:bg-amber-500/15 text-amber-200 font-black uppercase tracking-widest text-xs gap-3"
-              >
-                <HardHat className="h-4 w-4" />
-                Entrar en modo offline
-              </Button>
+              {ENABLE_OFFLINE_MODE && (
+                <Button
+                  type="button"
+                  onClick={signInOffline}
+                  className="w-full h-14 rounded-lg border border-amber-300/25 bg-amber-500/10 hover:bg-amber-500/15 text-amber-200 font-black uppercase tracking-widest text-xs gap-3"
+                >
+                  <HardHat className="h-4 w-4" />
+                  Entrar en modo offline
+                </Button>
+              )}
               
               <div className="pt-6 border-t border-white/10 space-y-3">
                 <p className="section-eyebrow">¿Eres colaborador?</p>
@@ -467,7 +469,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             <p className="section-eyebrow">Acceso Administrativo</p>
             <h1 className="text-3xl font-black text-white tracking-tight">Cuenta no autorizada</h1>
             <p className="text-white/50 font-medium leading-relaxed">
-              {user.email} no está en la lista de administradores globales de AssetGuard.
+              {user.email} no tiene un perfil administrativo activo en AssetGuard.
             </p>
           </div>
           <Button

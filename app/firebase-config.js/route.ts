@@ -25,6 +25,10 @@ function getFirebaseConfig() {
       process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID ||
       process.env.FIREBASE_DATABASE_ID ||
       "(default)",
+    appCheckSiteKey:
+      process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY ||
+      process.env.FIREBASE_APPCHECK_SITE_KEY ||
+      "",
   };
 }
 
