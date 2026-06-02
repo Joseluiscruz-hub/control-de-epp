@@ -60,31 +60,45 @@ export async function POST(req: NextRequest) {
     if (clientRateLimit.blocked) return kioskPinRateLimitResponse(clientRateLimit);
 
     const employeeRef = db.collection("kiosk_employees").doc(employeeId);
+    const secretRef = db.collection("kiosk_employee_secrets").doc(employeeId);
     const pinHash = await bcrypt.hash(pin, 12);
 
     try {
       await db.runTransaction(async (transaction) => {
-        const snapshot = await transaction.get(employeeRef);
+        const [snapshot, secretSnapshot] = await Promise.all([
+          transaction.get(employeeRef),
+          transaction.get(secretRef),
+        ]);
         if (!snapshot.exists) {
           throw new KioskPinError("Empleado no encontrado en kiosko.", 404);
         }
 
         const employee = snapshot.data() ?? {};
+        const secret = secretSnapshot.data() ?? {};
         if (employee.active !== true) {
           throw new KioskPinError("Empleado inactivo para kiosko.", 403);
         }
 
-        if (employee.firstLogin === false && typeof employee.pin === "string" && employee.pin.length > 0) {
+        const existingPinHash = typeof secret.pinHash === "string" ? secret.pinHash : "";
+        if (employee.firstLogin === false && existingPinHash.length > 0) {
           throw new KioskPinError("El PIN ya fue configurado.", 409);
         }
 
-        transaction.update(employeeRef, {
-          pin: pinHash,
+        transaction.set(secretRef, {
+          pinHash,
           pinVersion: 2,
+          lastPinChangeAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          ...(secretSnapshot.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
+        }, { merge: true });
+        transaction.update(employeeRef, {
           firstLogin: false,
           termsAccepted: true,
           termsAcceptedAt: FieldValue.serverTimestamp(),
-          lastPinChangeAt: FieldValue.serverTimestamp(),
+          pin: FieldValue.delete(),
+          pinVersion: FieldValue.delete(),
+          lastPinChangeAt: FieldValue.delete(),
+          legacyPinMigratedAt: FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp(),
         });
       });
@@ -103,7 +117,7 @@ export async function POST(req: NextRequest) {
       clearKioskPinFailures(db, clientAttemptKey),
       db.collection("audit_events").add(buildAuditEvent({
         type: "kiosk.pin.setup",
-        targetCollection: "kiosk_employees",
+        targetCollection: "kiosk_employee_secrets",
         targetId: employeeId,
         metadata: { source: "kiosk", pinVersion: 2 },
       }, req)),

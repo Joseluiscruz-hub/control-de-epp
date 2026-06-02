@@ -55,9 +55,13 @@ export async function POST(req: NextRequest) {
     if (clientRateLimit.blocked) return kioskPinRateLimitResponse(clientRateLimit, true);
 
     const employeeRef = db.collection("kiosk_employees").doc(employeeId);
-    const snapshot = await employeeRef.get();
+    const secretRef = db.collection("kiosk_employee_secrets").doc(employeeId);
+    const [snapshot, secretSnapshot] = await Promise.all([employeeRef.get(), secretRef.get()]);
     const employee = snapshot.data();
-    const storedPin = typeof employee?.pin === "string" ? employee.pin : "";
+    const secret = secretSnapshot.data();
+    const storedSecretPin = typeof secret?.pinHash === "string" ? secret.pinHash : "";
+    const storedLegacyPin = typeof employee?.pin === "string" ? employee.pin : "";
+    const storedPin = storedSecretPin || storedLegacyPin;
 
     if (!snapshot.exists || employee?.active !== true || !storedPin) {
       const nextRateLimit = await registerFailure(db, attemptKey, clientAttemptKey);
@@ -77,18 +81,28 @@ export async function POST(req: NextRequest) {
       clearKioskPinFailures(db, clientAttemptKey),
     ]);
 
-    if (!storedPin.startsWith("$2")) {
-      const upgradedHash = await bcrypt.hash(pin, 12);
+    if (!storedSecretPin && storedLegacyPin) {
+      const migratedHash = storedLegacyPin.startsWith("$2")
+        ? storedLegacyPin
+        : await bcrypt.hash(pin, 12);
       await Promise.all([
+        secretRef.set({
+          pinHash: migratedHash,
+          pinVersion: 2,
+          legacyPinMigratedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          ...(secretSnapshot.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
+        }, { merge: true }),
         employeeRef.update({
-        pin: upgradedHash,
-        pinVersion: 2,
-        legacyPinMigratedAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
+          pin: FieldValue.delete(),
+          pinVersion: FieldValue.delete(),
+          lastPinChangeAt: FieldValue.delete(),
+          legacyPinMigratedAt: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
         }),
         db.collection("audit_events").add(buildAuditEvent({
           type: "kiosk.pin.legacy_migrated",
-          targetCollection: "kiosk_employees",
+          targetCollection: "kiosk_employee_secrets",
           targetId: employeeId,
           metadata: { source: "kiosk", pinVersion: 2 },
         }, req)),

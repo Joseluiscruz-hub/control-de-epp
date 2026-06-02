@@ -17,6 +17,23 @@ export const runtime = "nodejs";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const VALID_REASONS = new Set(["vida_util", "desgaste", "extravio"]);
 const ALERT_COLLECTION = "kiosk_alerts";
+const REQUEST_ITEM_KEYS = new Set([
+  "itemId",
+  "itemName",
+  "sku",
+  "size",
+  "replacementDays",
+  "replacementReason",
+  "durationRuleId",
+  "durationRuleSource",
+  "durationRuleSku",
+  "durationRuleSapMaterial",
+  "requiredQuantity",
+  "requiredUnit",
+  "chargeAmount",
+  "signatureDataUrl",
+  "earlyReplacementAlert",
+]);
 
 class KioskRequestError extends Error {
   status: number;
@@ -47,6 +64,10 @@ function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function toDate(value: unknown): Date | null {
   if (!value) return null;
   if (value instanceof Date) return value;
@@ -69,6 +90,35 @@ function addDays(date: Date, days: number) {
 function readNumber(value: unknown, fallback = 0) {
   const parsed = Number(value ?? fallback);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function isValidRequestItemShape(value: unknown): value is RequestItemInput {
+  if (!isObject(value)) return false;
+  const keys = Object.keys(value);
+  if (keys.some((key) => !REQUEST_ITEM_KEYS.has(key))) return false;
+
+  const itemId = readText(value.itemId);
+  if (!itemId) return false;
+
+  const replacementReason = readText(value.replacementReason);
+  if (replacementReason && !VALID_REASONS.has(replacementReason)) return false;
+
+  if (
+    value.replacementDays != null &&
+    (!Number.isFinite(Number(value.replacementDays)) || Number(value.replacementDays) <= 0)
+  ) {
+    return false;
+  }
+
+  if (value.chargeAmount != null && (!Number.isFinite(Number(value.chargeAmount)) || Number(value.chargeAmount) < 0)) {
+    return false;
+  }
+
+  if (value.signatureDataUrl != null && typeof value.signatureDataUrl !== "string") {
+    return false;
+  }
+
+  return true;
 }
 
 function normalizeFulfillableItems(input: unknown): FulfillableKioskItem[] {
@@ -518,6 +568,9 @@ export async function POST(req: NextRequest) {
 
     if (!employeeId || !employeeName || itemsInput.length === 0 || itemsInput.length > 10) {
       return Response.json({ error: "Empleado e items de solicitud requeridos." }, { status: 400 });
+    }
+    if (!itemsInput.every(isValidRequestItemShape)) {
+      return Response.json({ error: "Items de solicitud invalidos." }, { status: 400 });
     }
 
     const db = getAdminDb();

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from 'react';
-import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { db, getAppCheckTokenForRequest } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { HardHat, Search, AlertTriangle, CheckCircle2, ArrowLeft, Loader2, ShieldCheck, Activity } from 'lucide-react';
@@ -40,9 +40,19 @@ export default function UserPortal() {
     setLoading(true);
     try {
       const normalizedEmployeeId = employeeId.trim();
-      const empDoc = await getDoc(doc(db, 'kiosk_employees', normalizedEmployeeId));
+      const appCheckToken = await getAppCheckTokenForRequest();
+      const employeeResponse = await fetch('/api/kiosk/employee', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}),
+        },
+        body: JSON.stringify({ employeeId: normalizedEmployeeId }),
+      });
+      const payload = employeeResponse.ok ? await employeeResponse.json() : null;
+      const employeeData = payload?.employee;
 
-      if (!empDoc.exists() || empDoc.data().active !== true) {
+      if (!employeeData || employeeData.active !== true) {
         const localEmployee = getLocalKioskEmployee(normalizedEmployeeId);
         if (!localEmployee || localEmployee.active !== true) {
           setEmployee(null);
@@ -65,15 +75,14 @@ export default function UserPortal() {
         return;
       }
 
-      const empData = empDoc.data();
       setEmployee({
-        id: empDoc.id,
-        name: empData.name,
-        area: empData.area ?? empData.plantArea ?? 'SIN ÁREA',
+        id: employeeData.id,
+        name: employeeData.name,
+        area: employeeData.area ?? employeeData.plantArea ?? 'SIN ÁREA',
       });
 
       try {
-        const assQuery = query(collection(db, 'assignments'), where('employeeId', '==', empDoc.id));
+        const assQuery = query(collection(db, 'assignments'), where('employeeId', '==', employeeData.id));
         const assSnap = await getDocs(assQuery);
 
         const assData = assSnap.docs.map(doc => {

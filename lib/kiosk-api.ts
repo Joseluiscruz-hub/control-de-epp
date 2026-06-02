@@ -77,14 +77,26 @@ function isLocalRuntime() {
 
 export async function getEmployeeById(employeeId: string): Promise<KioskEmployee | null> {
   try {
-    await ensureFirebaseReady();
-    const snap = await getDoc(doc(db, "kiosk_employees", employeeId));
-    if (snap.exists()) return { id: snap.id, ...snap.data() } as KioskEmployee;
+    const response = await fetch("/api/kiosk/employee", {
+      method: "POST",
+      headers: await kioskApiHeaders(),
+      body: JSON.stringify({ employeeId }),
+    });
+    if (response.ok) {
+      const payload = await response.json();
+      if (payload?.employee && typeof payload.employee === "object") {
+        return payload.employee as KioskEmployee;
+      }
+      return null;
+    }
+    throw new KioskApiError(
+      await parseKioskApiError(response, "No se pudo consultar el colaborador."),
+      response.status
+    );
   } catch (error) {
     console.warn("[Kiosko] Usando empleado local por error de Firebase.", error);
     return getLocalKioskEmployee(employeeId, isLocalRuntime() || canUseLocalFallback());
   }
-  return getLocalKioskEmployee(employeeId, isLocalRuntime() || canUseLocalFallback());
 }
 
 export async function saveEmployeePin(employeeId: string, pin: string): Promise<void> {

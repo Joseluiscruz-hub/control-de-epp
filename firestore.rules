@@ -12,11 +12,16 @@ service cloud.firestore {
 
     // ── Snapshot público mínimo para kiosko ────────────────────────────────
     match /kiosk_employees/{employeeId} {
-      allow get: if true;
-      allow list: if false;
+      allow get: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
+      allow list: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
       allow create: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && isValidKioskEmployeeSnapshot(request.resource.data);
       allow update: if request.auth != null && isAdmin() && canWritePlant(request.resource.data) && isValidKioskEmployeeSnapshot(request.resource.data);
       allow delete: if false;
+    }
+
+    // ── Secretos sensibles de kiosko (solo servidor Admin SDK) ─────────────
+    match /kiosk_employee_secrets/{employeeId} {
+      allow read, write: if false;
     }
 
     // ── Catálogo EPP ───────────────────────────────────────────────────────
@@ -71,7 +76,7 @@ service cloud.firestore {
 
     // ── Sesiones Kiosko ─────────────────────────────────────────────────────
     match /kiosk_sessions/{sessionId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && (isAdmin() || isKioskSessionOwner(sessionId));
     }
 
     // ── Perfiles administrativos multi-planta ─────────────────────────────
@@ -198,8 +203,7 @@ service cloud.firestore {
 
     function isValidKioskEmployeeSnapshot(data) {
       return data.keys().hasOnly([
-          "id", "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt", "pin",
-          "pinVersion", "lastPinChangeAt", "legacyPinMigratedAt", "createdAt",
+          "id", "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt", "createdAt",
           "updatedAt", "personnelArea", "plantArea", "position", "jobFunction", "source", "schemaVersion", "plantaId"
         ])
         && data.keys().hasAll(["name", "active", "updatedAt"])
@@ -217,12 +221,14 @@ service cloud.firestore {
         && optionalString(data.jobFunction)
         && optionalString(data.source)
         && (data.plantaId == null || data.plantaId in ["cuautitlan", "toluca"])
-        && (data.pin == null || (data.pin is string && data.pin.size() >= 8))
-        && (data.pinVersion == null || data.pinVersion is int)
-        && (data.lastPinChangeAt == null || data.lastPinChangeAt is timestamp)
-        && (data.legacyPinMigratedAt == null || data.legacyPinMigratedAt is timestamp)
         && (data.termsAcceptedAt == null || data.termsAcceptedAt is timestamp)
         && (data.schemaVersion == null || data.schemaVersion is int);
+    }
+
+    function isKioskSessionOwner(sessionId) {
+      return sessionId == request.auth.uid
+        || (resource != null && resource.data.uid == request.auth.uid)
+        || (request.resource != null && request.resource.data.uid == request.auth.uid);
     }
 
     function optionalString(value) {
