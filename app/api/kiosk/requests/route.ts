@@ -68,6 +68,10 @@ function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function readPackageUnit(value: unknown): "CAJA" | "BOLSA" | undefined {
+  return value === "CAJA" || value === "BOLSA" ? value : undefined;
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -225,7 +229,7 @@ function buildStockUpdates(
       aggregateNewStock: aggregateStock,
       consumedQuantity,
       packageRuleId: typeof currentVariant.packageRuleId === "string" ? currentVariant.packageRuleId : undefined,
-      packageUnit: currentVariant.packageUnit,
+      packageUnit: readPackageUnit(currentVariant.packageUnit),
       unitsPerPackage:
         typeof currentVariant.unitsPerPackage === "number" && currentVariant.unitsPerPackage > 0
           ? currentVariant.unitsPerPackage
@@ -253,7 +257,7 @@ function buildStockUpdates(
     aggregateNewStock: nextStock,
     consumedQuantity,
     packageRuleId: typeof catalogData.packageRuleId === "string" ? catalogData.packageRuleId : undefined,
-    packageUnit: catalogData.packageUnit,
+    packageUnit: readPackageUnit(catalogData.packageUnit),
     unitsPerPackage:
       typeof catalogData.unitsPerPackage === "number" && catalogData.unitsPerPackage > 0
         ? catalogData.unitsPerPackage
@@ -407,13 +411,14 @@ async function fulfillApprovedKioskRequest(params: {
             aggregateNewStock: stockChange.aggregateNewStock,
             consumedQuantity: stockChange.consumedQuantity,
             consumedUnit: "PZA",
-            packageRuleId: stockChange.packageRuleId,
-            packageUnit: stockChange.packageUnit,
-            unitsPerPackage: stockChange.unitsPerPackage,
-            packageEquivalentConsumed:
-              stockChange.unitsPerPackage && stockChange.unitsPerPackage > 0
-                ? stockChange.consumedQuantity / stockChange.unitsPerPackage
-                : undefined,
+            ...(stockChange.packageRuleId ? { packageRuleId: stockChange.packageRuleId } : {}),
+            ...(stockChange.packageUnit ? { packageUnit: stockChange.packageUnit } : {}),
+            ...(typeof stockChange.unitsPerPackage === "number" && stockChange.unitsPerPackage > 0
+              ? {
+                  unitsPerPackage: stockChange.unitsPerPackage,
+                  packageEquivalentConsumed: stockChange.consumedQuantity / stockChange.unitsPerPackage,
+                }
+              : {}),
           },
         })
       );
