@@ -113,7 +113,7 @@ Nota de privacidad: la carga inicial no escribe RFC, IMSS, CURP ni fecha de naci
 
 ### `kiosk_employees`
 
-Snapshot público mínimo consultable por ID exacto. Permite que el portal y kiosko validen colaboradores sin exponer la base administrativa completa.
+Snapshot mínimo de kiosko usado por APIs server-side. El cliente ya no lo consulta directo; portal y kiosko pasan por rutas API para evitar exponer campos sensibles.
 
 Campos principales:
 
@@ -123,7 +123,16 @@ Campos principales:
 - `position`
 - `jobFunction`
 - `active`
-- `firstLogin`, `termsAccepted`, `pin`
+- `firstLogin`, `termsAccepted`
+
+### `kiosk_employee_secrets`
+
+Colección privada para secretos de autenticación de kiosko.
+
+- `pinHash`
+- `pinVersion`
+- `lastPinChangeAt`
+- `legacyPinMigratedAt`
 
 ### `ppe_catalog`
 
@@ -250,7 +259,8 @@ Principios:
 - Las escrituras críticas de inventario pasan por APIs server-side con auditoría.
 - `ppe_catalog`, `kiosk_catalog`, `assignments`, `kiosk_requests` y `kiosk_request_status` no aceptan escrituras directas desde cliente.
 - `employees` no es público.
-- `kiosk_employees` permite `get` exacto, no `list`.
+- `kiosk_employees` solo es legible por administradores autenticados con alcance de planta.
+- `kiosk_employee_secrets` bloquea lecturas/escrituras desde cliente (`allow false`).
 - `kiosk_catalog` permite lectura pública controlada.
 - ARIA usa `GEMINI_API_KEY` solo en servidor y trabaja con datos agregados cuando consulta empleados/consumos.
 - Los importadores no escriben datos privados innecesarios.
