@@ -19,6 +19,7 @@ import {
 } from '@/lib/kiosk-local-store';
 import { PPECatalogItem } from '@/lib/kiosk-types';
 import { getEppDurationRulePayload, resolveEppReplacementDays } from '@/lib/epp-duration-rules';
+import { resolveStockFromPackageRule } from '@/lib/epp-package-rules';
 import { normalizePlantId } from '@/lib/plants';
 import { usePlantStore } from '@/store/usePlantStore';
 
@@ -34,6 +35,11 @@ export interface PpeSizeVariant {
   unit?: string;
   unitCost?: number;
   temporarySku?: boolean;
+  stockUnit?: 'PZA';
+  packageUnit?: 'CAJA' | 'BOLSA';
+  unitsPerPackage?: number;
+  stockPackageInput?: number;
+  packageRuleId?: string;
 }
 
 export interface PpeItem {
@@ -49,6 +55,11 @@ export interface PpeItem {
   location?: string;
   unit?: string;
   unitCost?: number;
+  stockUnit?: 'PZA';
+  packageUnit?: 'CAJA' | 'BOLSA';
+  unitsPerPackage?: number;
+  stockPackageInput?: number;
+  packageRuleId?: string;
   plantaId?: string;
   createdAt?: Date;
 }
@@ -160,6 +171,11 @@ export function useInventoryData() {
             location: item.location,
             unit: item.unit,
             unitCost: item.unitCost,
+            stockUnit: item.stockUnit,
+            packageUnit: item.packageUnit,
+            unitsPerPackage: item.unitsPerPackage,
+            stockPackageInput: item.stockPackageInput,
+            packageRuleId: item.packageRuleId,
             plantaId: item.plantaId,
             createdAt: item.createdAt?.toDate(),
           };
@@ -275,6 +291,7 @@ export function useInventoryData() {
       const ruleInput = { sku: form.sku, name: form.name };
       const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
       const rulePayload = getEppDurationRulePayload(ruleInput);
+      const stockConversion = resolveStockFromPackageRule({ name: form.name, stockInput: initialStock });
       const token = await requireAdminToken();
       const response = await fetch('/api/inventory/items', {
         method: 'POST',
@@ -302,11 +319,13 @@ export function useInventoryData() {
         replacementDays,
         ...rulePayload,
         plantaId: writePlantId,
-        stock: initialStock,
+        stock: stockConversion.stock,
+        ...stockConversion.metadata,
+        unit: stockConversion.metadata?.stockUnit ?? 'PZA',
         minStock: 2,
         hasSizes: false,
         active: true,
-        available: initialStock > 0,
+        available: stockConversion.stock > 0,
       });
       toast.success(`Artículo "${form.name}" agregado al catálogo`);
       setForm({ sku: '', name: '', category: '', replacementDays: '', stock: '' });
@@ -316,6 +335,7 @@ export function useInventoryData() {
       const ruleInput = { sku: form.sku, name: form.name };
       const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
       const rulePayload = getEppDurationRulePayload(ruleInput);
+      const stockConversion = resolveStockFromPackageRule({ name: form.name, stockInput: initialStock });
       upsertLocalCatalogItem({
         id: form.sku,
         sku: form.sku,
@@ -324,11 +344,13 @@ export function useInventoryData() {
         replacementDays,
         ...rulePayload,
         plantaId: writePlantId,
-        stock: initialStock,
+        stock: stockConversion.stock,
+        ...stockConversion.metadata,
+        unit: stockConversion.metadata?.stockUnit ?? 'PZA',
         minStock: 2,
         hasSizes: false,
         active: true,
-        available: initialStock > 0,
+        available: stockConversion.stock > 0,
       });
       setItems(listLocalInventory());
       toast.success(`Artículo "${form.name}" agregado localmente`);

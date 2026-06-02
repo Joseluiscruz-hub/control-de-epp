@@ -404,6 +404,11 @@ export function listLocalInventory() {
     material: (item as PPECatalogItem & { material?: string }).material,
     location: (item as PPECatalogItem & { location?: string }).location,
     unit: (item as PPECatalogItem & { unit?: string }).unit,
+    stockUnit: item.stockUnit,
+    packageUnit: item.packageUnit,
+    unitsPerPackage: item.unitsPerPackage,
+    stockPackageInput: item.stockPackageInput,
+    packageRuleId: item.packageRuleId,
     unitCost: item.unitCost,
     createdAt: undefined as Date | undefined,
   }));

@@ -19,7 +19,7 @@ export function InventoryStatsGrid({
         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
            <Package className="h-20 w-20 text-white" />
         </div>
-        <p className="section-eyebrow mb-2">Unidades Totales</p>
+        <p className="section-eyebrow mb-2">Piezas Totales (PZA)</p>
         <p className="text-4xl font-black text-white tracking-tight">{totalStock.toLocaleString()}</p>
       </div>
       

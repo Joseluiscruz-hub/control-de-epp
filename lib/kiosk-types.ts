@@ -22,6 +22,11 @@ export interface PPESizeVariant {
   stock?: number;
   minStock?: number;
   available?: boolean;
+  stockUnit?: "PZA";
+  packageUnit?: "CAJA" | "BOLSA";
+  unitsPerPackage?: number;
+  stockPackageInput?: number;
+  packageRuleId?: string;
 }
 
 export interface PPECatalogItem {
@@ -45,6 +50,11 @@ export interface PPECatalogItem {
   stock?: number;
   minStock?: number;
   available?: boolean;
+  stockUnit?: "PZA";
+  packageUnit?: "CAJA" | "BOLSA";
+  unitsPerPackage?: number;
+  stockPackageInput?: number;
+  packageRuleId?: string;
   imageUrl?: string;
   plantaId?: string;
 }
