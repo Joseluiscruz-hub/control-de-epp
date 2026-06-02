@@ -22,6 +22,15 @@ export interface PPESizeVariant {
   stock?: number;
   minStock?: number;
   available?: boolean;
+  location?: string;
+  unit?: string;
+  unitCost?: number;
+  temporarySku?: boolean;
+  stockUnit?: "PZA";
+  packageUnit?: "CAJA" | "BOLSA";
+  unitsPerPackage?: number;
+  stockPackageInput?: number;
+  packageRuleId?: string;
 }
 
 export interface PPECatalogItem {
@@ -42,9 +51,16 @@ export interface PPECatalogItem {
   // Para EPP sin tallas, SKU y stock directo:
   sku?: string;
   material?: string;
+  location?: string;
+  unit?: string;
   stock?: number;
   minStock?: number;
   available?: boolean;
+  stockUnit?: "PZA";
+  packageUnit?: "CAJA" | "BOLSA";
+  unitsPerPackage?: number;
+  stockPackageInput?: number;
+  packageRuleId?: string;
   imageUrl?: string;
   plantaId?: string;
 }

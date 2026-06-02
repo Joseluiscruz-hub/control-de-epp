@@ -4,6 +4,7 @@ import {
   resolveEppReplacementDays,
   type EppDurationRule,
 } from "./epp-duration-rules";
+import { resolveStockFromPackageRule } from "./epp-package-rules";
 
 export const INVENTORY_IMPORT_SOURCE = "plant_epp_inventory";
 export const INVENTORY_SCHEMA_VERSION = 1;
@@ -31,6 +32,11 @@ export interface InventoryVariant {
   unit: string;
   unitCost?: number;
   temporarySku: boolean;
+  stockUnit?: "PZA";
+  packageUnit?: "CAJA" | "BOLSA";
+  unitsPerPackage?: number;
+  stockPackageInput?: number;
+  packageRuleId?: string;
 }
 
 export interface InventoryImportItem {
@@ -52,6 +58,11 @@ export interface InventoryImportItem {
   location: string;
   unit: string;
   unitCost?: number;
+  stockUnit?: "PZA";
+  packageUnit?: "CAJA" | "BOLSA";
+  unitsPerPackage?: number;
+  stockPackageInput?: number;
+  packageRuleId?: string;
   variants: InventoryVariant[];
   sourceRows: number[];
 }
@@ -280,7 +291,7 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
     const rawName = read("Texto breve de Material");
     const size = read("Talla").toUpperCase() || "N/A";
     const material = read("Material");
-    const stock = parseNumber(read("Stock"));
+    const stockInput = parseNumber(read("Stock"));
     const unitCost = parseNumber(read("Precio variable"));
 
     if (!rawName) {
@@ -297,7 +308,7 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
       });
     }
 
-    if (stock === undefined) {
+    if (stockInput === undefined) {
       missingStock++;
       issues.push({
         row: rowNumber,
@@ -316,18 +327,24 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
       description: rawName,
       name: baseName,
     });
+    const stockConversion = resolveStockFromPackageRule({
+      name: baseName || rawName,
+      size,
+      stockInput: stockInput ?? 0,
+    });
 
     const variant: InventoryVariant = {
       size,
       sku,
       material,
-      stock: stock ?? 0,
+      stock: stockConversion.stock,
       minStock: DEFAULT_MIN_STOCK,
-      available: (stock ?? 0) > 0,
+      available: stockConversion.stock > 0,
       location: read("Ubicación"),
-      unit: read("Umb") || "PZA",
+      unit: (stockConversion.metadata?.stockUnit ?? read("Umb")) || "PZA",
       unitCost,
       temporarySku: !material,
+      ...stockConversion.metadata,
     };
 
     const current = groups.get(baseId);
@@ -397,6 +414,11 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
         location: primary.location,
         unit: primary.unit,
         unitCost: primary.unitCost,
+        stockUnit: primary.stockUnit,
+        packageUnit: primary.packageUnit,
+        unitsPerPackage: primary.unitsPerPackage,
+        stockPackageInput: primary.stockPackageInput,
+        packageRuleId: primary.packageRuleId,
         variants,
         sourceRows: group.sourceRows,
       };
@@ -449,6 +471,11 @@ export function buildInventoryCatalogPayload(item: InventoryImportItem) {
     location: item.location,
     unit: item.unit,
     unitCost: item.unitCost,
+    stockUnit: item.stockUnit,
+    packageUnit: item.packageUnit,
+    unitsPerPackage: item.unitsPerPackage,
+    stockPackageInput: item.stockPackageInput,
+    packageRuleId: item.packageRuleId,
     active: true,
     available: item.stock > 0,
     source: INVENTORY_IMPORT_SOURCE,
