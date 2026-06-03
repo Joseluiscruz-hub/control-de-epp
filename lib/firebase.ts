@@ -196,6 +196,7 @@ function initializeAppCheckIfPossible() {
     if (!_appCheckInitWarningShown) {
       console.warn("[App Check] No se pudo inicializar App Check. Firestore o las APIs pueden rechazar solicitudes con enforcement activo.", error);
       _appCheckInitWarningShown = true;
+            _appCheck = null;
     }
     return null;
   }
