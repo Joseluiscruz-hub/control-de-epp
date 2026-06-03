@@ -172,7 +172,6 @@ export function getFirebaseDb() {
 }
 
 function getAppCheckSiteKey() {
-  if (typeof window !== 'undefined' && window.location.hostname.endsWith('.run.app')) return '';
   return firstNonEmpty(
     process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY,
     getRuntimeConfig()?.appCheckSiteKey
