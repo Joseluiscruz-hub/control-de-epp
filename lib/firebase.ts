@@ -60,6 +60,7 @@ function getFirebaseConfig(): FirebaseAppConfig {
 // This prevents build-time errors when NEXT_PUBLIC_* env vars are unavailable during SSG.
 let _initialized = false;
 let _initPromise: Promise<void> | null = null;
+let _runtimeConfigPromise: Promise<void> | null = null;
 let _firestoreDatabaseId = '(default)';
 let _appCheck: AppCheck | null = null;
 let _appCheckInitWarningShown = false;
@@ -96,27 +97,42 @@ function ensureInitialized() {
   return initializeWithConfig(getFirebaseConfig());
 }
 
-async function loadRuntimeConfig() {
+async function loadRuntimeConfig(options: { force?: boolean } = {}) {
   if (typeof window === 'undefined') return;
 
-  if (getRuntimeConfig()?.apiKey) return;
+  if (!options.force && getRuntimeConfig()?.apiKey) return;
 
-  const response = await fetch('/firebase-config.json', {
-    cache: 'no-store',
-    headers: {
-      Accept: 'application/json',
-    },
+  _runtimeConfigPromise ??= (async () => {
+    const response = await fetch('/firebase-config.json', {
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Firebase config request failed with status ${response.status}`);
+    }
+
+    window.__ASSETGUARD_FIREBASE_CONFIG__ = (await response.json()) as RuntimeFirebaseConfig;
+  })().finally(() => {
+    _runtimeConfigPromise = null;
   });
 
-  if (!response.ok) {
-    throw new Error(`Firebase config request failed with status ${response.status}`);
-  }
+  await _runtimeConfigPromise;
+}
 
-  window.__ASSETGUARD_FIREBASE_CONFIG__ = (await response.json()) as RuntimeFirebaseConfig;
+async function ensureAppCheckConfigLoaded() {
+  if (typeof window === 'undefined' || getAppCheckSiteKey()) return;
+  await loadRuntimeConfig({ force: true });
 }
 
 export async function ensureFirebaseReady() {
-  if (ensureInitialized()) return;
+  if (ensureInitialized()) {
+    await ensureAppCheckConfigLoaded();
+    initializeAppCheckIfPossible();
+    return;
+  }
   if (typeof window === 'undefined') return;
 
   _initPromise ??= (async () => {
@@ -124,6 +140,8 @@ export async function ensureFirebaseReady() {
     if (!ensureInitialized()) {
       throw new Error('Firebase app not initialized. Check NEXT_PUBLIC_FIREBASE_* env vars.');
     }
+    await ensureAppCheckConfigLoaded();
+    initializeAppCheckIfPossible();
   })().catch((error) => {
     _initPromise = null;
     throw error;
@@ -186,6 +204,8 @@ function initializeAppCheckIfPossible() {
 }
 
 export async function getAppCheckTokenForRequest() {
+  await ensureFirebaseReady();
+  await ensureAppCheckConfigLoaded();
   const appCheck = initializeAppCheckIfPossible();
   if (!appCheck) return undefined;
   try {
