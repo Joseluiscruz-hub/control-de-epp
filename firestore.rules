@@ -81,7 +81,7 @@ service cloud.firestore {
 
     // ── Perfiles administrativos multi-planta ─────────────────────────────
     match /users/{userId} {
-      allow get: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow get: if request.auth != null && (request.auth.uid == userId || isBootstrapAdmin());
       allow list: if request.auth != null && isGlobalAdmin();
       allow create, update: if request.auth != null && isGlobalAdmin() && isValidUserProfile(request.resource.data, userId);
       allow delete: if false;
