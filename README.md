@@ -27,11 +27,23 @@ La aplicación ya cuenta con:
 - Portal público para consulta de colaborador por número de nómina.
 - Kiosko público para solicitar EPP sin exponer colecciones privadas.
 - ARIA, asistente de análisis operacional con Gemini.
+- Firebase App Check aplicado para Cloud Firestore y APIs públicas de kiosko.
 - Firestore Rules reforzadas con validación de esquemas y control por rol.
 - Validaciones server-side para ARIA y PIN del kiosko.
 - Transacciones para proteger stock y asignaciones concurrentes.
-- CI automático de `lint` y `build`.
-- Deploy automático a Google Cloud Run desde `master`.
+- CI automático de `lint`, `typecheck` y `build`.
+- Deploy automático a Google Cloud Run desde `main`.
+
+## Firebase Apps
+
+La app web usada por producción es:
+
+```text
+displayName: control-de-epp
+appId: 1:659644890317:web:4089a7a7b1a89b55c17d84
+```
+
+Existe una Web App legacy llamada `ai-studio-applet-webapp` dentro del mismo proyecto Firebase. No es la app que despliega Cloud Run actualmente. Si se vuelve a usar, debe registrarse completamente en App Check antes de tocar Cloud Firestore.
 
 ## Módulos Principales
 
@@ -359,25 +371,18 @@ Workflow:
 Flujo:
 
 1. Checkout del repo.
-2. Autenticación con Workload Identity Federation si está configurado, o `GCP_SA_KEY` como fallback temporal.
+2. Autenticación con Workload Identity Federation/OIDC.
 3. Setup de Google Cloud SDK.
 4. Deploy a Cloud Run con `gcloud run deploy --source .`.
 5. Inyección de variables públicas Firebase.
 6. Montaje de `GEMINI_API_KEY` desde Secret Manager.
-7. Deploy de `firestore.rules` con `FIREBASE_TOKEN`.
+7. Deploy de `firestore.rules` con la misma identidad OIDC.
 
 Secrets requeridos:
 
 ```text
 GCP_WORKLOAD_IDENTITY_PROVIDER
 GCP_SERVICE_ACCOUNT
-FIREBASE_TOKEN
-```
-
-Fallback temporal:
-
-```text
-GCP_SA_KEY
 ```
 
 GitHub Variables requeridas:
@@ -399,6 +404,8 @@ NEXT_PUBLIC_ENABLE_OFFLINE_MODE
 FIREBASE_APPCHECK_SITE_KEY
 FIREBASE_APP_CHECK_REQUIRED
 ```
+
+En producción `FIREBASE_APP_CHECK_REQUIRED=true` y Cloud Firestore debe permanecer en estado App Check `Aplicada`.
 
 ## Operación Recomendada Después de Deploy
 

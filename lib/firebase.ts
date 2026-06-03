@@ -62,6 +62,7 @@ let _initialized = false;
 let _initPromise: Promise<void> | null = null;
 let _firestoreDatabaseId = '(default)';
 let _appCheck: AppCheck | null = null;
+let _appCheckInitWarningShown = false;
 let _appCheckTokenWarningShown = false;
 
 function hasRequiredConfig(config: FirebaseAppConfig) {
@@ -72,6 +73,7 @@ function initializeWithConfig(config: FirebaseAppConfig) {
   if (_initialized || getApps().length > 0) {
     _initialized = true;
     _firestoreDatabaseId = config.firestoreDatabaseId;
+    initializeAppCheckIfPossible();
     return true;
   }
 
@@ -80,12 +82,14 @@ function initializeWithConfig(config: FirebaseAppConfig) {
   initializeApp(config);
   _initialized = true;
   _firestoreDatabaseId = config.firestoreDatabaseId;
+  initializeAppCheckIfPossible();
   return true;
 }
 
 function ensureInitialized() {
   if (_initialized || getApps().length > 0) {
     _initialized = true;
+    initializeAppCheckIfPossible();
     return true;
   }
 
@@ -143,6 +147,7 @@ export function getFirebaseAuth() {
 
 export function getFirebaseDb() {
   const app = getFirebaseApp();
+  initializeAppCheckIfPossible();
   return _firestoreDatabaseId && _firestoreDatabaseId !== '(default)'
     ? getFirestore(app, _firestoreDatabaseId)
     : getFirestore(app);
@@ -155,28 +160,40 @@ function getAppCheckSiteKey() {
   );
 }
 
-function getFirebaseAppCheck() {
+function initializeAppCheckIfPossible() {
   if (typeof window === 'undefined') return null;
   const siteKey = getAppCheckSiteKey();
   if (!siteKey) return null;
   if (_appCheck) return _appCheck;
 
-  _appCheck = initializeAppCheck(getFirebaseApp(), {
-    provider: new ReCaptchaV3Provider(siteKey),
-    isTokenAutoRefreshEnabled: true,
-  });
+  const app = getApps()[0];
+  if (!app) return null;
+
+  try {
+    _appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(siteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (error) {
+    if (!_appCheckInitWarningShown) {
+      console.warn("[App Check] No se pudo inicializar App Check. Firestore o las APIs pueden rechazar solicitudes con enforcement activo.", error);
+      _appCheckInitWarningShown = true;
+    }
+    return null;
+  }
+
   return _appCheck;
 }
 
 export async function getAppCheckTokenForRequest() {
-  const appCheck = getFirebaseAppCheck();
+  const appCheck = initializeAppCheckIfPossible();
   if (!appCheck) return undefined;
   try {
     const result = await getToken(appCheck, false);
     return result.token;
   } catch (error) {
     if (!_appCheckTokenWarningShown) {
-      console.warn("[App Check] Token unavailable; request will continue without App Check while monitoring is disabled.", error);
+      console.warn("[App Check] Token no disponible; la solicitud puede ser rechazada si App Check esta en enforcement.", error);
       _appCheckTokenWarningShown = true;
     }
     return undefined;
