@@ -206,8 +206,12 @@ export function useInventoryData() {
 
   /* ── Server inventory loader ─────────────────── */
   useEffect(() => {
-    void loadInventory();
-  }, [activePlantId, loadLocalInventory]);
+    const timeout = window.setTimeout(() => {
+      void loadInventory();
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [loadInventory]);
 
   /* ── Computed values ─────────────────────────── */
   const filtered = items.filter(it => {
