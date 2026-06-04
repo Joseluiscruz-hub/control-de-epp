@@ -1,20 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
-import {
-  collection,
-  onSnapshot,
-  query,
-  where,
-  orderBy,
-  limit,
-  type CollectionReference,
-  type DocumentData,
-  type Query,
-  type QueryConstraint,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, ensureFirebaseReady } from "@/lib/firebase";
 import { DEFAULT_PLANT_ID, plantLabel, type ActivePlantId } from "@/lib/plants";
 import { usePlantStore } from "@/store/usePlantStore";
 
@@ -56,6 +43,14 @@ export interface LiveDashboardState {
 }
 
 const LOW_STOCK_THRESHOLD = 20;
+const REFRESH_INTERVAL_MS = 15_000;
+
+type LiveDashboardPayload = {
+  requests?: LiveDoc[];
+  assignments?: LiveDoc[];
+  inventory?: LiveDoc[];
+  alerts?: LiveDoc[];
+};
 
 function toDate(value: unknown) {
   if (value instanceof Date) return value;
@@ -80,23 +75,6 @@ function number(value: unknown, fallback = 0) {
 
 function docPlant(data: Record<string, unknown>) {
   return text(data.plantaId, DEFAULT_PLANT_ID);
-}
-
-function scopedQuery(
-  ref: CollectionReference<DocumentData>,
-  activePlantId: ActivePlantId,
-  ...extra: QueryConstraint[]
-): Query<DocumentData> {
-  const constraints: QueryConstraint[] =
-    activePlantId === "todas" ? [] : [where("plantaId", "==", activePlantId)];
-  return query(ref, ...constraints, ...extra);
-}
-
-function daysAgo(days: number): Date {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  d.setHours(0, 0, 0, 0);
-  return d;
 }
 
 function isToday(date: Date) {
@@ -142,48 +120,58 @@ export function useLiveDashboard(): LiveDashboardState {
   const [assignments, setAssignments] = useState<LiveDoc[]>([]);
   const [inventory, setInventory] = useState<LiveDoc[]>([]);
   const [alerts, setAlerts] = useState<LiveDoc[]>([]);
-  const [pendingListeners, setPendingListeners] = useState(4);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let unsubscribers: Array<() => void> = [];
-    const timeout = window.setTimeout(() => {
-      setPendingListeners(4);
+    let cancelled = false;
+    let intervalId: number | undefined;
+
+    const syncDashboard = async (showLoading: boolean) => {
+      if (showLoading) setLoading(true);
       setError(null);
 
-      const attach = (
-        ref: CollectionReference<DocumentData>,
-        setter: Dispatch<SetStateAction<LiveDoc[]>>,
-        ...extra: QueryConstraint[]
-      ) => onSnapshot(
-        scopedQuery(ref, activePlantId, ...extra),
-        (snapshot) => {
-          setter(snapshot.docs.map((docSnap) => ({ id: docSnap.id, data: docSnap.data() })));
-          setPendingListeners((current) => Math.max(0, current - 1));
-        },
-        (snapshotError) => {
-          console.error("[Live dashboard listener error]", snapshotError);
-          setError("No se pudo sincronizar la torre de control en vivo.");
-          setPendingListeners((current) => Math.max(0, current - 1));
+      try {
+        await ensureFirebaseReady();
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) {
+          throw new Error("missing_admin_session");
         }
-      );
 
-      const thirtyDaysAgo = daysAgo(30);
+        const response = await fetch(`/api/monitoring/live?plant=${encodeURIComponent(activePlantId)}`, {
+          cache: "no-store",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
 
-      unsubscribers = [
-        attach(collection(db, "kiosk_requests"), setRequests,
-          where("createdAt", ">=", thirtyDaysAgo), orderBy("createdAt", "desc"), limit(200)),
-        attach(collection(db, "assignments"), setAssignments,
-          where("assignedAt", ">=", thirtyDaysAgo), orderBy("assignedAt", "desc"), limit(500)),
-        attach(collection(db, "ppe_catalog"), setInventory),
-        attach(collection(db, "kiosk_alerts"), setAlerts,
-          where("createdAt", ">=", thirtyDaysAgo), orderBy("createdAt", "desc"), limit(100)),
-      ];
-    }, 0);
+        if (!response.ok) {
+          const result = await response.json().catch(() => null) as { error?: string } | null;
+          throw new Error(result?.error || "live_dashboard_sync_failed");
+        }
+
+        const payload = await response.json() as LiveDashboardPayload;
+        if (cancelled) return;
+        setRequests(Array.isArray(payload.requests) ? payload.requests : []);
+        setAssignments(Array.isArray(payload.assignments) ? payload.assignments : []);
+        setInventory(Array.isArray(payload.inventory) ? payload.inventory : []);
+        setAlerts(Array.isArray(payload.alerts) ? payload.alerts : []);
+      } catch (syncError) {
+        if (cancelled) return;
+        console.error("[Live dashboard sync error]", syncError);
+        setError("No se pudo sincronizar la torre de control en vivo.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void syncDashboard(true);
+    intervalId = window.setInterval(() => void syncDashboard(false), REFRESH_INTERVAL_MS);
 
     return () => {
-      window.clearTimeout(timeout);
-      unsubscribers.forEach((unsubscribe) => unsubscribe());
+      cancelled = true;
+      if (intervalId) window.clearInterval(intervalId);
     };
   }, [activePlantId]);
 
@@ -236,7 +224,7 @@ export function useLiveDashboard(): LiveDashboardState {
     });
 
     return {
-      loading: pendingListeners > 0,
+      loading,
       error,
       activePlantId,
       recentActivity,
@@ -248,5 +236,5 @@ export function useLiveDashboard(): LiveDashboardState {
       lowStockItems,
       totalStock,
     };
-  }, [activePlantId, alerts, assignments, error, inventory, pendingListeners, requests]);
+  }, [activePlantId, alerts, assignments, error, inventory, loading, requests]);
 }
