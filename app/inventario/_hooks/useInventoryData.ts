@@ -1,10 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  collection, onSnapshot, query, where
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { toast } from 'sonner';
 import {
   buildInventoryCatalogPayload,
@@ -14,6 +11,7 @@ import {
 } from '@/lib/inventory-import';
 import {
   adjustLocalInventoryStock,
+  canUseLocalFallback,
   listLocalInventory,
   upsertLocalCatalogItem,
 } from '@/lib/kiosk-local-store';
@@ -131,26 +129,42 @@ export function useInventoryData() {
 
   /* ── Local fallback loader ───────────────────── */
   const loadLocalInventory = useCallback(() => {
+    if (!canUseLocalFallback()) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+
     setItems(listLocalInventory());
     setLoading(false);
   }, []);
 
-  /* ── Firestore listener ──────────────────────── */
-  useEffect(() => {
+  const loadInventory = useCallback(async () => {
+    setLoading(true);
     try {
-      const q = activePlantId === 'todas'
-        ? query(collection(db, 'ppe_catalog'))
-        : query(collection(db, 'ppe_catalog'), where('plantaId', '==', activePlantId));
-      const unsub = onSnapshot(q, (snap) => {
-        const data = snap.docs.map(d => {
-          const item = d.data();
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('missing_admin_session');
+
+      const response = await fetch(`/api/inventory/items?plant=${encodeURIComponent(activePlantId)}`, {
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof result?.error === 'string' ? result.error : 'inventory_load_failed');
+      }
+
+      const data = (Array.isArray(result?.items) ? result.items : []).map((item: PpeItem & { createdAt?: string }) => {
           const sizes = item.sizes as Record<string, PpeSizeVariant> | undefined;
           const sizeStock = sizes
             ? Object.values(sizes).reduce((sum, variant) => sum + (variant.stock ?? 0), 0)
             : 0;
           const replacementDays = resolveEppReplacementDays(
             {
-              sku: item.sku ?? d.id,
+              sku: item.sku ?? item.docId,
               material: item.material,
               name: item.name,
               sizes,
@@ -159,8 +173,8 @@ export function useInventoryData() {
           );
 
           return {
-            docId: d.id,
-            sku: item.sku ?? d.id,
+            docId: item.docId,
+            sku: item.sku ?? item.docId,
             name: item.name,
             category: item.category,
             replacementDays,
@@ -177,19 +191,22 @@ export function useInventoryData() {
             stockPackageInput: item.stockPackageInput,
             packageRuleId: item.packageRuleId,
             plantaId: item.plantaId,
-            createdAt: item.createdAt?.toDate(),
+            createdAt: item.createdAt ? new Date(item.createdAt) : undefined,
           };
-        });
-        setItems(data);
-        setLoading(false);
-      }, () => loadLocalInventory());
-      return () => unsub();
-    } catch {
-      const timeout = window.setTimeout(() => {
-        loadLocalInventory();
-      }, 0);
-      return () => window.clearTimeout(timeout);
+      });
+
+      setItems(data);
+      setLoading(false);
+    } catch (error) {
+      console.error('[Inventory load error]', error);
+      toast.error('No se pudo sincronizar el inventario desde Firebase.');
+      loadLocalInventory();
     }
+  }, [activePlantId, loadLocalInventory]);
+
+  /* ── Server inventory loader ─────────────────── */
+  useEffect(() => {
+    void loadInventory();
   }, [activePlantId, loadLocalInventory]);
 
   /* ── Computed values ─────────────────────────── */
@@ -269,13 +286,19 @@ export function useInventoryData() {
       if (!response.ok) {
         throw new Error(typeof result?.error === 'string' ? result.error : 'inventory_import_failed');
       }
-      saveInventoryLocally(importPreview);
+      setImportOpen(false);
+      resetInventoryImport();
+      await loadInventory();
 
       toast.success(`Inventario cargado: ${result.created ?? 0} nuevos, ${result.updated ?? 0} actualizados.`);
     } catch (error) {
       console.error('[Inventory import write error]', error);
-      const total = saveInventoryLocally(importPreview);
-      toast.warning(`Sin conexión con servidor. Inventario guardado localmente con ${total} artículo(s).`);
+      if (canUseLocalFallback()) {
+        const total = saveInventoryLocally(importPreview);
+        toast.warning(`Sin conexión con servidor. Inventario guardado localmente con ${total} artículo(s).`);
+      } else {
+        toast.error('No se pudo cargar el inventario en Firebase.');
+      }
     } finally {
       setImportingInventory(false);
     }
@@ -311,22 +334,25 @@ export function useInventoryData() {
       if (!response.ok) {
         throw new Error(await readApiError(response, 'inventory_item_save_failed'));
       }
-      upsertLocalCatalogItem({
-        id: form.sku,
-        sku: form.sku,
-        name: form.name,
-        category: form.category,
-        replacementDays,
-        ...rulePayload,
-        plantaId: writePlantId,
-        stock: stockConversion.stock,
-        ...stockConversion.metadata,
-        unit: stockConversion.metadata?.stockUnit ?? 'PZA',
-        minStock: 2,
-        hasSizes: false,
-        active: true,
-        available: stockConversion.stock > 0,
-      });
+      if (canUseLocalFallback()) {
+        upsertLocalCatalogItem({
+          id: form.sku,
+          sku: form.sku,
+          name: form.name,
+          category: form.category,
+          replacementDays,
+          ...rulePayload,
+          plantaId: writePlantId,
+          stock: stockConversion.stock,
+          ...stockConversion.metadata,
+          unit: stockConversion.metadata?.stockUnit ?? 'PZA',
+          minStock: 2,
+          hasSizes: false,
+          active: true,
+          available: stockConversion.stock > 0,
+        });
+      }
+      await loadInventory();
       toast.success(`Artículo "${form.name}" agregado al catálogo`);
       setForm({ sku: '', name: '', category: '', replacementDays: '', stock: '' });
       setAddOpen(false);
@@ -336,26 +362,30 @@ export function useInventoryData() {
       const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
       const rulePayload = getEppDurationRulePayload(ruleInput);
       const stockConversion = resolveStockFromPackageRule({ name: form.name, stockInput: initialStock });
-      upsertLocalCatalogItem({
-        id: form.sku,
-        sku: form.sku,
-        name: form.name,
-        category: form.category,
-        replacementDays,
-        ...rulePayload,
-        plantaId: writePlantId,
-        stock: stockConversion.stock,
-        ...stockConversion.metadata,
-        unit: stockConversion.metadata?.stockUnit ?? 'PZA',
-        minStock: 2,
-        hasSizes: false,
-        active: true,
-        available: stockConversion.stock > 0,
-      });
-      setItems(listLocalInventory());
-      toast.success(`Artículo "${form.name}" agregado localmente`);
-      setForm({ sku: '', name: '', category: '', replacementDays: '', stock: '' });
-      setAddOpen(false);
+      if (canUseLocalFallback()) {
+        upsertLocalCatalogItem({
+          id: form.sku,
+          sku: form.sku,
+          name: form.name,
+          category: form.category,
+          replacementDays,
+          ...rulePayload,
+          plantaId: writePlantId,
+          stock: stockConversion.stock,
+          ...stockConversion.metadata,
+          unit: stockConversion.metadata?.stockUnit ?? 'PZA',
+          minStock: 2,
+          hasSizes: false,
+          active: true,
+          available: stockConversion.stock > 0,
+        });
+        setItems(listLocalInventory());
+        toast.success(`Artículo "${form.name}" agregado localmente`);
+        setForm({ sku: '', name: '', category: '', replacementDays: '', stock: '' });
+        setAddOpen(false);
+      } else {
+        toast.error('No se pudo agregar el material en Firebase.');
+      }
     } finally {
       setSaving(false);
     }
@@ -387,13 +417,19 @@ export function useInventoryData() {
       if (!response.ok) {
         throw new Error(await readApiError(response, 'inventory_stock_adjust_failed'));
       }
-      adjustLocalInventoryStock({ itemId: adjustItem.docId, qty, type: adjustType, size: adjustItem.hasSizes ? adjustSize : undefined });
+      if (canUseLocalFallback()) {
+        adjustLocalInventoryStock({ itemId: adjustItem.docId, qty, type: adjustType, size: adjustItem.hasSizes ? adjustSize : undefined });
+      }
+      await loadInventory();
       const label = adjustType === 'add' ? `+${qty}` : adjustType === 'subtract' ? `-${qty}` : `= ${qty}`;
       toast.success(`Stock de "${adjustItem.name}" actualizado (${label})`);
       setAdjustOpen(false);
       setAdjustQty('');
     } catch {
       try {
+        if (!canUseLocalFallback()) {
+          throw new Error('local_fallback_disabled');
+        }
         adjustLocalInventoryStock({ itemId: adjustItem.docId, qty, type: adjustType, size: adjustSize || undefined });
         setItems(listLocalInventory());
         const label = adjustType === 'add' ? `+${qty}` : adjustType === 'subtract' ? `-${qty}` : `= ${qty}`;

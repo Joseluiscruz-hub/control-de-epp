@@ -7,12 +7,76 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
 import {
   buildInventoryMovement,
+  readStock,
   readNumber,
   readText,
   resolveWritePlant,
 } from "../_lib";
 
 export const runtime = "nodejs";
+
+function timestampToIso(value: unknown) {
+  return value && typeof value === "object" && "toDate" in value && typeof value.toDate === "function"
+    ? (value.toDate() as Date).toISOString()
+    : undefined;
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const adminUser = await requireAdminUser(req);
+    const requestedPlant = req.nextUrl.searchParams.get("plant");
+    const plant = adminUser.role === "admin_global" && requestedPlant && requestedPlant !== "todas"
+      ? requestedPlant
+      : adminUser.role === "admin_global"
+        ? "todas"
+        : adminUser.plantaId;
+
+    const db = getAdminDb();
+    const query = plant === "todas"
+      ? db.collection("ppe_catalog").limit(1000)
+      : db.collection("ppe_catalog").where("plantaId", "==", plant).limit(1000);
+    const snapshot = await query.get();
+
+    const items = snapshot.docs
+      .map((doc) => {
+        const data = doc.data();
+        return {
+          docId: doc.id,
+          sku: readText(data.sku) || doc.id,
+          name: readText(data.name),
+          category: readText(data.category),
+          replacementDays: readNumber(data.replacementDays, 365),
+          stock: readStock(data),
+          hasSizes: data.hasSizes === true,
+          sizes: data.sizes && typeof data.sizes === "object" ? data.sizes : undefined,
+          material: readText(data.material),
+          location: readText(data.location),
+          unit: readText(data.unit),
+          unitCost: readNumber(data.unitCost),
+          stockUnit: data.stockUnit,
+          packageUnit: data.packageUnit,
+          unitsPerPackage: data.unitsPerPackage,
+          stockPackageInput: data.stockPackageInput,
+          packageRuleId: data.packageRuleId,
+          plantaId: readText(data.plantaId),
+          createdAt: timestampToIso(data.createdAt),
+        };
+      })
+      .filter((item) => adminUser.role === "admin_global" || item.plantaId === adminUser.plantaId || !item.plantaId);
+
+    return Response.json(
+      { items },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
+  } catch (error) {
+    if (error instanceof AuthHttpError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
+
+    console.error("[Inventory list API error]", error);
+    return Response.json({ error: "No se pudo leer el inventario." }, { status: 500 });
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {

@@ -1,13 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
-import {
-  collection, onSnapshot, doc,
-  serverTimestamp, query, where, getDocs, getDoc, writeBatch, limit
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { toast } from 'sonner';
 import {
+  canUseLocalFallback,
   listLocalAssignmentsForEmployee,
   listLocalEmployees,
   setLocalEmployeeActive,
@@ -81,42 +78,57 @@ export function useEmployeeData() {
   /* ── Firestore listener / local fallback ───────── */
 
   const loadLocalEmployees = useCallback(() => {
+    if (!canUseLocalFallback()) {
+      setEmployees([]);
+      setLoading(false);
+      return;
+    }
+
     setEmployees(listLocalEmployees());
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    try {
-      const q = activePlantId === 'todas'
-        ? query(collection(db, 'employees'))
-        : query(collection(db, 'employees'), where('plantaId', '==', activePlantId));
-      const unsub = onSnapshot(q, (snap) => {
-        const data = snap.docs.map(d => {
-          const employee = d.data();
-          return {
-            docId: d.id,
-            id: employee.id,
-            name: employee.name,
-            area: employee.area,
-            personnelArea: employee.personnelArea,
-            plantArea: employee.plantArea,
-            position: employee.position,
-            jobFunction: employee.jobFunction,
-            plantaId: employee.plantaId,
-            active: employee.active,
-            createdAt: employee.createdAt?.toDate(),
-          };
+    let cancelled = false;
+
+    const loadEmployees = async () => {
+      setLoading(true);
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error('missing_admin_session');
+
+        const response = await fetch(`/api/employees?plant=${encodeURIComponent(activePlantId)}`, {
+          cache: 'no-store',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
         });
-        setEmployees(data);
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(typeof result?.error === 'string' ? result.error : 'employees_load_failed');
+        }
+
+        if (cancelled) return;
+        const data = Array.isArray(result?.employees) ? result.employees : [];
+        setEmployees(data.map((employee: Employee & { createdAt?: string }) => ({
+          ...employee,
+          createdAt: employee.createdAt ? new Date(employee.createdAt) : undefined,
+        })));
         setLoading(false);
-      }, () => loadLocalEmployees());
-      return () => unsub();
-    } catch {
-      const timeout = window.setTimeout(() => {
+      } catch (error) {
+        if (cancelled) return;
+        console.error('[Employee admin list error]', error);
+        toast.error('No se pudo cargar la base de colaboradores desde Firebase.');
         loadLocalEmployees();
-      }, 0);
-      return () => window.clearTimeout(timeout);
-    }
+      }
+    };
+
+    void loadEmployees();
+
+    return () => {
+      cancelled = true;
+    };
   }, [activePlantId, loadLocalEmployees]);
 
   /* ── Add single employee ───────────────────────── */
@@ -252,8 +264,12 @@ export function useEmployeeData() {
       );
     } catch (error) {
       console.error('[Personnel import write error]', error);
-      const localSync = savePersonnelLocally();
-      toast.warning(`Sin conexión con servidor. Base guardada localmente con ${localSync.total} colaborador(es).`);
+      if (canUseLocalFallback()) {
+        const localSync = savePersonnelLocally();
+        toast.warning(`Sin conexión con servidor. Base guardada localmente con ${localSync.total} colaborador(es).`);
+      } else {
+        toast.error('No se pudo cargar la base en Firebase.');
+      }
     } finally {
       setImportingPersonnel(false);
     }
@@ -264,35 +280,37 @@ export function useEmployeeData() {
   const toggleStatus = async (emp: Employee) => {
     try {
       const nextActive = !emp.active;
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'employees', emp.docId), {
-        active: nextActive,
-        updatedAt: serverTimestamp(),
-      });
-      batch.set(
-        doc(db, 'kiosk_employees', emp.docId),
-        {
-          name: emp.name,
-          area: emp.area,
-          plantaId: emp.plantaId ?? writePlantId,
-          personnelArea: emp.personnelArea ?? '',
-          plantArea: emp.plantArea ?? emp.area,
-          position: emp.position ?? '',
-          jobFunction: emp.jobFunction ?? '',
-          active: nextActive,
-          updatedAt: serverTimestamp(),
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('missing_admin_session');
+
+      const response = await fetch('/api/employees', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-        { merge: true }
-      );
-      await batch.commit();
-      setLocalEmployeeActive(emp.id, nextActive);
+        body: JSON.stringify({ employeeId: emp.docId, active: nextActive }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(typeof result?.error === 'string' ? result.error : 'employee_status_failed');
+      }
+
+      if (canUseLocalFallback()) setLocalEmployeeActive(emp.id, nextActive);
+      setEmployees((current) => current.map((item) => (
+        item.docId === emp.docId ? { ...item, active: nextActive } : item
+      )));
       toast.success(`${emp.name} fue ${emp.active ? 'dado de baja' : 'reactivado'} correctamente`);
       setConfirmToggle(null);
     } catch {
       const nextActive = !emp.active;
-      setLocalEmployeeActive(emp.id, nextActive);
-      setEmployees(listLocalEmployees());
-      toast.success(`${emp.name} fue ${emp.active ? 'dado de baja' : 'reactivado'} localmente`);
+      if (canUseLocalFallback()) {
+        setLocalEmployeeActive(emp.id, nextActive);
+        setEmployees(listLocalEmployees());
+        toast.success(`${emp.name} fue ${emp.active ? 'dado de baja' : 'reactivado'} localmente`);
+      } else {
+        toast.error('Firebase no permitió actualizar el colaborador.');
+      }
       setConfirmToggle(null);
     }
   };
@@ -301,76 +319,50 @@ export function useEmployeeData() {
 
   const syncKioskEmployees = async () => {
     setSyncingKiosk(true);
-    const localSync = syncLocalKioskEmployees(
-      employees.map(emp => ({
-        id: emp.id,
-        name: emp.name,
-        area: emp.area,
-        personnelArea: emp.personnelArea,
-        plantArea: emp.plantArea,
-        position: emp.position,
-        jobFunction: emp.jobFunction,
-        active: emp.active,
-      }))
-    );
-
-    try {
-      const snapshots = await Promise.all(
-        employees.map(emp => getDoc(doc(db, 'kiosk_employees', emp.docId)))
-      );
-
-      let batch = writeBatch(db);
-      let writes = 0;
-      let created = 0;
-
-      for (let i = 0; i < employees.length; i++) {
-        const emp = employees[i];
-        const kioskRef = doc(db, 'kiosk_employees', emp.docId);
-        const baseData = {
+    const localSync = canUseLocalFallback()
+      ? syncLocalKioskEmployees(
+        employees.map(emp => ({
+          id: emp.id,
           name: emp.name,
           area: emp.area,
-          personnelArea: emp.personnelArea ?? '',
-          plantArea: emp.plantArea ?? emp.area,
-          position: emp.position ?? '',
-          jobFunction: emp.jobFunction ?? '',
+          personnelArea: emp.personnelArea,
+          plantArea: emp.plantArea,
+          position: emp.position,
+          jobFunction: emp.jobFunction,
           active: emp.active,
-          plantaId: emp.plantaId ?? writePlantId,
-          updatedAt: serverTimestamp(),
-        };
+        }))
+      )
+      : { total: 0 };
 
-        if (snapshots[i].exists()) {
-          batch.set(kioskRef, baseData, { merge: true });
-        } else {
-          batch.set(kioskRef, {
-            ...baseData,
-            firstLogin: true,
-            termsAccepted: false,
-          });
-          created++;
-        }
-
-        writes++;
-        if (writes >= 450) {
-          await batch.commit();
-          batch = writeBatch(db);
-          writes = 0;
-        }
-      }
-
-      if (writes > 0) {
-        await batch.commit();
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('missing_admin_session');
+      const response = await fetch(`/api/employees/sync-kiosk?plant=${encodeURIComponent(activePlantId)}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof result?.error === 'string' ? result.error : 'kiosk_sync_failed');
       }
 
       toast.success(
-        created > 0
-          ? `Kiosko sincronizado: ${created} colaborador(es) habilitado(s). Copia local lista.`
-          : `Kiosko sincronizado. Copia local lista con ${localSync.total} colaborador(es).`
+        result.created > 0
+          ? `Kiosko sincronizado: ${result.created} colaborador(es) habilitado(s).`
+          : `Kiosko sincronizado con ${result.total ?? employees.length} colaborador(es).`
       );
     } catch (error) {
       console.error('[Kiosk employees sync error]', error);
-      toast.warning(
-        `Firebase no permitió sincronizar, pero el kiosko local quedó listo con ${localSync.total} colaborador(es).`
-      );
+      if (canUseLocalFallback()) {
+        toast.warning(
+          `Firebase no permitió sincronizar, pero el kiosko local quedó listo con ${localSync.total} colaborador(es).`
+        );
+      } else {
+        toast.error('Firebase no permitió sincronizar el kiosko.');
+      }
     } finally {
       setSyncingKiosk(false);
     }
@@ -383,34 +375,47 @@ export function useEmployeeData() {
     setHistoryOpen(true);
     setHistoryLoading(true);
     try {
-      const q = query(
-        collection(db, 'assignments'),
-        where('employeeId', '==', emp.docId),
-        limit(50)
-      );
-      const snap = await getDocs(q);
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('missing_admin_session');
+      const response = await fetch(`/api/employees/history?employeeId=${encodeURIComponent(emp.docId)}`, {
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof result?.error === 'string' ? result.error : 'employee_history_failed');
+      }
+
       setHistory(
-        snap.docs
-          .map(d => ({
-            id: d.id,
-            sku: d.data().sku,
-            assignedAt: d.data().assignedAt?.toDate() || new Date(),
-            nextReplacementAt: d.data().nextReplacementAt?.toDate(),
-            status: d.data().status,
-          }))
+        ((Array.isArray(result?.assignments) ? result.assignments : [])
+          .map((assignment: Assignment & { assignedAt?: string; nextReplacementAt?: string }) => ({
+            id: assignment.id,
+            sku: assignment.sku,
+            assignedAt: assignment.assignedAt ? new Date(assignment.assignedAt) : new Date(),
+            nextReplacementAt: assignment.nextReplacementAt ? new Date(assignment.nextReplacementAt) : undefined,
+            status: assignment.status,
+          })) as Assignment[])
           .sort((a, b) => b.assignedAt.getTime() - a.assignedAt.getTime())
       );
     } catch {
-      setHistory(
-        listLocalAssignmentsForEmployee(emp.docId).map((assignment) => ({
-          id: assignment.id,
-          sku: assignment.sku,
-          assignedAt: assignment.assignedAt,
-          nextReplacementAt: assignment.nextReplacementAt,
-          status: assignment.status,
-        }))
-      );
-      toast.warning('Historial local cargado sin conexión corporativa');
+      if (canUseLocalFallback()) {
+        setHistory(
+          listLocalAssignmentsForEmployee(emp.docId).map((assignment) => ({
+            id: assignment.id,
+            sku: assignment.sku,
+            assignedAt: assignment.assignedAt,
+            nextReplacementAt: assignment.nextReplacementAt,
+            status: assignment.status,
+          }))
+        );
+        toast.warning('Historial local cargado sin conexión corporativa');
+      } else {
+        setHistory([]);
+        toast.error('No se pudo cargar el historial desde Firebase.');
+      }
     } finally {
       setHistoryLoading(false);
     }

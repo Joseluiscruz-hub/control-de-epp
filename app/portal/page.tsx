@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
-import { db, getAppCheckTokenForRequest } from '@/lib/firebase';
+import { getAppCheckTokenForRequest } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { HardHat, Search, AlertTriangle, CheckCircle2, ArrowLeft, Loader2, ShieldCheck, Activity } from 'lucide-react';
@@ -45,7 +44,7 @@ export default function UserPortal() {
         throw new Error('missing_app_check');
       }
 
-      const employeeResponse = await fetch('/api/kiosk/employee', {
+      const employeeResponse = await fetch('/api/portal/employee', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -92,25 +91,14 @@ export default function UserPortal() {
         area: employeeData.area ?? employeeData.plantArea ?? 'SIN ÁREA',
       });
 
-      try {
-        const assQuery = query(collection(db, 'assignments'), where('employeeId', '==', employeeData.id));
-        const assSnap = await getDocs(assQuery);
-
-        const assData = assSnap.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            sku: data.sku,
-            assignedAt: data.assignedAt instanceof Timestamp ? data.assignedAt.toDate() : new Date(),
-            nextReplacementAt: data.nextReplacementAt instanceof Timestamp ? data.nextReplacementAt.toDate() : undefined,
-            status: data.status,
-          };
-        }).sort((a, b) => b.assignedAt.getTime() - a.assignedAt.getTime());
-        setAssignments(assData);
-      } catch (historyError) {
-        console.warn('[Portal assignments unavailable]', historyError);
-        setAssignments([]);
-      }
+      const assignmentData = Array.isArray(payload?.assignments) ? payload.assignments : [];
+      setAssignments(assignmentData.map((assignment: Assignment & { assignedAt?: string; nextReplacementAt?: string }) => ({
+        id: assignment.id,
+        sku: assignment.sku,
+        assignedAt: assignment.assignedAt ? new Date(assignment.assignedAt) : new Date(),
+        nextReplacementAt: assignment.nextReplacementAt ? new Date(assignment.nextReplacementAt) : undefined,
+        status: assignment.status,
+      })));
     } catch (error) {
       console.error(error);
       if (!canUseLocalFallback()) {

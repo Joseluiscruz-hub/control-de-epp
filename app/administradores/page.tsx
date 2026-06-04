@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, query } from "firebase/firestore";
 import { AlertTriangle, KeyRound, Loader2, RotateCcw, ShieldCheck, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/components/auth-provider";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { plantLabel } from "@/lib/plants";
 import type { UserProfile } from "@/lib/admin-profile";
 
@@ -43,20 +42,39 @@ export default function AdministradoresPage() {
       return () => window.clearTimeout(timeout);
     }
 
-    const unsubscribe = onSnapshot(
-      query(collection(db, "users")),
-      (snapshot) => {
-        setAdmins(snapshot.docs.map((docSnap) => readProfile(docSnap.id, docSnap.data())));
+    let cancelled = false;
+    const loadAdmins = async () => {
+      setLoading(true);
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error("missing_session");
+        const response = await fetch("/api/admin/users", {
+          cache: "no-store",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(typeof result?.error === "string" ? result.error : "admin_users_load_failed");
+        }
+        if (cancelled) return;
+        setAdmins(Array.isArray(result?.users) ? result.users.map((user: UserProfile) => readProfile(user.uid, user as unknown as Record<string, unknown>)) : []);
         setLoading(false);
-      },
-      (error) => {
+      } catch (error) {
+        if (cancelled) return;
         console.error("[Admin users load error]", error);
         toast.error("No se pudo cargar el directorio de administradores.");
         setLoading(false);
       }
-    );
+    };
 
-    return () => unsubscribe();
+    void loadAdmins();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isGlobalAdmin]);
 
   const sortedAdmins = useMemo(
