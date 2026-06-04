@@ -94,8 +94,11 @@ export async function getEmployeeById(employeeId: string): Promise<KioskEmployee
       response.status
     );
   } catch (error) {
-    console.warn("[Kiosko] Usando empleado local por error de Firebase.", error);
-    return getLocalKioskEmployee(employeeId, isLocalRuntime() || canUseLocalFallback());
+    if (canFallbackToLocal(error)) {
+      console.warn("[Kiosko] Usando empleado local por error de Firebase.", error);
+      return getLocalKioskEmployee(employeeId, true);
+    }
+    throw error;
   }
 }
 
@@ -323,9 +326,13 @@ export interface AdminKioskRequest {
 
 async function kioskApiHeaders() {
   const appCheckToken = await getAppCheckTokenForRequest();
+  if (!appCheckToken) {
+    throw new KioskApiError("No se pudo validar App Check. Recarga el kiosko e intenta de nuevo.", 401);
+  }
+
   return {
     "Content-Type": "application/json",
-    ...(appCheckToken ? { "X-Firebase-AppCheck": appCheckToken } : {}),
+    "X-Firebase-AppCheck": appCheckToken,
   };
 }
 

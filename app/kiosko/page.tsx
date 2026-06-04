@@ -7,6 +7,14 @@ import { Loader2, HardHat, ShieldCheck } from "lucide-react";
 import { clearKioskSession, setKioskSessionBusy } from "@/lib/kiosk-session";
 
 function getKioskConnectionErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  const status =
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    typeof (error as { status?: unknown }).status === "number"
+      ? (error as { status: number }).status
+      : 0;
   const code =
     typeof error === "object" &&
     error !== null &&
@@ -14,6 +22,10 @@ function getKioskConnectionErrorMessage(error: unknown) {
     typeof (error as { code?: unknown }).code === "string"
       ? (error as { code: string }).code
       : "";
+
+  if (status === 401 && message.includes("App Check")) {
+    return "No se pudo validar App Check. Recarga el kiosko e intenta de nuevo.";
+  }
 
   if (code === "permission-denied") {
     return "El kiosko no tiene permisos. Sincroniza desde el panel de Empleados.";

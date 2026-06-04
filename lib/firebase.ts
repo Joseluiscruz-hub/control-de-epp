@@ -66,6 +66,10 @@ let _appCheck: AppCheck | null = null;
 let _appCheckInitWarningShown = false;
 let _appCheckTokenWarningShown = false;
 
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function hasRequiredConfig(config: FirebaseAppConfig) {
   return Boolean(config.apiKey && config.authDomain && config.projectId && config.appId);
 }
@@ -204,21 +208,30 @@ function initializeAppCheckIfPossible() {
   return _appCheck;
 }
 
-export async function getAppCheckTokenForRequest() {
+export async function getAppCheckTokenForRequest(options: { forceRefresh?: boolean } = {}) {
   await ensureFirebaseReady();
   await ensureAppCheckConfigLoaded();
   const appCheck = initializeAppCheckIfPossible();
   if (!appCheck) return undefined;
-  try {
-    const result = await getToken(appCheck, false);
-    return result.token;
-  } catch (error) {
-    if (!_appCheckTokenWarningShown) {
-      console.warn("[App Check] Token no disponible; la solicitud puede ser rechazada si App Check esta en enforcement.", error);
-      _appCheckTokenWarningShown = true;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const result = await getToken(appCheck, options.forceRefresh || attempt > 0);
+      return result.token;
+    } catch (error) {
+      if (attempt === 0) {
+        await wait(350);
+        continue;
+      }
+
+      if (!_appCheckTokenWarningShown) {
+        console.warn("[App Check] Token no disponible; la solicitud puede ser rechazada si App Check esta en enforcement.", error);
+        _appCheckTokenWarningShown = true;
+      }
     }
-    return undefined;
   }
+
+  return undefined;
 }
 
 function initializeFromStaticConfig() {
