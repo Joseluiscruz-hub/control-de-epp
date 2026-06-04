@@ -10,6 +10,7 @@ const EMPLOYEES_KEY = "assetguard.local.kiosk.employees";
 const CATALOG_KEY = "assetguard.local.kiosk.catalog";
 const REQUESTS_KEY = "assetguard.local.kiosk.requests";
 const ASSIGNMENTS_KEY = "assetguard.local.assignments";
+const ENABLE_OFFLINE_MODE = process.env.NEXT_PUBLIC_ENABLE_OFFLINE_MODE === "true";
 
 type StockAdjustType = "add" | "subtract" | "set";
 
@@ -226,9 +227,11 @@ export function isOfflineRuntime() {
 
 export function canUseLocalFallback() {
   if (typeof window === "undefined") return false;
+  if (["localhost", "127.0.0.1"].includes(window.location.hostname)) return true;
+  if (!ENABLE_OFFLINE_MODE) return false;
+
   return (
     isOfflineRuntime() ||
-    ["localhost", "127.0.0.1"].includes(window.location.hostname) ||
     window.localStorage.getItem("assetguard.offline.adminSession") === "true"
   );
 }

@@ -48,9 +48,8 @@ async function parseKioskApiError(response: Response, fallback: string) {
 
 function canFallbackToLocal(error: unknown) {
   return (
-    canUseLocalFallback() ||
-    isOfflineRuntime() ||
-    (isLocalRuntime() && (!(error instanceof KioskApiError) || error.status >= 500))
+    canUseLocalFallback() &&
+    (!(error instanceof KioskApiError) || error.status >= 500 || isLocalRuntime() || isOfflineRuntime())
   );
 }
 

@@ -11,7 +11,7 @@ import { es } from 'date-fns/locale';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
-import { getLocalKioskEmployee, listLocalAssignmentsForEmployee } from '@/lib/kiosk-local-store';
+import { canUseLocalFallback, getLocalKioskEmployee, listLocalAssignmentsForEmployee } from '@/lib/kiosk-local-store';
 
 interface Assignment {
   id: string;
@@ -41,11 +41,15 @@ export default function UserPortal() {
     try {
       const normalizedEmployeeId = employeeId.trim();
       const appCheckToken = await getAppCheckTokenForRequest();
+      if (!appCheckToken) {
+        throw new Error('missing_app_check');
+      }
+
       const employeeResponse = await fetch('/api/kiosk/employee', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}),
+          'X-Firebase-AppCheck': appCheckToken,
         },
         body: JSON.stringify({ employeeId: normalizedEmployeeId }),
       });
@@ -53,6 +57,13 @@ export default function UserPortal() {
       const employeeData = payload?.employee;
 
       if (!employeeData || employeeData.active !== true) {
+        if (!canUseLocalFallback()) {
+          setEmployee(null);
+          setAssignments([]);
+          toast.error('Número de empleado no válido');
+          return;
+        }
+
         const localEmployee = getLocalKioskEmployee(normalizedEmployeeId);
         if (!localEmployee || localEmployee.active !== true) {
           setEmployee(null);
@@ -102,6 +113,11 @@ export default function UserPortal() {
       }
     } catch (error) {
       console.error(error);
+      if (!canUseLocalFallback()) {
+        toast.error('Error de conexión con el servidor corporativo');
+        return;
+      }
+
       const localEmployee = getLocalKioskEmployee(employeeId.trim());
       if (!localEmployee || localEmployee.active !== true) {
         toast.error('Error de conexión con el servidor corporativo');

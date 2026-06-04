@@ -8,7 +8,7 @@ import {
 import { db } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/firestore-error';
 import { isToday, isBefore, addDays } from 'date-fns';
-import { getLocalDashboardSnapshot } from '@/lib/kiosk-local-store';
+import { canUseLocalFallback, getLocalDashboardSnapshot } from '@/lib/kiosk-local-store';
 import { usePlantStore } from '@/store/usePlantStore';
 
 // ── Interfaces ────────────────────────────────────────────────
@@ -59,6 +59,11 @@ export function useDashboardData() {
   });
 
   const applyLocalDashboard = useCallback(() => {
+    if (!canUseLocalFallback()) {
+      setLoading(false);
+      return;
+    }
+
     const local = getLocalDashboardSnapshot();
     setRecentAssignments(local.assignments.slice(0, 10).map((assignment) => ({
       id: assignment.id,

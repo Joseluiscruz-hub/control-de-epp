@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
-import { getLocalDashboardSnapshot } from '@/lib/kiosk-local-store';
+import { canUseLocalFallback, getLocalDashboardSnapshot } from '@/lib/kiosk-local-store';
 
 interface Message {
   id: string;
@@ -88,6 +88,7 @@ export function AiChatPanel() {
     try {
       const offlineMode =
         typeof navigator !== 'undefined' &&
+        canUseLocalFallback() &&
         (navigator.onLine === false || window.localStorage.getItem('assetguard.offline.adminSession') === 'true');
 
       if (offlineMode) {
@@ -127,8 +128,10 @@ export function AiChatPanel() {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: error instanceof Error && error.message === 'missing_auth'
-          ? buildOfflineReply()
-          : `No pude conectar con el servidor de IA. Te dejo el resumen local disponible:\n\n${buildOfflineReply()}`,
+          ? 'Necesito una sesión administrativa online para responder.'
+          : canUseLocalFallback()
+            ? `No pude conectar con el servidor de IA. Te dejo el resumen local disponible:\n\n${buildOfflineReply()}`
+            : 'No pude conectar con el servidor de IA. Intenta de nuevo en unos momentos.',
         timestamp: new Date(),
       }]);
     } finally {

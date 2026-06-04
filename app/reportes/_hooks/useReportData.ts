@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { db } from "@/lib/firebase";
 import { handleFirestoreError, OperationType } from "@/lib/firestore-error";
 import {
+  canUseLocalFallback,
   listLocalAssignments,
   listLocalEmployees,
   listLocalInventory,
@@ -469,6 +470,12 @@ export function useReportData() {
       setAllRows(nextRows);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, "reporte diario SAP");
+      if (!canUseLocalFallback()) {
+        setAllRows([]);
+        setLocalMode(false);
+        return;
+      }
+
       const localEmployees = buildEmployeeIndex(
         listLocalEmployees().map((employee) => ({
           id: employee.id,
