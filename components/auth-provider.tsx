@@ -100,7 +100,29 @@ async function resolveUserProfile(user: User) {
       return normalizeUserProfile(user.uid, email, snap.data()) ?? fallback;
     }
   } catch (error) {
-    console.warn('[Admin profile unavailable, using fallback permissions]', error);
+    console.warn('[Admin profile unavailable from Firestore, trying server profile]', error);
+  }
+
+  try {
+    const token = await user.getIdToken();
+    const response = await fetch('/api/auth/profile', {
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const result = await response.json() as { profile?: Record<string, unknown> };
+      if (result.profile) {
+        return normalizeUserProfile(user.uid, email, result.profile) ?? fallback;
+      }
+    } else if (response.status !== 401 && response.status !== 403) {
+      console.warn('[Admin profile server fallback failed]', response.status);
+    }
+  } catch (error) {
+    console.warn('[Admin profile server fallback unavailable]', error);
   }
 
   return fallback;
