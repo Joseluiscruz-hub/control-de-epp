@@ -157,17 +157,24 @@ export async function validateEmployeePin(
 
 // ── Catálogo ──────────────────────────────────────────────────────────────────
 
-export async function getPPECatalog(): Promise<PPECatalogItem[]> {
+export async function getPPECatalog(plantId?: string): Promise<PPECatalogItem[]> {
+  const localCatalog = () => getLocalPPECatalog().filter((item) => (
+    !plantId || !item.plantaId || item.plantaId === plantId
+  ));
+
   try {
     await ensureFirebaseReady();
-    const snap = await getDocs(collection(db, "kiosk_catalog"));
+    const catalogQuery = plantId
+      ? query(collection(db, "kiosk_catalog"), where("plantaId", "==", plantId))
+      : collection(db, "kiosk_catalog");
+    const snap = await getDocs(catalogQuery);
     const items = snap.docs
       .map(d => normalizeCatalogDuration({ id: d.id, ...d.data() } as PPECatalogItem))
       .sort((a, b) => a.name.localeCompare(b.name, "es"));
-    return items.length > 0 ? items : getLocalPPECatalog();
+    return items.length > 0 ? items : localCatalog();
   } catch (error) {
     console.warn("[Kiosko] Usando catalogo local por error de Firebase.", error);
-    return getLocalPPECatalog();
+    return localCatalog();
   }
 }
 

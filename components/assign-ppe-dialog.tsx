@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,23 @@ import { normalizePlantId } from "@/lib/plants";
 import { usePlantStore } from "@/store/usePlantStore";
 
 type EmployeeOption = { id: string; name: string; area?: string; plantaId?: string };
-type ItemOption = { id: string; name: string; stock: number; replacementDays: number; plantaId?: string };
+type ItemSizeOption = { sku?: string; stock?: number; available?: boolean };
+type ItemOption = {
+  id: string;
+  name: string;
+  stock: number;
+  replacementDays: number;
+  plantaId?: string;
+  hasSizes?: boolean;
+  sizes?: Record<string, ItemSizeOption>;
+};
+
+function availableSizeEntries(item: ItemOption | undefined) {
+  if (!item?.hasSizes || !item.sizes) return [];
+  return Object.entries(item.sizes).filter(([, variant]) => (
+    variant.available === true || Number(variant.stock ?? 0) > 0
+  ));
+}
 
 export function AssignPpeDialog() {
   const { user: authUser } = useAuth();
@@ -32,6 +48,7 @@ export function AssignPpeDialog() {
 
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedItem, setSelectedItem] = useState("");
+  const [selectedSize, setSelectedSize] = useState("");
 
   const fetchData = useCallback(async () => {
     try {
@@ -56,6 +73,8 @@ export function AssignPpeDialog() {
         id: d.id, 
         name: data.name,
         stock: Number(data.stock ?? 0),
+        hasSizes: data.hasSizes === true,
+        sizes: data.sizes,
         replacementDays: resolveEppReplacementDays(
           {
             sku: data.sku ?? d.id,
@@ -89,6 +108,22 @@ export function AssignPpeDialog() {
     })();
   }, [fetchData, open]);
 
+  const selectedItemRecord = useMemo(
+    () => items.find((item) => item.id === selectedItem),
+    [items, selectedItem]
+  );
+  const selectedItemSizes = useMemo(
+    () => availableSizeEntries(selectedItemRecord),
+    [selectedItemRecord]
+  );
+
+  const handleItemSelect = (value: string | null) => {
+    const nextItemId = value || "";
+    const nextItem = items.find((item) => item.id === nextItemId);
+    setSelectedItem(nextItemId);
+    setSelectedSize(availableSizeEntries(nextItem)[0]?.[0] ?? "");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEmployee || !selectedItem || !authUser) return;
@@ -98,6 +133,11 @@ export function AssignPpeDialog() {
       const itemRecord = items.find(i => i.id === selectedItem);
       const employeeRecord = employees.find(employee => employee.id === selectedEmployee);
       if (!itemRecord) throw new Error("Item no encontrado");
+      if (itemRecord.hasSizes && !selectedSize) {
+        toast.error("Selecciona una talla disponible para este material.");
+        setLoading(false);
+        return;
+      }
 
       if (itemRecord.stock <= 0) {
         toast.error("No hay stock disponible para este artículo.");
@@ -117,6 +157,7 @@ export function AssignPpeDialog() {
         body: JSON.stringify({
           employeeId: selectedEmployee,
           itemId: selectedItem,
+          size: itemRecord.hasSizes ? selectedSize : "N/A",
           plantaId: normalizePlantId(employeeRecord?.plantaId ?? itemRecord.plantaId ?? writePlantId),
         }),
       });
@@ -129,6 +170,7 @@ export function AssignPpeDialog() {
       setOpen(false);
       setSelectedEmployee("");
       setSelectedItem("");
+      setSelectedSize("");
     } catch (err) {
       try {
         const itemRecord = items.find(i => i.id === selectedItem);
@@ -136,7 +178,7 @@ export function AssignPpeDialog() {
         createLocalAssignment({
           employeeId: selectedEmployee,
           sku: selectedItem,
-          size: 'N/A',
+          size: itemRecord.hasSizes ? selectedSize : 'N/A',
           itemId: selectedItem,
           replacementDays: itemRecord.replacementDays,
           issuedByUserId: authUser?.uid || 'offline-admin',
@@ -145,6 +187,7 @@ export function AssignPpeDialog() {
         setOpen(false);
         setSelectedEmployee("");
         setSelectedItem("");
+        setSelectedSize("");
       } catch {
         if (err instanceof Error && err.message === 'out_of_stock') {
           toast.error("No hay stock disponible para este artículo.");
@@ -210,7 +253,7 @@ export function AssignPpeDialog() {
 
             <div className="space-y-4">
               <Label className="section-eyebrow ml-1">Especificación de Equipo (SKU)</Label>
-              <Select value={selectedItem} onValueChange={v => setSelectedItem(v || '')} disabled={loading}>
+              <Select value={selectedItem} onValueChange={handleItemSelect} disabled={loading}>
                 <SelectTrigger className="h-14 rounded-lg bg-white/5 border-white/10 font-bold text-white px-5">
                   <div className="flex items-center gap-3">
                     <HardHat className="h-5 w-5 text-red-600" />
@@ -230,10 +273,31 @@ export function AssignPpeDialog() {
               </Select>
             </div>
 
+            {selectedItemRecord?.hasSizes && (
+              <div className="space-y-4">
+                <Label className="section-eyebrow ml-1">Talla disponible</Label>
+                <Select value={selectedSize} onValueChange={v => setSelectedSize(v || '')} disabled={loading || selectedItemSizes.length === 0}>
+                  <SelectTrigger className="h-14 rounded-lg bg-white/5 border-white/10 font-bold text-white px-5">
+                    <SelectValue placeholder="Seleccionar talla..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-lg border-white/10 bg-[#10151d] text-white shadow-2xl">
+                    {selectedItemSizes.map(([size, variant]) => (
+                      <SelectItem key={size} value={size} className="font-bold py-3 px-4">
+                        <div className="flex justify-between items-center w-full gap-10">
+                          <span>{size}</span>
+                          <Badge className="rounded-md bg-white/10 text-white/60 border-none font-black text-[9px]">STOCK: {Number(variant.stock ?? 0)}</Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <Button 
               type="submit" 
               className="w-full h-14 rounded-lg bg-[#F40009] hover:bg-red-700 text-white font-black uppercase tracking-widest shadow-xl transition-all text-sm active:scale-95"
-              disabled={loading || !selectedEmployee || !selectedItem}
+              disabled={loading || !selectedEmployee || !selectedItem || (selectedItemRecord?.hasSizes && !selectedSize)}
             >
               {loading ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : "Confirmar Dotación Técnica"}
             </Button>

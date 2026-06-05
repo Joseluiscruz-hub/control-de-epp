@@ -99,6 +99,15 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // ── Controles internos de rate limit (solo servidor Admin SDK) ──────────
+    match /kiosk_pin_rate_limits/{limitId} {
+      allow read, write: if false;
+    }
+
+    match /public_api_rate_limits/{limitId} {
+      allow read, write: if false;
+    }
+
     // ── Funciones helper ───────────────────────────────────────────────────
 
     function isBootstrapAdmin() {

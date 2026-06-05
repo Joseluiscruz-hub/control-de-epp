@@ -55,7 +55,7 @@ type CatalogAvailabilityStatus = "ok" | "empty" | "unauthorized";
 
 export default function KioskoCatalogoPage() {
   const router = useRouter();
-  const { ready, employeeId, employeeName, pinVerified } = useKioskSessionSnapshot();
+  const { ready, employeeId, employeeName, employeePlant, pinVerified } = useKioskSessionSnapshot();
   const [items, setItems] = useState<PPECatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -75,14 +75,14 @@ export default function KioskoCatalogoPage() {
 
   useEffect(() => {
     if (!ready) return;
-    if (!employeeId || !pinVerified) {
+    if (!employeeId || !employeePlant || !pinVerified) {
       router.replace("/kiosko");
       return;
     }
 
     let cancelled = false;
 
-    void getPPECatalog().then((data) => {
+    void getPPECatalog(employeePlant).then((data) => {
       if (cancelled) return;
       setItems(data);
       setLoading(false);
@@ -91,7 +91,7 @@ export default function KioskoCatalogoPage() {
     return () => {
       cancelled = true;
     };
-  }, [employeeId, pinVerified, ready, router]);
+  }, [employeeId, employeePlant, pinVerified, ready, router]);
 
   const isVariantAvailable = (variant?: { available?: boolean; stock?: number }) => (
     Boolean(variant) && (variant?.available === true || Number(variant?.stock ?? 0) > 0)
@@ -121,7 +121,7 @@ export default function KioskoCatalogoPage() {
     [items, category, search]
   );
 
-  if (!ready || !employeeId || !pinVerified) {
+  if (!ready || !employeeId || !employeePlant || !pinVerified) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <Loader2 size={32} className="animate-spin text-amber-400" />

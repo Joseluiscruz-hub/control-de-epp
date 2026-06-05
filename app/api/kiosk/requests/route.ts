@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
 import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
-import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
+import { AuthHttpError, canAdminUsePlant, requireAdminUser, type AdminSession } from "@/lib/server-auth";
 import {
   getEppDurationRulePayload,
   resolveEppReplacementDays,
@@ -11,12 +11,19 @@ import {
 import { KioskEarlyReplacementAlert, KioskRequestItem, ReplacementReason } from "@/lib/kiosk-types";
 import { normalizePlantId } from "@/lib/plants";
 import { buildInventoryMovement } from "@/app/api/inventory/_lib";
+import { evaluateReplacement } from "@/lib/replacement-logic";
+import {
+  PublicRateLimitHttpError,
+  publicRateLimitResponse,
+  requirePublicRateLimit,
+} from "@/lib/public-api-rate-limit";
 
 export const runtime = "nodejs";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const VALID_REASONS = new Set(["vida_util", "desgaste", "extravio"]);
 const ALERT_COLLECTION = "kiosk_alerts";
+const MAX_SIGNATURE_DATA_URL_LENGTH = 120_000;
 const REQUEST_ITEM_KEYS = new Set([
   "itemId",
   "itemName",
@@ -48,6 +55,11 @@ class KioskRequestError extends Error {
 type RequestItemInput = Partial<KioskRequestItem>;
 type FulfillableKioskItem = KioskRequestItem & {
   chargeAmount?: number;
+  signatureDataUrl?: string | null;
+};
+
+type SanitizedKioskItem = KioskRequestItem & {
+  unitCost: number;
   signatureDataUrl?: string | null;
 };
 
@@ -98,6 +110,22 @@ function addDays(date: Date, days: number) {
 function readNumber(value: unknown, fallback = 0) {
   const parsed = Number(value ?? fallback);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function sanitizeSignatureDataUrl(value: unknown) {
+  if (value == null) return undefined;
+  if (typeof value !== "string") {
+    throw new KioskRequestError("Firma invalida.", 400);
+  }
+  const signature = value.trim();
+  if (!signature) return undefined;
+  if (signature.length > MAX_SIGNATURE_DATA_URL_LENGTH) {
+    throw new KioskRequestError("La firma excede el tamaño permitido.", 413);
+  }
+  if (!/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(signature)) {
+    throw new KioskRequestError("Formato de firma invalido.", 400);
+  }
+  return signature;
 }
 
 function isValidRequestItemShape(value: unknown): value is RequestItemInput {
@@ -169,6 +197,7 @@ function getSizes(data: FirebaseFirestore.DocumentData) {
       packageRuleId?: string;
       packageUnit?: "CAJA" | "BOLSA";
       unitsPerPackage?: number;
+      unitCost?: number;
     }>
     : undefined;
 }
@@ -268,10 +297,9 @@ function buildStockUpdates(
 async function fulfillApprovedKioskRequest(params: {
   db: FirebaseFirestore.Firestore;
   requestId: string;
-  approvedByUserId: string;
-  approvedByEmail: string;
+  adminUser: AdminSession;
 }) {
-  const { db, requestId, approvedByUserId, approvedByEmail } = params;
+  const { db, requestId, adminUser } = params;
   const requestRef = db.collection("kiosk_requests").doc(requestId);
   const statusRef = db.collection("kiosk_request_status").doc(requestId);
 
@@ -295,6 +323,9 @@ async function fulfillApprovedKioskRequest(params: {
 
     if (!employeeId || !employeeName || items.length === 0) {
       throw new KioskRequestError("Solicitud de kiosko incompleta para sincronizar consumo.", 409);
+    }
+    if (!canAdminUsePlant(adminUser, plantaId)) {
+      throw new KioskRequestError("No tienes permisos para operar esta planta.", 403);
     }
 
     const existingFulfillmentSnap = await transaction.get(
@@ -355,6 +386,10 @@ async function fulfillApprovedKioskRequest(params: {
       }
 
       const catalogData = catalogSnap.data() ?? {};
+      const catalogPlant = readText(catalogData.plantaId);
+      if (!catalogPlant || normalizePlantId(catalogPlant) !== plantaId) {
+        throw new KioskRequestError(`Material ${item.itemName} no pertenece a la planta de la solicitud.`, 409);
+      }
       const stockChange = buildStockUpdates(catalogData, item);
       const assignmentRef = db.collection("assignments").doc();
       assignmentRefs.push(assignmentRef);
@@ -377,8 +412,8 @@ async function fulfillApprovedKioskRequest(params: {
         chargeApproved: item.chargeAmount ? false : true,
         signatureDataUrl: item.signatureDataUrl ?? null,
         issuedByKiosk: true,
-        issuedByUserId: approvedByUserId,
-        approvedByEmail,
+        issuedByUserId: adminUser.uid,
+        approvedByEmail: adminUser.email,
         kioskRequestId: requestId,
       });
 
@@ -399,8 +434,8 @@ async function fulfillApprovedKioskRequest(params: {
           reason: `Asignacion por solicitud kiosko ${requestId}`,
           source: "kiosk",
           plantaId,
-          performedByUid: approvedByUserId,
-          performedByEmail: approvedByEmail,
+          performedByUid: adminUser.uid,
+          performedByEmail: adminUser.email,
           metadata: {
             requestId,
             assignmentId: assignmentRef.id,
@@ -440,8 +475,8 @@ async function fulfillApprovedKioskRequest(params: {
       assignmentIds,
       plantaId,
       approvedAt: FieldValue.serverTimestamp(),
-      approvedByUserId,
-      approvedByEmail,
+      approvedByUserId: adminUser.uid,
+      approvedByEmail: adminUser.email,
       syncedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -464,10 +499,9 @@ async function fulfillApprovedKioskRequest(params: {
 async function rejectKioskRequest(params: {
   db: FirebaseFirestore.Firestore;
   requestId: string;
-  rejectedByUserId: string;
-  rejectedByEmail: string;
+  adminUser: AdminSession;
 }) {
-  const { db, requestId, rejectedByUserId, rejectedByEmail } = params;
+  const { db, requestId, adminUser } = params;
   const requestRef = db.collection("kiosk_requests").doc(requestId);
   const statusRef = db.collection("kiosk_request_status").doc(requestId);
 
@@ -481,6 +515,9 @@ async function rejectKioskRequest(params: {
     const requestData = requestSnap.data() ?? {};
     const currentStatus = readText(requestData.status) || "pending";
     const plantaId = normalizePlantId(requestData.plantaId);
+    if (!canAdminUsePlant(adminUser, plantaId)) {
+      throw new KioskRequestError("No tienes permisos para operar esta planta.", 403);
+    }
     if (currentStatus !== "pending" && currentStatus !== "rejected") {
       throw new KioskRequestError(`La solicitud ya esta ${currentStatus}.`, 409);
     }
@@ -489,8 +526,8 @@ async function rejectKioskRequest(params: {
       status: "rejected",
       plantaId,
       rejectedAt: FieldValue.serverTimestamp(),
-      rejectedByUserId,
-      rejectedByEmail,
+      rejectedByUserId: adminUser.uid,
+      rejectedByEmail: adminUser.email,
       updatedAt: FieldValue.serverTimestamp(),
     });
     transaction.set(
@@ -509,7 +546,11 @@ async function rejectKioskRequest(params: {
   });
 }
 
-async function sanitizeRequestItem(db: FirebaseFirestore.Firestore, input: RequestItemInput) {
+async function sanitizeRequestItem(
+  db: FirebaseFirestore.Firestore,
+  input: RequestItemInput,
+  expectedPlantId: string
+): Promise<SanitizedKioskItem> {
   const itemId = readText(input.itemId);
   const requestedSize = readText(input.size) || "N/A";
   const requestedReason = readText(input.replacementReason);
@@ -529,6 +570,10 @@ async function sanitizeRequestItem(db: FirebaseFirestore.Firestore, input: Reque
   }
 
   const catalog = catalogSnap.data() ?? {};
+  const catalogPlant = readText(catalog.plantaId);
+  if (!catalogPlant || normalizePlantId(catalogPlant) !== expectedPlantId) {
+    throw new KioskRequestError("EPP no disponible para la planta del colaborador.", 403);
+  }
   if (catalog.active === false) {
     throw new KioskRequestError("EPP inactivo para kiosko.", 409);
   }
@@ -560,6 +605,7 @@ async function sanitizeRequestItem(db: FirebaseFirestore.Firestore, input: Reque
     ruleInput,
     Number.isFinite(fallbackDays) && fallbackDays > 0 ? fallbackDays : 365
   );
+  const signatureDataUrl = sanitizeSignatureDataUrl(input.signatureDataUrl);
 
   return {
     itemId,
@@ -567,11 +613,24 @@ async function sanitizeRequestItem(db: FirebaseFirestore.Firestore, input: Reque
     sku,
     size,
     replacementDays,
+    unitCost: readNumber(variant?.unitCost ?? catalog.unitCost),
     ...(replacementReason ? { replacementReason } : {}),
-    ...(readNumber(input.chargeAmount) > 0 ? { chargeAmount: readNumber(input.chargeAmount) } : {}),
-    ...(typeof input.signatureDataUrl === "string" ? { signatureDataUrl: input.signatureDataUrl } : {}),
+    ...(signatureDataUrl ? { signatureDataUrl } : {}),
     ...getEppDurationRulePayload(ruleInput),
   };
+}
+
+function resolveServerChargeAmount(item: SanitizedKioskItem, assignment: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData> | undefined) {
+  if (item.replacementReason !== "extravio" || !assignment) return 0;
+  const assignedAt = toDate(assignment.data().assignedAt);
+  if (!assignedAt) return 0;
+
+  return evaluateReplacement(
+    assignedAt,
+    item.replacementDays,
+    item.unitCost,
+    "extravio"
+  ).chargeAmount;
 }
 
 function buildEarlyReplacementAlert(
@@ -626,6 +685,8 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getAdminDb();
+    await requirePublicRateLimit(db, req, "kiosk_request_create");
+
     const employeeSnap = await db.collection("kiosk_employees").doc(employeeId).get();
     if (!employeeSnap.exists) {
       throw new KioskRequestError("Empleado no encontrado en kiosko.", 404);
@@ -641,7 +702,7 @@ export async function POST(req: NextRequest) {
       throw new KioskRequestError("Los datos del empleado no coinciden.", 409);
     }
 
-    const sanitizedItems = await Promise.all(itemsInput.map((item) => sanitizeRequestItem(db, item)));
+    const sanitizedItems = await Promise.all(itemsInput.map((item) => sanitizeRequestItem(db, item, plantaId)));
     const activeAssignmentsSnap = await db
       .collection("assignments")
       .where("employeeId", "==", employeeId)
@@ -661,12 +722,23 @@ export async function POST(req: NextRequest) {
       .filter((warning): warning is KioskEarlyReplacementAlert => warning !== null);
 
     const items = sanitizedItems.map((item) => {
+      const matchingAssignment = activeAssignments.find((assignment) => {
+        const data = assignment.data();
+        return data.sku === item.sku || data.itemId === item.itemId;
+      });
       const warning = warnings.find((candidate) => (
         candidate.itemId === item.itemId &&
         candidate.sku === item.sku &&
         candidate.size === item.size
       ));
-      return warning ? { ...item, earlyReplacementAlert: warning } : item;
+      const chargeAmount = resolveServerChargeAmount(item, matchingAssignment);
+      const { unitCost: _unitCost, signatureDataUrl, ...requestItem } = item;
+      return {
+        ...requestItem,
+        ...(chargeAmount > 0 ? { chargeAmount } : {}),
+        ...(chargeAmount > 0 && signatureDataUrl ? { signatureDataUrl } : {}),
+        ...(warning ? { earlyReplacementAlert: warning } : {}),
+      };
     });
 
     const requestRef = db.collection("kiosk_requests").doc();
@@ -753,6 +825,9 @@ export async function POST(req: NextRequest) {
     if (error instanceof KioskRequestError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
+    if (error instanceof PublicRateLimitHttpError) {
+      return publicRateLimitResponse(error);
+    }
 
     console.error("[Kiosk request create error]:", error);
     return Response.json({ error: "No se pudo crear la solicitud de kiosko." }, { status: 500 });
@@ -775,14 +850,12 @@ export async function PATCH(req: NextRequest) {
       ? await fulfillApprovedKioskRequest({
           db,
           requestId,
-          approvedByUserId: adminUser.uid,
-          approvedByEmail: adminUser.email,
+          adminUser,
         })
       : await rejectKioskRequest({
           db,
           requestId,
-          rejectedByUserId: adminUser.uid,
-          rejectedByEmail: adminUser.email,
+          adminUser,
         });
 
     const alertsSnap = await db

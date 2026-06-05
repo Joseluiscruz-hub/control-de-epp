@@ -1,7 +1,7 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { NextRequest } from "next/server";
 import { addDays } from "date-fns";
-import { buildInventoryMovement, readNumber, readText } from "@/app/api/inventory/_lib";
+import { buildInventoryMovement, readNumber, readStock, readText } from "@/app/api/inventory/_lib";
 import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { normalizePlantId } from "@/lib/plants";
@@ -20,12 +20,19 @@ class AssignmentHttpError extends Error {
   }
 }
 
+function getSizes(data: FirebaseFirestore.DocumentData) {
+  return data.sizes && typeof data.sizes === "object" && !Array.isArray(data.sizes)
+    ? data.sizes as Record<string, Record<string, unknown>>
+    : undefined;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const adminUser = await requireAdminUser(req);
     const body = await req.json();
     const employeeId = readText(body?.employeeId);
     const itemId = readText(body?.itemId);
+    const requestedSize = readText(body?.size) || "N/A";
 
     if (!employeeId || !itemId) {
       return Response.json({ error: "Colaborador y material requeridos." }, { status: 400 });
@@ -51,32 +58,73 @@ export async function POST(req: NextRequest) {
 
       const employee = employeeSnap.data() ?? {};
       const item = itemSnap.data() ?? {};
-      const plantaId = normalizePlantId(employee.plantaId ?? item.plantaId ?? adminUser.plantaId);
+      const employeePlant = normalizePlantId(employee.plantaId ?? adminUser.plantaId);
+      const itemPlant = normalizePlantId(item.plantaId ?? employeePlant);
+      const plantaId = employeePlant;
 
       if (!canAdminUsePlant(adminUser, plantaId)) {
         throw new AssignmentHttpError("No tienes permisos para operar esta planta.", 403);
+      }
+      if (itemPlant !== employeePlant) {
+        throw new AssignmentHttpError("El material no pertenece a la planta del colaborador.", 409);
       }
       if (employee.active === false) {
         throw new AssignmentHttpError("Colaborador inactivo.", 409);
       }
 
-      const previousStock = readNumber(item.stock);
+      const sizes = getSizes(item);
+      const hasSizes = sizes && Object.keys(sizes).length > 0;
+      if (hasSizes && requestedSize === "N/A") {
+        throw new AssignmentHttpError("Selecciona una talla para este material.", 400);
+      }
+
+      const variant = hasSizes ? sizes?.[requestedSize] : undefined;
+      if (hasSizes && !variant) {
+        throw new AssignmentHttpError("Talla no encontrada para este material.", 404);
+      }
+
+      const aggregatePreviousStock = readStock(item);
+      const previousStock = hasSizes ? readNumber(variant?.stock) : aggregatePreviousStock;
       if (previousStock <= 0) {
         throw new AssignmentHttpError("No hay stock disponible para este material.", 409);
       }
 
       const newStock = previousStock - 1;
-      const sku = readText(item.sku) || itemId;
+      const sku = readText(variant?.sku) || readText(item.sku) || itemId;
       const itemName = readText(item.name) || itemId;
       const replacementDays = resolveEppReplacementDays(
         {
           sku,
-          material: item.material,
+          material: variant?.material ?? item.material,
           name: itemName,
           sizes: item.sizes,
         },
         readNumber(item.replacementDays, 365)
       );
+      const aggregateNewStock = hasSizes
+        ? aggregatePreviousStock - 1
+        : newStock;
+      const stockUpdate = hasSizes
+        ? {
+            sizes: {
+              ...sizes,
+              [requestedSize]: {
+                ...variant,
+                stock: newStock,
+                available: newStock > 0,
+              },
+            },
+            stock: aggregateNewStock,
+            available: aggregateNewStock > 0,
+            plantaId,
+            updatedAt: FieldValue.serverTimestamp(),
+          }
+        : {
+            stock: newStock,
+            available: newStock > 0,
+            plantaId,
+            updatedAt: FieldValue.serverTimestamp(),
+          };
 
       transaction.set(assignmentRef, {
         employeeId,
@@ -87,7 +135,7 @@ export async function POST(req: NextRequest) {
         itemId,
         itemName,
         replacementDays,
-        size: "N/A",
+        size: hasSizes ? requestedSize : "N/A",
         assignedAt: FieldValue.serverTimestamp(),
         nextReplacementAt: Timestamp.fromDate(addDays(new Date(), replacementDays)),
         status: "active",
@@ -96,19 +144,13 @@ export async function POST(req: NextRequest) {
         source: "admin",
       });
 
-      const stockUpdate = {
-        stock: newStock,
-        available: newStock > 0,
-        plantaId,
-        updatedAt: FieldValue.serverTimestamp(),
-      };
       transaction.update(itemRef, stockUpdate);
       if (kioskItemSnap.exists) transaction.update(kioskItemRef, stockUpdate);
 
       transaction.set(movementRef, buildInventoryMovement({
         itemId,
         sku,
-        size: "N/A",
+        size: hasSizes ? requestedSize : "N/A",
         type: "assignment",
         previousStock,
         newStock,
@@ -122,6 +164,8 @@ export async function POST(req: NextRequest) {
           employeeId,
           employeeName: readText(employee.name),
           itemName,
+          aggregatePreviousStock,
+          aggregateNewStock,
         },
       }));
 
@@ -131,7 +175,7 @@ export async function POST(req: NextRequest) {
         actorEmail: adminUser.email,
         targetCollection: "assignments",
         targetId: assignmentRef.id,
-        after: { employeeId, itemId, sku, stock: newStock, plantaId },
+        after: { employeeId, itemId, sku, size: hasSizes ? requestedSize : "N/A", stock: newStock, plantaId },
       }, req));
 
       return { assignmentId: assignmentRef.id, stock: newStock, plantaId };

@@ -18,6 +18,23 @@ export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+export function sanitizeInventoryDocumentId(value: string) {
+  return value
+    .trim()
+    .replace(/[\\/]+/g, "_")
+    .replace(/[\u0000-\u001F\u007F]+/g, "")
+    .slice(0, 140);
+}
+
+export function buildPlantScopedInventoryId(plantaId: string, itemId: string) {
+  const plant = normalizePlantId(plantaId);
+  const safeItemId = sanitizeInventoryDocumentId(itemId);
+  if (!safeItemId) {
+    throw new AuthHttpError("Identificador de material invalido.", 400);
+  }
+  return `${plant}__${safeItemId}`;
+}
+
 export function readStock(data: FirebaseFirestore.DocumentData) {
   if (typeof data.stock === "number") return Math.max(0, data.stock);
   const sizes = data.sizes;

@@ -94,7 +94,19 @@ export function InventoryImportDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                  <h3 className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] mb-4">Plantas Detectadas</h3>
+                  <div className="space-y-3">
+                    {Object.entries(importPreview.summary.byPlant).map(([plantName, total]) => (
+                      <div key={plantName} className="flex items-center justify-between gap-4">
+                        <span className="text-xs font-bold uppercase tracking-widest text-white/65">{plantName}</span>
+                        <span className="rounded-lg bg-white/10 px-3 py-1 text-[10px] font-black text-white">{total}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
                   <h3 className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] mb-4">Categorías Detectadas</h3>
                   <div className="space-y-3">

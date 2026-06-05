@@ -240,6 +240,7 @@ Comportamiento:
 Archivo esperado: TSV/TXT con columnas:
 
 ```text
+Planta
 Alma
 Material
 Texto breve de Material
@@ -252,6 +253,8 @@ Stock
 
 Comportamiento:
 
+- Requiere `Planta` por fila y acepta `Cuautitlan`, `Toluca`, `CTTOPMN001` o `TOLOPMN001`.
+- Rechaza en servidor archivos de inventario que no correspondan a la planta seleccionada o autorizada.
 - Agrupa filas por producto base.
 - Conserva tallas y variantes.
 - Suma stock consolidado por artículo.
@@ -350,7 +353,7 @@ NEXT_PUBLIC_ENABLE_BOOTSTRAP_ADMIN=false
 BOOTSTRAP_ADMIN_EMAIL=
 NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL=
 NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY=
-FIREBASE_APP_CHECK_REQUIRED=false
+FIREBASE_APP_CHECK_REQUIRED=true
 GEMINI_API_KEY=
 ```
 
@@ -405,7 +408,7 @@ FIREBASE_APPCHECK_SITE_KEY
 FIREBASE_APP_CHECK_REQUIRED
 ```
 
-En producción `FIREBASE_APP_CHECK_REQUIRED=true` y Cloud Firestore debe permanecer en estado App Check `Aplicada`.
+En producción `FIREBASE_APP_CHECK_REQUIRED=true` y Cloud Firestore debe permanecer en estado App Check `Aplicada`. En desarrollo local puede usarse `false` solo si no hay token debug de App Check.
 
 ## Operación Recomendada Después de Deploy
 

@@ -65,6 +65,7 @@ export default function KioskoHomePage() {
       clearKioskSession();
       sessionStorage.setItem("kiosk_employee_id", emp.id);
       sessionStorage.setItem("kiosk_employee_name", emp.name);
+      sessionStorage.setItem("kiosk_employee_plant", emp.plantaId ?? "");
       sessionStorage.setItem("kiosk_first_login", String(Boolean(emp.firstLogin)));
       sessionStorage.setItem("kiosk_terms_accepted", String(Boolean(emp.termsAccepted)));
 

@@ -2,6 +2,11 @@ import { NextRequest } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
 import { getAdminDb } from "@/lib/firebase-admin";
+import {
+  PublicRateLimitHttpError,
+  publicRateLimitResponse,
+  requirePublicRateLimit,
+} from "@/lib/public-api-rate-limit";
 
 export const runtime = "nodejs";
 
@@ -23,6 +28,8 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getAdminDb();
+    await requirePublicRateLimit(db, req, "portal_employee_lookup");
+
     const employeeSnap = await db.collection("kiosk_employees").doc(employeeId).get();
     const employee = employeeSnap.data();
     if (!employeeSnap.exists || employee?.active !== true) {
@@ -62,9 +69,11 @@ export async function POST(req: NextRequest) {
     if (error instanceof AppCheckHttpError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
+    if (error instanceof PublicRateLimitHttpError) {
+      return publicRateLimitResponse(error);
+    }
 
     console.error("[Portal employee API error]", error);
     return Response.json({ error: "No se pudo consultar el colaborador." }, { status: 500 });
   }
 }
-
