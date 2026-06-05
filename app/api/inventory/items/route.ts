@@ -6,6 +6,7 @@ import { resolveStockFromPackageRule } from "@/lib/epp-package-rules";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
 import {
+  buildPlantScopedInventoryId,
   buildInventoryMovement,
   readStock,
   readNumber,
@@ -94,8 +95,9 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getAdminDb();
-    const itemRef = db.collection("ppe_catalog").doc(sku);
-    const kioskRef = db.collection("kiosk_catalog").doc(sku);
+    const itemDocId = buildPlantScopedInventoryId(plantaId, sku);
+    const itemRef = db.collection("ppe_catalog").doc(itemDocId);
+    const kioskRef = db.collection("kiosk_catalog").doc(itemDocId);
     const movementRef = db.collection("inventory_movements").doc();
     const auditRef = db.collection("audit_events").doc();
     const ruleInput = { sku, name };
@@ -163,7 +165,7 @@ export async function POST(req: NextRequest) {
       }, req));
     });
 
-    return Response.json({ success: true, itemId: sku, plantaId });
+    return Response.json({ success: true, itemId: itemDocId, sku, plantaId });
   } catch (error) {
     if (error instanceof AuthHttpError) {
       return Response.json({ error: error.message }, { status: error.status });

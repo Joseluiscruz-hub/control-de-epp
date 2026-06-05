@@ -5,6 +5,7 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { buildInventoryCatalogPayload, buildKioskCatalogPayload, type InventoryImportItem } from "@/lib/inventory-import";
 import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
 import {
+  buildPlantScopedInventoryId,
   buildInventoryMovement,
   isObject,
   readStock,
@@ -50,7 +51,8 @@ export async function POST(req: NextRequest) {
     const items = parseInventoryItems(body?.items);
     const plantaId = resolveWritePlant(adminUser, body?.plantaId);
     const db = getAdminDb();
-    const existingCatalog = await readExistingCatalog(items.map((item) => item.id));
+    const itemDocIds = new Map(items.map((item) => [item.id, buildPlantScopedInventoryId(plantaId, item.id)]));
+    const existingCatalog = await readExistingCatalog(Array.from(itemDocIds.values()));
 
     let batch = db.batch();
     let writes = 0;
@@ -65,13 +67,17 @@ export async function POST(req: NextRequest) {
     };
 
     for (const item of items) {
-      const existing = existingCatalog.get(item.id);
+      const itemDocId = itemDocIds.get(item.id);
+      if (!itemDocId) {
+        throw new AuthHttpError("Identificador de material invalido.", 400);
+      }
+      const existing = existingCatalog.get(itemDocId);
       const previousStock = existing ? readStock(existing) : 0;
       const catalogPayload = buildInventoryCatalogPayload(item);
       const kioskPayload = buildKioskCatalogPayload(item);
 
       batch.set(
-        db.collection("ppe_catalog").doc(item.id),
+        db.collection("ppe_catalog").doc(itemDocId),
         {
           ...catalogPayload,
           plantaId,
@@ -81,7 +87,7 @@ export async function POST(req: NextRequest) {
         { merge: true }
       );
       batch.set(
-        db.collection("kiosk_catalog").doc(item.id),
+        db.collection("kiosk_catalog").doc(itemDocId),
         {
           ...kioskPayload,
           plantaId,
@@ -92,7 +98,7 @@ export async function POST(req: NextRequest) {
       batch.set(
         db.collection("inventory_movements").doc(),
         buildInventoryMovement({
-          itemId: item.id,
+          itemId: itemDocId,
           sku: item.sku,
           type: "import",
           previousStock,

@@ -1,6 +1,7 @@
 const KIOSK_SESSION_KEYS = [
   "kiosk_employee_id",
   "kiosk_employee_name",
+  "kiosk_employee_plant",
   "kiosk_first_login",
   "kiosk_terms_accepted",
   "kiosk_pin_verified",

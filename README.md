@@ -350,7 +350,7 @@ NEXT_PUBLIC_ENABLE_BOOTSTRAP_ADMIN=false
 BOOTSTRAP_ADMIN_EMAIL=
 NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL=
 NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY=
-FIREBASE_APP_CHECK_REQUIRED=false
+FIREBASE_APP_CHECK_REQUIRED=true
 GEMINI_API_KEY=
 ```
 
@@ -405,7 +405,7 @@ FIREBASE_APPCHECK_SITE_KEY
 FIREBASE_APP_CHECK_REQUIRED
 ```
 
-En producción `FIREBASE_APP_CHECK_REQUIRED=true` y Cloud Firestore debe permanecer en estado App Check `Aplicada`.
+En producción `FIREBASE_APP_CHECK_REQUIRED=true` y Cloud Firestore debe permanecer en estado App Check `Aplicada`. En desarrollo local puede usarse `false` solo si no hay token debug de App Check.
 
 ## Operación Recomendada Después de Deploy
 

@@ -47,7 +47,7 @@ jobs:
           BOOTSTRAP_ADMIN_EMAIL: ${{ vars.BOOTSTRAP_ADMIN_EMAIL }}
           NEXT_PUBLIC_ENABLE_OFFLINE_MODE: ${{ vars.NEXT_PUBLIC_ENABLE_OFFLINE_MODE || 'false' }}
           FIREBASE_APPCHECK_SITE_KEY: ${{ vars.FIREBASE_APPCHECK_SITE_KEY }}
-          FIREBASE_APP_CHECK_REQUIRED: ${{ vars.FIREBASE_APP_CHECK_REQUIRED || 'false' }}
+          FIREBASE_APP_CHECK_REQUIRED: ${{ vars.FIREBASE_APP_CHECK_REQUIRED || 'true' }}
         run: |
           python3 - <<'PYEOF'
           import os
@@ -63,6 +63,9 @@ jobs:
             "FIREBASE_DATABASE_ID",
           ]
           missing = [key for key in required if not os.environ.get(key)]
+          app_check_required = (os.environ.get("FIREBASE_APP_CHECK_REQUIRED", "true") or "true").lower() == "true"
+          if app_check_required and not os.environ.get("FIREBASE_APPCHECK_SITE_KEY"):
+            missing.append("FIREBASE_APPCHECK_SITE_KEY")
           if missing:
             sys.exit("Missing required GitHub variables: " + ", ".join(missing))
 
@@ -96,7 +99,7 @@ jobs:
             "ENABLE_BOOTSTRAP_ADMIN": os.environ.get("ENABLE_BOOTSTRAP_ADMIN", "false") or "false",
             "BOOTSTRAP_ADMIN_EMAIL": os.environ.get("BOOTSTRAP_ADMIN_EMAIL", ""),
             "FIREBASE_APPCHECK_SITE_KEY": os.environ.get("FIREBASE_APPCHECK_SITE_KEY", ""),
-            "FIREBASE_APP_CHECK_REQUIRED": os.environ.get("FIREBASE_APP_CHECK_REQUIRED", "false") or "false",
+            "FIREBASE_APP_CHECK_REQUIRED": os.environ.get("FIREBASE_APP_CHECK_REQUIRED", "true") or "true",
           }
 
           if measurement_id:

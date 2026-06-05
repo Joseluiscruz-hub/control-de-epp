@@ -11,8 +11,13 @@ export class AppCheckHttpError extends Error {
   }
 }
 
+function isAppCheckRequired() {
+  if (process.env.NODE_ENV === "production") return true;
+  return process.env.FIREBASE_APP_CHECK_REQUIRED === "true";
+}
+
 export async function requireAppCheck(req: NextRequest) {
-  if (process.env.FIREBASE_APP_CHECK_REQUIRED !== "true") return;
+  if (!isAppCheckRequired()) return;
 
   const token = req.headers.get("x-firebase-appcheck");
   if (!token) {

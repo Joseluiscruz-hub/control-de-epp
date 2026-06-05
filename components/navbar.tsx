@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { Button } from './ui/button';
 import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X, HardHat, FileSpreadsheet, RadioTower, UserCog } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
@@ -167,9 +168,12 @@ export function NavBar() {
                   </span>
                 </div>
                 {authUser?.photoURL ? (
-                  <img
+                  <Image
                     src={authUser.photoURL}
                     alt="Perfil"
+                    width={28}
+                    height={28}
+                    unoptimized
                     className="h-7 w-7 rounded-full ring-2 ring-white/10 hover:ring-red-500/40 transition-all shrink-0"
                     referrerPolicy="no-referrer"
                   />
@@ -263,7 +267,15 @@ export function NavBar() {
               <div className="mt-4 pt-4 flex items-center justify-between gap-4" style={{borderTop:'1px solid rgba(255,255,255,0.06)'}}>
                 <div className="flex items-center gap-3 min-w-0">
                   {authUser?.photoURL ? (
-                    <img src={authUser.photoURL} alt="Perfil" className="h-9 w-9 rounded-full ring-2 ring-white/10" referrerPolicy="no-referrer" />
+                    <Image
+                      src={authUser.photoURL}
+                      alt="Perfil"
+                      width={36}
+                      height={36}
+                      unoptimized
+                      className="h-9 w-9 rounded-full ring-2 ring-white/10"
+                      referrerPolicy="no-referrer"
+                    />
                   ) : (
                     <div className="h-9 w-9 rounded-full flex items-center justify-center font-bold ring-2 ring-white/10 text-sm" style={{background:'rgba(244,0,9,0.15)', color:'#F40009'}}>
                       {authUser?.email?.charAt(0).toUpperCase() || 'A'}
