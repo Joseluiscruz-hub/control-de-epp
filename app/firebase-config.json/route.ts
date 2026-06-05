@@ -9,6 +9,15 @@ function getOptionalEnv(...keys: string[]) {
   return "";
 }
 
+function getBooleanEnv(defaultValue: boolean, ...keys: string[]) {
+  for (const key of keys) {
+    const value = process.env[key]?.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(value ?? "")) return true;
+    if (["false", "0", "no", "off"].includes(value ?? "")) return false;
+  }
+  return defaultValue;
+}
+
 function getFirebaseConfig() {
   const measurementId = getOptionalEnv(
     "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID",
@@ -29,6 +38,7 @@ function getFirebaseConfig() {
     firestoreDatabaseId:
       getOptionalEnv("NEXT_PUBLIC_FIREBASE_DATABASE_ID", "FIREBASE_DATABASE_ID") || "(default)",
     appCheckSiteKey: getOptionalEnv("NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY", "FIREBASE_APPCHECK_SITE_KEY"),
+    appCheckRequired: getBooleanEnv(true, "NEXT_PUBLIC_FIREBASE_APP_CHECK_REQUIRED", "FIREBASE_APP_CHECK_REQUIRED"),
   };
 }
 

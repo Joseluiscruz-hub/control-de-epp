@@ -1,7 +1,7 @@
 import {
   doc, getDoc, collection, query, where, getDocs, limit
 } from "firebase/firestore";
-import { auth, db, ensureFirebaseReady, getAppCheckTokenForRequest } from "./firebase";
+import { auth, db, ensureFirebaseReady, getAppCheckTokenForRequest, isAppCheckRequiredForClient } from "./firebase";
 import { resolveEppReplacementDays, getEppDurationRulePayload } from "./epp-duration-rules";
 import {
   KioskEarlyReplacementAlert,
@@ -332,13 +332,13 @@ export interface AdminKioskRequest {
 
 async function kioskApiHeaders() {
   const appCheckToken = await getAppCheckTokenForRequest();
-  if (!appCheckToken) {
+  if (!appCheckToken && isAppCheckRequiredForClient()) {
     throw new KioskApiError("No se pudo validar App Check. Recarga el kiosko e intenta de nuevo.", 401);
   }
 
   return {
     "Content-Type": "application/json",
-    "X-Firebase-AppCheck": appCheckToken,
+    ...(appCheckToken ? { "X-Firebase-AppCheck": appCheckToken } : {}),
   };
 }
 

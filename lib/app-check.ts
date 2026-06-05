@@ -11,9 +11,16 @@ export class AppCheckHttpError extends Error {
   }
 }
 
-function isAppCheckRequired() {
-  if (process.env.NODE_ENV === "production") return true;
-  return process.env.FIREBASE_APP_CHECK_REQUIRED === "true";
+function parseBooleanFlag(value: string | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "off"].includes(normalized)) return false;
+  return undefined;
+}
+
+export function isAppCheckRequired() {
+  return parseBooleanFlag(process.env.FIREBASE_APP_CHECK_REQUIRED) ?? (process.env.NODE_ENV === "production");
 }
 
 export async function requireAppCheck(req: NextRequest) {

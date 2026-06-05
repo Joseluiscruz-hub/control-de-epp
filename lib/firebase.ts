@@ -10,6 +10,7 @@ type FirebaseAppConfig = FirebaseOptions & {
 type RuntimeFirebaseConfig = Partial<FirebaseOptions> & {
   firestoreDatabaseId?: string;
   appCheckSiteKey?: string;
+  appCheckRequired?: boolean | string;
 };
 
 declare global {
@@ -25,6 +26,24 @@ function getRuntimeConfig() {
 
 function firstNonEmpty(...values: Array<string | undefined>) {
   return values.find((value) => typeof value === 'string' && value.trim().length > 0)?.trim() ?? '';
+}
+
+function parseBooleanFlag(value: unknown) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value !== 'string') return undefined;
+
+  const normalized = value.trim().toLowerCase();
+  if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+  return undefined;
+}
+
+export function isAppCheckRequiredForClient() {
+  const configured =
+    parseBooleanFlag(getRuntimeConfig()?.appCheckRequired) ??
+    parseBooleanFlag(process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_REQUIRED);
+
+  return configured ?? (process.env.NODE_ENV === 'production');
 }
 
 function getFirebaseConfig(): FirebaseAppConfig {
@@ -127,7 +146,13 @@ async function loadRuntimeConfig(options: { force?: boolean } = {}) {
 }
 
 async function ensureAppCheckConfigLoaded() {
-  if (typeof window === 'undefined' || getAppCheckSiteKey()) return;
+  if (typeof window === 'undefined') return;
+
+  const runtimeConfig = getRuntimeConfig();
+  if (runtimeConfig?.appCheckRequired !== undefined) {
+    if (!isAppCheckRequiredForClient() || getAppCheckSiteKey()) return;
+  }
+
   await loadRuntimeConfig({ force: true });
 }
 
@@ -184,6 +209,7 @@ function getAppCheckSiteKey() {
 
 function initializeAppCheckIfPossible() {
   if (typeof window === 'undefined') return null;
+  if (!isAppCheckRequiredForClient()) return null;
   const siteKey = getAppCheckSiteKey();
   if (!siteKey) return null;
   if (_appCheck) return _appCheck;
@@ -211,6 +237,8 @@ function initializeAppCheckIfPossible() {
 export async function getAppCheckTokenForRequest(options: { forceRefresh?: boolean } = {}) {
   await ensureFirebaseReady();
   await ensureAppCheckConfigLoaded();
+  if (!isAppCheckRequiredForClient()) return undefined;
+
   const appCheck = initializeAppCheckIfPossible();
   if (!appCheck) return undefined;
 
