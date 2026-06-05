@@ -240,6 +240,7 @@ Comportamiento:
 Archivo esperado: TSV/TXT con columnas:
 
 ```text
+Planta
 Alma
 Material
 Texto breve de Material
@@ -252,6 +253,8 @@ Stock
 
 Comportamiento:
 
+- Requiere `Planta` por fila y acepta `Cuautitlan`, `Toluca`, `CTTOPMN001` o `TOLOPMN001`.
+- Rechaza en servidor archivos de inventario que no correspondan a la planta seleccionada o autorizada.
 - Agrupa filas por producto base.
 - Conserva tallas y variantes.
 - Suma stock consolidado por artículo.

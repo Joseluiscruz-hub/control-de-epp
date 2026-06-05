@@ -5,12 +5,14 @@ import {
   type EppDurationRule,
 } from "./epp-duration-rules";
 import { resolveStockFromPackageRule } from "./epp-package-rules";
+import { parsePlantId, plantLabel, type PlantId } from "./plants";
 
 export const INVENTORY_IMPORT_SOURCE = "plant_epp_inventory";
 export const INVENTORY_SCHEMA_VERSION = 1;
 export const DEFAULT_MIN_STOCK = 2;
 
 const EXPECTED_HEADERS = [
+  "Planta",
   "Alma",
   "Material",
   "Texto breve de Material",
@@ -41,6 +43,7 @@ export interface InventoryVariant {
 
 export interface InventoryImportItem {
   id: string;
+  plantaId: PlantId;
   sku: string;
   name: string;
   category: string;
@@ -84,6 +87,7 @@ export interface InventoryImportSummary {
   temporarySkuCount: number;
   totalStock: number;
   byCategory: Record<string, number>;
+  byPlant: Record<string, number>;
 }
 
 export interface ParsedInventoryImport {
@@ -248,6 +252,7 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
         temporarySkuCount: 0,
         totalStock: 0,
         byCategory: {},
+        byPlant: {},
       },
     };
   }
@@ -264,6 +269,8 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
 
   const indexByHeader = new Map(headers.map((header, index) => [header, index]));
   const groups = new Map<string, {
+    plantaId: PlantId;
+    baseId: string;
     baseName: string;
     category: string;
     durationRule?: EppDurationRule;
@@ -288,11 +295,22 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
     }
 
     const read = (header: (typeof EXPECTED_HEADERS)[number]) => cells[indexByHeader.get(header) ?? -1] ?? "";
+    const rawPlant = read("Planta");
+    const plantaId = parsePlantId(rawPlant);
     const rawName = read("Texto breve de Material");
     const size = read("Talla").toUpperCase() || "N/A";
     const material = read("Material");
     const stockInput = parseNumber(read("Stock"));
     const unitCost = parseNumber(read("Precio variable"));
+
+    if (!plantaId) {
+      issues.push({
+        row: rowNumber,
+        severity: "error",
+        message: "Planta invalida. Usa Cuautitlan, Toluca, CTTOPMN001 o TOLOPMN001.",
+      });
+      continue;
+    }
 
     if (!rawName) {
       issues.push({ row: rowNumber, severity: "error", message: "Falta texto breve de material." });
@@ -347,13 +365,16 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
       ...stockConversion.metadata,
     };
 
-    const current = groups.get(baseId);
+    const groupId = `${plantaId}:${baseId}`;
+    const current = groups.get(groupId);
     if (current) {
       current.variants.push(variant);
       current.sourceRows.push(rowNumber);
       if (!current.durationRule && durationRule) current.durationRule = durationRule;
     } else {
-      groups.set(baseId, {
+      groups.set(groupId, {
+        plantaId,
+        baseId,
         baseName,
         category,
         durationRule,
@@ -365,11 +386,12 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
   }
 
   const byCategory: Record<string, number> = {};
+  const byPlant: Record<string, number> = {};
   let temporarySkuCount = 0;
   let totalStock = 0;
 
   const items = Array.from(groups.entries())
-    .map(([id, group]) => {
+    .map(([, group]) => {
       const variants = group.variants.sort((a, b) => a.size.localeCompare(b.size, "es", { numeric: true }));
       const hasSizes = variants.length > 1 || variants.some((variant) => variant.size !== "N/A");
       const primary = pickPrimaryVariant(variants);
@@ -388,6 +410,7 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
       temporarySkuCount += variants.filter((variant) => variant.temporarySku).length;
       totalStock += stock;
       incrementCounter(byCategory, group.category);
+      incrementCounter(byPlant, plantLabel(group.plantaId));
 
       const sizes = hasSizes
         ? Object.fromEntries(
@@ -399,7 +422,8 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
         : undefined;
 
       return {
-        id,
+        id: group.baseId,
+        plantaId: group.plantaId,
         sku: primary.sku,
         name: titleCase(group.baseName),
         category: group.category,
@@ -439,6 +463,7 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
       temporarySkuCount,
       totalStock,
       byCategory,
+      byPlant,
     },
   };
 }
@@ -454,6 +479,7 @@ function cleanUndefined<T extends Record<string, unknown>>(input: T) {
 export function buildInventoryCatalogPayload(item: InventoryImportItem) {
   return cleanUndefined({
     sku: item.sku,
+    plantaId: item.plantaId,
     name: item.name,
     category: item.category,
     replacementDays: item.replacementDays,

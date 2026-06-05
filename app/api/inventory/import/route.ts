@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { buildInventoryCatalogPayload, buildKioskCatalogPayload, type InventoryImportItem } from "@/lib/inventory-import";
+import { plantLabel } from "@/lib/plants";
 import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
 import {
   buildPlantScopedInventoryId,
@@ -50,6 +51,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const items = parseInventoryItems(body?.items);
     const plantaId = resolveWritePlant(adminUser, body?.plantaId);
+    const invalidPlantItem = items.find((item) => item.plantaId !== plantaId);
+    if (invalidPlantItem) {
+      throw new AuthHttpError(
+        `El archivo contiene materiales de ${plantLabel(invalidPlantItem.plantaId)} y la carga esta configurada para ${plantLabel(plantaId)}. Selecciona la planta correcta o separa el archivo.`,
+        400
+      );
+    }
+
     const db = getAdminDb();
     const itemDocIds = new Map(items.map((item) => [item.id, buildPlantScopedInventoryId(plantaId, item.id)]));
     const existingCatalog = await readExistingCatalog(Array.from(itemDocIds.values()));

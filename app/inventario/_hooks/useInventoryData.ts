@@ -18,7 +18,7 @@ import {
 import { PPECatalogItem } from '@/lib/kiosk-types';
 import { getEppDurationRulePayload, resolveEppReplacementDays } from '@/lib/epp-duration-rules';
 import { resolveStockFromPackageRule } from '@/lib/epp-package-rules';
-import { normalizePlantId } from '@/lib/plants';
+import { normalizePlantId, plantLabel } from '@/lib/plants';
 import { usePlantStore } from '@/store/usePlantStore';
 
 /* ── Shared Types ──────────────────────────────── */
@@ -92,6 +92,12 @@ async function readApiError(response: Response, fallback: string) {
     return typeof data?.error === 'string' ? data.error : fallback;
   } catch {
     return fallback;
+  }
+}
+
+class ApiRequestError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
   }
 }
 
@@ -261,7 +267,7 @@ export function useInventoryData() {
       upsertLocalCatalogItem({
         id: item.id,
         ...buildInventoryCatalogPayload(item),
-        plantaId: writePlantId,
+        plantaId: item.plantaId,
       } as PPECatalogItem);
     });
     setItems(listLocalInventory());
@@ -273,6 +279,13 @@ export function useInventoryData() {
   /* ── Import to Firestore ─────────────────────── */
   const importInventoryBase = async () => {
     if (!importPreview || hasBlockingInventoryIssues(importPreview) || importPreview.items.length === 0) return;
+    const invalidPlantItem = importPreview.items.find((item) => item.plantaId !== writePlantId);
+    if (invalidPlantItem) {
+      toast.error(
+        `El archivo contiene materiales de ${plantLabel(invalidPlantItem.plantaId)} y la carga esta configurada para ${plantLabel(writePlantId)}.`
+      );
+      return;
+    }
 
     setImportingInventory(true);
     try {
@@ -288,7 +301,10 @@ export function useInventoryData() {
 
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(typeof result?.error === 'string' ? result.error : 'inventory_import_failed');
+        throw new ApiRequestError(
+          typeof result?.error === 'string' ? result.error : 'inventory_import_failed',
+          response.status
+        );
       }
       setImportOpen(false);
       resetInventoryImport();
@@ -297,11 +313,11 @@ export function useInventoryData() {
       toast.success(`Inventario cargado: ${result.created ?? 0} nuevos, ${result.updated ?? 0} actualizados.`);
     } catch (error) {
       console.error('[Inventory import write error]', error);
-      if (canUseLocalFallback()) {
+      if (canUseLocalFallback() && (!(error instanceof ApiRequestError) || error.status >= 500)) {
         const total = saveInventoryLocally(importPreview);
         toast.warning(`Sin conexión con servidor. Inventario guardado localmente con ${total} artículo(s).`);
       } else {
-        toast.error('No se pudo cargar el inventario en Firebase.');
+        toast.error(error instanceof Error && error.message ? error.message : 'No se pudo cargar el inventario en Firebase.');
       }
     } finally {
       setImportingInventory(false);
