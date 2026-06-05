@@ -81,6 +81,7 @@ jobs:
             "NEXT_PUBLIC_ENABLE_BOOTSTRAP_ADMIN": os.environ.get("ENABLE_BOOTSTRAP_ADMIN", "false") or "false",
             "NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL": os.environ.get("BOOTSTRAP_ADMIN_EMAIL", ""),
             "NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY": os.environ.get("FIREBASE_APPCHECK_SITE_KEY", ""),
+            "NEXT_PUBLIC_FIREBASE_APP_CHECK_REQUIRED": os.environ.get("FIREBASE_APP_CHECK_REQUIRED", "true") or "true",
           }
 
           measurement_id = os.environ.get("FIREBASE_MEASUREMENT_ID", "").strip()
@@ -100,6 +101,7 @@ jobs:
             "BOOTSTRAP_ADMIN_EMAIL": os.environ.get("BOOTSTRAP_ADMIN_EMAIL", ""),
             "FIREBASE_APPCHECK_SITE_KEY": os.environ.get("FIREBASE_APPCHECK_SITE_KEY", ""),
             "FIREBASE_APP_CHECK_REQUIRED": os.environ.get("FIREBASE_APP_CHECK_REQUIRED", "true") or "true",
+            "NEXT_PUBLIC_FIREBASE_APP_CHECK_REQUIRED": os.environ.get("FIREBASE_APP_CHECK_REQUIRED", "true") or "true",
           }
 
           if measurement_id:

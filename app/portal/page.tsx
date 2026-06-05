@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { getAppCheckTokenForRequest } from '@/lib/firebase';
+import { getAppCheckTokenForRequest, isAppCheckRequiredForClient } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { HardHat, Search, AlertTriangle, CheckCircle2, ArrowLeft, Loader2, ShieldCheck, Activity } from 'lucide-react';
@@ -40,7 +40,7 @@ export default function UserPortal() {
     try {
       const normalizedEmployeeId = employeeId.trim();
       const appCheckToken = await getAppCheckTokenForRequest();
-      if (!appCheckToken) {
+      if (!appCheckToken && isAppCheckRequiredForClient()) {
         throw new Error('missing_app_check');
       }
 
@@ -48,7 +48,7 @@ export default function UserPortal() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Firebase-AppCheck': appCheckToken,
+          ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}),
         },
         body: JSON.stringify({ employeeId: normalizedEmployeeId }),
       });

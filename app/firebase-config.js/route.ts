@@ -1,6 +1,15 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function getBooleanEnv(defaultValue: boolean, ...keys: string[]) {
+  for (const key of keys) {
+    const value = process.env[key]?.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(value ?? "")) return true;
+    if (["false", "0", "no", "off"].includes(value ?? "")) return false;
+  }
+  return defaultValue;
+}
+
 function getFirebaseConfig() {
   const measurementId =
     process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID ||
@@ -29,6 +38,7 @@ function getFirebaseConfig() {
       process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY ||
       process.env.FIREBASE_APPCHECK_SITE_KEY ||
       "",
+    appCheckRequired: getBooleanEnv(true, "NEXT_PUBLIC_FIREBASE_APP_CHECK_REQUIRED", "FIREBASE_APP_CHECK_REQUIRED"),
   };
 }
 
