@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin";
 import type { AdminRole, UserProfile } from "@/lib/admin-profile";
-import { isPlantId, type PlantScope } from "@/lib/plants";
+import type { PlantScope } from "@/lib/plants";
+import { buildBootstrapAdminProfile, normalizeUserProfile } from "@/lib/user-profile";
 
 export class AuthHttpError extends Error {
   status: number;
@@ -14,13 +15,9 @@ export class AuthHttpError extends Error {
 }
 
 const ENABLE_BOOTSTRAP_ADMIN = process.env.ENABLE_BOOTSTRAP_ADMIN === "true";
-const BOOTSTRAP_ADMIN_EMAIL = (process.env.BOOTSTRAP_ADMIN_EMAIL || process.env.NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL || "")
+const BOOTSTRAP_ADMIN_EMAIL = (process.env.BOOTSTRAP_ADMIN_EMAIL || "")
   .trim()
   .toLowerCase();
-
-function isBootstrapAdminEmail(email: string) {
-  return ENABLE_BOOTSTRAP_ADMIN && !!BOOTSTRAP_ADMIN_EMAIL && email === BOOTSTRAP_ADMIN_EMAIL;
-}
 
 export type AdminSession = {
   uid: string;
@@ -39,34 +36,11 @@ function getBearerToken(req: NextRequest) {
   return token;
 }
 
-function normalizeProfile(uid: string, fallbackEmail: string, data: FirebaseFirestore.DocumentData): UserProfile | null {
-  const role = data.role === "admin_local" || data.role === "admin_global"
-    ? data.role as AdminRole
-    : null;
-  if (!role) return null;
-
-  const rawPlant = typeof data.plantaId === "string" ? data.plantaId : "";
-  const plantaId: PlantScope = role === "admin_global"
-    ? (rawPlant === "nacional" || isPlantId(rawPlant) ? rawPlant : "nacional")
-    : isPlantId(rawPlant)
-      ? rawPlant
-      : "cuautitlan";
-
-  return {
-    uid,
-    email: typeof data.email === "string" && data.email ? data.email.toLowerCase() : fallbackEmail,
-    role,
-    plantaId,
-    displayName: typeof data.displayName === "string" ? data.displayName : undefined,
-    active: data.active !== false,
-  };
-}
-
 async function readUserProfile(uid: string, email: string) {
   try {
     const snap = await getAdminDb().collection("users").doc(uid).get();
     if (!snap.exists) return null;
-    return normalizeProfile(uid, email, snap.data() ?? {});
+    return normalizeUserProfile(uid, email, snap.data() ?? {});
   } catch (error) {
     console.warn("[Server auth profile read failed]", error);
     return null;
@@ -103,22 +77,25 @@ export async function requireAdminUser(req: NextRequest) {
     } satisfies AdminSession;
   }
 
-  if (!isBootstrapAdminEmail(email)) {
+  const bootstrapProfile = buildBootstrapAdminProfile(
+    {
+      uid: decodedToken.uid,
+      email,
+      displayName: typeof decodedToken.name === "string" ? decodedToken.name : undefined,
+    },
+    { enabled: ENABLE_BOOTSTRAP_ADMIN, email: BOOTSTRAP_ADMIN_EMAIL }
+  );
+
+  if (!bootstrapProfile) {
     throw new AuthHttpError("Cuenta sin permisos administrativos.", 403);
   }
 
   return {
     uid: decodedToken.uid,
     email,
-    role: "admin_global" as const,
-    plantaId: "nacional" as const,
-    profile: {
-      uid: decodedToken.uid,
-      email,
-      role: "admin_global" as const,
-      plantaId: "nacional" as const,
-      active: true,
-    },
+    role: bootstrapProfile.role,
+    plantaId: bootstrapProfile.plantaId,
+    profile: bootstrapProfile,
   } satisfies AdminSession;
 }
 
