@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest } from 'next/server';
 import { buildAuditEvent } from '@/lib/audit-events';
+import { parseChatMessageInput } from '@/lib/chat-request';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { AuthHttpError, requireAdminUser, type AdminSession } from '@/lib/server-auth';
 
@@ -139,11 +140,11 @@ export async function POST(req: NextRequest) {
     const adminUser = await requireAdminUser(req);
 
     const body = await req.json();
-    const message = typeof body?.message === 'string' ? body.message.trim() : '';
-
-    if (!message || message.length > 2000) {
-      return Response.json({ error: 'Mensaje requerido de maximo 2000 caracteres.' }, { status: 400 });
+    const parsedMessage = parseChatMessageInput(body);
+    if (!parsedMessage.ok) {
+      return Response.json({ error: parsedMessage.error }, { status: 400 });
     }
+    const { message } = parsedMessage;
 
     const context = await readPlantContext(adminUser);
     const ai = new GoogleGenAI({ apiKey });

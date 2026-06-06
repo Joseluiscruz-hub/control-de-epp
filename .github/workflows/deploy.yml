@@ -78,8 +78,6 @@ jobs:
             "NEXT_PUBLIC_FIREBASE_APP_ID": os.environ["FIREBASE_APP_ID"],
             "NEXT_PUBLIC_FIREBASE_DATABASE_ID": os.environ["FIREBASE_DATABASE_ID"],
             "NEXT_PUBLIC_ENABLE_OFFLINE_MODE": os.environ.get("NEXT_PUBLIC_ENABLE_OFFLINE_MODE", "false") or "false",
-            "NEXT_PUBLIC_ENABLE_BOOTSTRAP_ADMIN": os.environ.get("ENABLE_BOOTSTRAP_ADMIN", "false") or "false",
-            "NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL": os.environ.get("BOOTSTRAP_ADMIN_EMAIL", ""),
             "NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY": os.environ.get("FIREBASE_APPCHECK_SITE_KEY", ""),
             "NEXT_PUBLIC_FIREBASE_APP_CHECK_REQUIRED": os.environ.get("FIREBASE_APP_CHECK_REQUIRED", "true") or "true",
           }

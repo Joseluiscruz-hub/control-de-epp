@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db, ensureFirebaseReady } from '@/lib/firebase';
@@ -9,12 +9,11 @@ import { usePathname } from 'next/navigation';
 import { ShieldCheck, Fingerprint, Lock, ArrowRight, HardHat } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { canUseAdminProfile, isGlobalProfile, type AdminRole, type UserProfile } from '@/lib/admin-profile';
-import { isPlantId, type PlantScope } from '@/lib/plants';
+import { canUseAdminProfile, isGlobalProfile, type UserProfile } from '@/lib/admin-profile';
+import { AuthContext, useAuth as useAuthContext } from '@/components/auth-context';
+import { normalizeUserProfile } from '@/lib/user-profile';
 
 const ENABLE_OFFLINE_MODE = process.env.NEXT_PUBLIC_ENABLE_OFFLINE_MODE === 'true';
-const ENABLE_BOOTSTRAP_ADMIN = process.env.NEXT_PUBLIC_ENABLE_BOOTSTRAP_ADMIN === 'true';
-const BOOTSTRAP_ADMIN_EMAIL = (process.env.NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase();
 const OFFLINE_SESSION_KEY = 'assetguard.offline.adminSession';
 const OFFLINE_ADMIN_USER = {
   uid: 'offline-admin',
@@ -23,81 +22,15 @@ const OFFLINE_ADMIN_USER = {
   photoURL: null,
 } as User;
 
-interface AuthContextType {
-  user: User | null;
-  profile: UserProfile | null;
-  loading: boolean;
-  isAdmin: boolean;
-  isGlobalAdmin: boolean;
-  isOfflineSession: boolean;
-  signIn: () => Promise<void>;
-  signInOffline: () => Promise<void>;
-  logOut: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  profile: null,
-  loading: true,
-  isAdmin: false,
-  isGlobalAdmin: false,
-  isOfflineSession: false,
-  signIn: async () => {},
-  signInOffline: async () => {},
-  logOut: async () => {},
-});
-
-export const useAuth = () => useContext(AuthContext);
-
-function isConfiguredAdminEmail(email: string | null | undefined) {
-  return ENABLE_BOOTSTRAP_ADMIN && !!email && !!BOOTSTRAP_ADMIN_EMAIL && email.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL;
-}
-
-function normalizeUserProfile(uid: string, fallbackEmail: string, data: Record<string, unknown>): UserProfile | null {
-  const role = data.role === 'admin_local' || data.role === 'admin_global'
-    ? data.role as AdminRole
-    : null;
-  if (!role) return null;
-
-  const rawPlant = typeof data.plantaId === 'string' ? data.plantaId : '';
-  const plantaId: PlantScope = role === 'admin_global'
-    ? (rawPlant === 'nacional' || isPlantId(rawPlant) ? rawPlant : 'nacional')
-    : isPlantId(rawPlant)
-      ? rawPlant
-      : 'cuautitlan';
-
-  return {
-    uid,
-    email: typeof data.email === 'string' && data.email ? data.email.toLowerCase() : fallbackEmail,
-    role,
-    plantaId,
-    displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
-    active: data.active !== false,
-  };
-}
-
-function fallbackAdminProfile(user: User): UserProfile | null {
-  const email = user.email?.toLowerCase();
-  if (!email || !isConfiguredAdminEmail(email)) return null;
-
-  return {
-    uid: user.uid,
-    email,
-    role: 'admin_global',
-    plantaId: 'nacional',
-    displayName: user.displayName ?? undefined,
-    active: true,
-  };
-}
+export { useAuthContext as useAuth };
 
 async function resolveUserProfile(user: User) {
-  const fallback = fallbackAdminProfile(user);
-  const email = user.email?.toLowerCase() ?? fallback?.email ?? '';
+  const email = user.email?.toLowerCase() ?? '';
 
   try {
     const snap = await getDoc(doc(db, 'users', user.uid));
     if (snap.exists()) {
-      return normalizeUserProfile(user.uid, email, snap.data()) ?? fallback;
+      return normalizeUserProfile(user.uid, email, snap.data());
     }
   } catch (error) {
     console.warn('[Admin profile unavailable from Firestore, trying server profile]', error);
@@ -116,7 +49,7 @@ async function resolveUserProfile(user: User) {
     if (response.ok) {
       const result = await response.json() as { profile?: Record<string, unknown> };
       if (result.profile) {
-        return normalizeUserProfile(user.uid, email, result.profile) ?? fallback;
+        return normalizeUserProfile(user.uid, email, result.profile);
       }
     } else if (response.status !== 401 && response.status !== 403) {
       console.warn('[Admin profile server fallback failed]', response.status);
@@ -125,7 +58,7 @@ async function resolveUserProfile(user: User) {
     console.warn('[Admin profile server fallback unavailable]', error);
   }
 
-  return fallback;
+  return null;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -301,7 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading, signIn, signInOffline, isAdmin, logOut } = useAuth();
+  const { user, loading, signIn, signInOffline, isAdmin, logOut } = useAuthContext();
   const pathname = usePathname();
 
   const handleOnlineSignIn = async () => {

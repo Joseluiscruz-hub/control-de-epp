@@ -5,7 +5,7 @@ import {
   collection, onSnapshot, query, orderBy, limit,
   where, Timestamp
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db, ensureFirebaseReady } from '@/lib/firebase';
 import { handleFirestoreError, OperationType } from '@/lib/firestore-error';
 import { isToday, isBefore, addDays } from 'date-fns';
 import { canUseLocalFallback, getLocalDashboardSnapshot } from '@/lib/kiosk-local-store';
@@ -35,6 +35,48 @@ export interface DashboardStats {
   totalInventoryItems: number;
   lowStockItems: number;
   totalStock: number;
+}
+
+type LiveDoc = {
+  id: string;
+  data: Record<string, unknown>;
+};
+
+type MonitoringPayload = {
+  assignments?: LiveDoc[];
+  employees?: LiveDoc[];
+  inventory?: LiveDoc[];
+};
+
+function toDate(value: unknown) {
+  if (value instanceof Timestamp) return value.toDate();
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
+}
+
+function readStock(item: Record<string, unknown>) {
+  if (typeof item.stock === 'number') return item.stock;
+  const sizes = item.sizes;
+  if (!sizes || typeof sizes !== 'object' || Array.isArray(sizes)) return Number(item.stock ?? 0);
+  return Object.values(sizes as Record<string, Record<string, unknown>>).reduce(
+    (sum, variant) => sum + Number(variant.stock ?? 0),
+    0
+  );
+}
+
+function assignmentFromDoc(doc: LiveDoc): Assignment {
+  return {
+    id: doc.id,
+    employeeId: String(doc.data.employeeId ?? ''),
+    sku: String(doc.data.sku ?? ''),
+    assignedAt: toDate(doc.data.assignedAt),
+    nextReplacementAt: doc.data.nextReplacementAt ? toDate(doc.data.nextReplacementAt) : undefined,
+    status: String(doc.data.status ?? ''),
+  };
 }
 
 // ── Hook ──────────────────────────────────────────────────────
@@ -86,6 +128,75 @@ export function useDashboardData() {
     setLoading(false);
   }, []);
 
+  const applyServerDashboard = useCallback(async () => {
+    try {
+      await ensureFirebaseReady();
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('missing_admin_session');
+
+      const response = await fetch(`/api/monitoring/live?plant=${encodeURIComponent(activePlantId)}`, {
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) throw new Error('dashboard_server_fallback_failed');
+
+      const payload = await response.json() as MonitoringPayload;
+      const assignments = (payload.assignments ?? [])
+        .map(assignmentFromDoc)
+        .sort((a, b) => b.assignedAt.getTime() - a.assignedAt.getTime());
+      const inventoryItems = (payload.inventory ?? []).map((doc) => doc.data);
+      const employees = (payload.employees ?? []).map((doc) => ({
+        id: doc.id,
+        area: String(doc.data.area ?? ''),
+      }));
+      const stockValues = inventoryItems.map(readStock);
+      const now = new Date();
+      const nextWeek = addDays(now, 7);
+      const upcoming = assignments.filter((assignment) =>
+        assignment.nextReplacementAt && assignment.status === 'active' &&
+        (isBefore(assignment.nextReplacementAt, nextWeek) || isBefore(assignment.nextReplacementAt, now))
+      );
+
+      const sortedByStock = [...inventoryItems].sort((a, b) => readStock(a) - readStock(b));
+      const lowestItem = sortedByStock.length > 0
+        ? { name: String(sortedByStock[0].name ?? 'EPP sin nombre'), stock: readStock(sortedByStock[0]) }
+        : null;
+      const empMap = new Map(employees.map((employee) => [employee.id, employee.area]));
+      const areaCounts: Record<string, number> = {};
+      assignments.forEach((assignment) => {
+        const area = empMap.get(assignment.employeeId);
+        if (area) areaCounts[area] = (areaCounts[area] || 0) + 1;
+      });
+      const topAreaEntry = Object.entries(areaCounts).sort((a, b) => b[1] - a[1])[0];
+      const activeAssigns = assignments.filter((assignment) => assignment.status === 'active');
+      const compliant = activeAssigns.filter((assignment) => !assignment.nextReplacementAt || assignment.nextReplacementAt > now);
+
+      setRecentAssignments(assignments.slice(0, 10));
+      setUpcomingAlerts(upcoming);
+      setStats({
+        todayAssignments: assignments.filter((assignment) => isToday(assignment.assignedAt)).length,
+        activeEmployees: employees.length,
+        alertsThisWeek: upcoming.length,
+        totalInventoryItems: inventoryItems.length,
+        lowStockItems: stockValues.filter((stock) => stock <= 20).length,
+        totalStock: stockValues.reduce((sum, stock) => sum + stock, 0),
+      });
+      setInsights({
+        lowStockItem: lowestItem,
+        topArea: topAreaEntry ? { area: topAreaEntry[0], count: topAreaEntry[1] } : null,
+        complianceRate: activeAssigns.length > 0 ? Math.round((compliant.length / activeAssigns.length) * 100) : 100,
+      });
+      setLoading(false);
+    } catch (error) {
+      console.error('[Dashboard server fallback error]', error);
+      applyLocalDashboard();
+    }
+  }, [activePlantId, applyLocalDashboard]);
+
   // ── Assignments listener (recent 10) ──────────────────────
   useEffect(() => {
     try {
@@ -118,17 +229,17 @@ export function useDashboardData() {
         setLoading(false);
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, 'assignments');
-        applyLocalDashboard();
+        void applyServerDashboard();
       });
       return () => unsubscribe();
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'assignments');
       const timeout = window.setTimeout(() => {
-        applyLocalDashboard();
+        void applyServerDashboard();
       }, 0);
       return () => window.clearTimeout(timeout);
     }
-  }, [activePlantId, applyLocalDashboard]);
+  }, [activePlantId, applyServerDashboard]);
 
   // ── Employees + Inventory + Assignments stats listener ────
   useEffect(() => {
@@ -199,7 +310,7 @@ export function useDashboardData() {
         },
         (error) => {
           console.error('[Dashboard employees stats error]', error);
-          applyLocalDashboard();
+          void applyServerDashboard();
         }
       );
 
@@ -214,7 +325,7 @@ export function useDashboardData() {
         },
         (error) => {
           console.error('[Dashboard inventory stats error]', error);
-          applyLocalDashboard();
+          void applyServerDashboard();
         }
       );
 
@@ -229,7 +340,7 @@ export function useDashboardData() {
         },
         (error) => {
           console.error('[Dashboard assignment stats error]', error);
-          applyLocalDashboard();
+          void applyServerDashboard();
         }
       );
 
@@ -241,11 +352,11 @@ export function useDashboardData() {
     } catch (error) {
       console.error('[Dashboard local fallback]', error);
       const timeout = window.setTimeout(() => {
-        applyLocalDashboard();
+        void applyServerDashboard();
       }, 0);
       return () => window.clearTimeout(timeout);
     }
-  }, [activePlantId, applyLocalDashboard]);
+  }, [activePlantId, applyServerDashboard]);
 
   return {
     recentAssignments,

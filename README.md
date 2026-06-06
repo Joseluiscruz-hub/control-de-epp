@@ -31,7 +31,7 @@ La aplicación ya cuenta con:
 - Firestore Rules reforzadas con validación de esquemas y control por rol.
 - Validaciones server-side para ARIA y PIN del kiosko.
 - Transacciones para proteger stock y asignaciones concurrentes.
-- CI automático de `lint`, `typecheck` y `build`.
+- CI automático de `lint`, `typecheck`, `test` y `build`.
 - Deploy automático a Google Cloud Run desde `main`.
 
 ## Firebase Apps
@@ -349,9 +349,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 NEXT_PUBLIC_FIREBASE_DATABASE_ID=(default)
 NEXT_PUBLIC_ENABLE_OFFLINE_MODE=false
 ENABLE_BOOTSTRAP_ADMIN=false
-NEXT_PUBLIC_ENABLE_BOOTSTRAP_ADMIN=false
 BOOTSTRAP_ADMIN_EMAIL=
-NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL=
 NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY=
 NEXT_PUBLIC_FIREBASE_APP_CHECK_REQUIRED=true
 FIREBASE_APP_CHECK_REQUIRED=true
@@ -461,6 +459,9 @@ app/api/chat/route.ts
 Comandos recomendados antes de abrir PR:
 
 ```powershell
+npm test
+npm run typecheck
+npm run lint
 npm run build
 git diff --check
 ```

@@ -66,15 +66,20 @@ export async function GET(req: NextRequest) {
 
     const inventoryQuery = db.collection("ppe_catalog").limit(500);
 
+    const employeesQuery = activePlantId === "todas"
+      ? db.collection("employees").where("active", "==", true).limit(1000)
+      : db.collection("employees").where("active", "==", true).where("plantaId", "==", activePlantId).limit(1000);
+
     const alertQuery = db.collection("kiosk_alerts")
       .where("createdAt", ">=", thirtyDaysAgo)
       .orderBy("createdAt", "desc")
       .limit(100);
 
-    const [requests, assignments, inventory, alerts] = await Promise.all([
+    const [requests, assignments, inventory, employees, alerts] = await Promise.all([
       requestQuery.get(),
       assignmentQuery.get(),
       inventoryQuery.get(),
+      employeesQuery.get(),
       alertQuery.get(),
     ]);
 
@@ -84,6 +89,7 @@ export async function GET(req: NextRequest) {
         requests: docsFrom(requests, activePlantId),
         assignments: docsFrom(assignments, activePlantId),
         inventory: docsFrom(inventory, activePlantId),
+        employees: docsFrom(employees, activePlantId),
         alerts: docsFrom(alerts, activePlantId),
       },
       {
