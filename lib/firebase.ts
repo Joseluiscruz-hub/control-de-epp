@@ -2,6 +2,7 @@ import { initializeApp, getApps, type FirebaseApp, type FirebaseOptions } from '
 import { getToken, initializeAppCheck, ReCaptchaV3Provider, type AppCheck } from 'firebase/app-check';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { resolveAppCheckRequired, shouldInitializeAppCheck } from './app-check-flags';
 
 type FirebaseAppConfig = FirebaseOptions & {
   firestoreDatabaseId: string;
@@ -28,22 +29,12 @@ function firstNonEmpty(...values: Array<string | undefined>) {
   return values.find((value) => typeof value === 'string' && value.trim().length > 0)?.trim() ?? '';
 }
 
-function parseBooleanFlag(value: unknown) {
-  if (typeof value === 'boolean') return value;
-  if (typeof value !== 'string') return undefined;
-
-  const normalized = value.trim().toLowerCase();
-  if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
-  if (['false', '0', 'no', 'off'].includes(normalized)) return false;
-  return undefined;
-}
-
 export function isAppCheckRequiredForClient() {
-  const configured =
-    parseBooleanFlag(getRuntimeConfig()?.appCheckRequired) ??
-    parseBooleanFlag(process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_REQUIRED);
-
-  return configured ?? (process.env.NODE_ENV === 'production');
+  return resolveAppCheckRequired(
+    getRuntimeConfig()?.appCheckRequired,
+    process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_REQUIRED,
+    process.env.NODE_ENV === 'production'
+  );
 }
 
 function getFirebaseConfig(): FirebaseAppConfig {
@@ -209,7 +200,14 @@ function getAppCheckSiteKey() {
 
 function initializeAppCheckIfPossible() {
   if (typeof window === 'undefined') return null;
-  if (!isAppCheckRequiredForClient()) return null;
+  if (
+    !shouldInitializeAppCheck(
+      getRuntimeConfig()?.appCheckRequired,
+      process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_REQUIRED
+    )
+  ) {
+    return null;
+  }
   const siteKey = getAppCheckSiteKey();
   if (!siteKey) return null;
   if (_appCheck) return _appCheck;
