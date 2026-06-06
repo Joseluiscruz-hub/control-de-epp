@@ -10,7 +10,7 @@
     "local:start": "next start -H 127.0.0.1 -p 3000",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "node --import tsx --test lib/chat-request.test.ts lib/inventory-import.test.ts lib/user-profile.test.ts",
+    "test": "node --import tsx --test lib/app-check-flags.test.ts lib/chat-request.test.ts lib/inventory-import.test.ts lib/user-profile.test.ts",
     "clean": "next clean"
   },
   "dependencies": {
