@@ -181,7 +181,8 @@ service cloud.firestore {
           "id", "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt",
           "createdAt", "updatedAt", "division", "personnelArea", "plantArea", "costCenter",
           "positionId", "position", "jobFunction", "hireDate", "sex", "source", "schemaVersion",
-          "rfc", "imss", "curp", "plantaId"
+          "rfc", "imss", "curp", "plantaId", "credentialResetAt", "credentialResetByUid",
+          "credentialResetByEmail"
         ])
         && data.keys().hasAll(["id", "name", "area", "active", "createdAt", "updatedAt"])
         && data.id is string && data.id.size() > 0
@@ -193,6 +194,9 @@ service cloud.firestore {
         && (data.firstLogin == null || data.firstLogin is bool)
         && (data.termsAccepted == null || data.termsAccepted is bool)
         && (data.termsAcceptedAt == null || data.termsAcceptedAt is timestamp)
+        && (data.credentialResetAt == null || data.credentialResetAt is timestamp)
+        && optionalString(data.credentialResetByUid)
+        && optionalString(data.credentialResetByEmail)
         && optionalString(data.division)
         && optionalString(data.personnelArea)
         && optionalString(data.plantArea)
@@ -213,7 +217,8 @@ service cloud.firestore {
     function isValidKioskEmployeeSnapshot(data) {
       return data.keys().hasOnly([
           "id", "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt", "createdAt",
-          "updatedAt", "personnelArea", "plantArea", "position", "jobFunction", "source", "schemaVersion", "plantaId"
+          "updatedAt", "personnelArea", "plantArea", "position", "jobFunction", "source", "schemaVersion",
+          "plantaId", "credentialResetAt", "credentialResetByUid", "credentialResetByEmail"
         ])
         && data.keys().hasAll(["name", "active", "updatedAt"])
         && data.name is string && data.name.size() > 0
@@ -223,6 +228,9 @@ service cloud.firestore {
         && (data.createdAt == null || data.createdAt is timestamp)
         && (data.firstLogin == null || data.firstLogin is bool)
         && (data.termsAccepted == null || data.termsAccepted is bool)
+        && (data.credentialResetAt == null || data.credentialResetAt is timestamp)
+        && optionalString(data.credentialResetByUid)
+        && optionalString(data.credentialResetByEmail)
         && optionalString(data.area)
         && optionalString(data.personnelArea)
         && optionalString(data.plantArea)
