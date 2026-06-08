@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { buildInventoryCatalogPayload, buildKioskCatalogPayload, type InventoryImportItem } from "@/lib/inventory-import";
+import { selectInventoryImportDocumentId } from "@/lib/inventory-document-id";
 import { plantLabel } from "@/lib/plants";
 import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
 import {
@@ -45,6 +46,32 @@ async function readExistingCatalog(ids: string[]) {
   return existing;
 }
 
+function buildImportDocumentIds(params: {
+  items: InventoryImportItem[];
+  plantaId: InventoryImportItem["plantaId"];
+  existingCatalog: Map<string, FirebaseFirestore.DocumentData>;
+}) {
+  const itemDocIds = new Map<string, string>();
+
+  for (const item of params.items) {
+    const scopedId = buildPlantScopedInventoryId(params.plantaId, item.id);
+    const baseDocument = params.existingCatalog.get(item.id);
+    const scopedDocument = params.existingCatalog.get(scopedId);
+    itemDocIds.set(
+      item.id,
+      selectInventoryImportDocumentId({
+        baseId: item.id,
+        scopedId,
+        plantaId: params.plantaId,
+        baseDocument: baseDocument ? { exists: true, plantaId: baseDocument.plantaId } : undefined,
+        scopedDocument: scopedDocument ? { exists: true, plantaId: scopedDocument.plantaId } : undefined,
+      })
+    );
+  }
+
+  return itemDocIds;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const adminUser = await requireAdminUser(req);
@@ -60,8 +87,12 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getAdminDb();
-    const itemDocIds = new Map(items.map((item) => [item.id, buildPlantScopedInventoryId(plantaId, item.id)]));
-    const existingCatalog = await readExistingCatalog(Array.from(itemDocIds.values()));
+    const candidateIds = Array.from(new Set(items.flatMap((item) => [
+      item.id,
+      buildPlantScopedInventoryId(plantaId, item.id),
+    ])));
+    const existingCatalog = await readExistingCatalog(candidateIds);
+    const itemDocIds = buildImportDocumentIds({ items, plantaId, existingCatalog });
 
     let batch = db.batch();
     let writes = 0;
