@@ -26,6 +26,40 @@ interface Employee {
   area: string;
 }
 
+type PortalEmployeeData = {
+  id?: string;
+  name?: string;
+  area?: string;
+  plantArea?: string;
+  active?: boolean;
+};
+
+type PortalAssignmentData = {
+  id?: string;
+  sku?: string;
+  assignedAt?: string;
+  nextReplacementAt?: string;
+  status?: string;
+};
+
+type PortalEmployeePayload = {
+  employee?: PortalEmployeeData | null;
+  assignments?: PortalAssignmentData[];
+  error?: string;
+};
+
+function parseRequiredDate(value: unknown) {
+  if (typeof value !== 'string') return new Date();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+function parseOptionalDate(value: unknown) {
+  if (typeof value !== 'string') return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
 export default function UserPortal() {
   const [employeeId, setEmployeeId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,11 +68,11 @@ export default function UserPortal() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!employeeId.trim()) return;
+    const normalizedEmployeeId = employeeId.replace(/\D/g, '').trim();
+    if (!normalizedEmployeeId) return;
 
     setLoading(true);
     try {
-      const normalizedEmployeeId = employeeId.trim();
       const appCheckToken = await getAppCheckTokenForRequest();
       if (!appCheckToken && isAppCheckRequiredForClient()) {
         throw new Error('missing_app_check');
@@ -52,7 +86,10 @@ export default function UserPortal() {
         },
         body: JSON.stringify({ employeeId: normalizedEmployeeId }),
       });
-      const payload = employeeResponse.ok ? await employeeResponse.json() : null;
+      const payload = await employeeResponse.json().catch(() => ({})) as PortalEmployeePayload;
+      if (!employeeResponse.ok) {
+        throw new Error(typeof payload.error === 'string' ? payload.error : 'portal_employee_lookup_failed');
+      }
       const employeeData = payload?.employee;
 
       if (!employeeData || employeeData.active !== true) {
@@ -86,18 +123,18 @@ export default function UserPortal() {
       }
 
       setEmployee({
-        id: employeeData.id,
-        name: employeeData.name,
+        id: employeeData.id ?? normalizedEmployeeId,
+        name: employeeData.name ?? 'Colaborador',
         area: employeeData.area ?? employeeData.plantArea ?? 'SIN ÁREA',
       });
 
       const assignmentData = Array.isArray(payload?.assignments) ? payload.assignments : [];
-      setAssignments(assignmentData.map((assignment: Assignment & { assignedAt?: string; nextReplacementAt?: string }) => ({
-        id: assignment.id,
-        sku: assignment.sku,
-        assignedAt: assignment.assignedAt ? new Date(assignment.assignedAt) : new Date(),
-        nextReplacementAt: assignment.nextReplacementAt ? new Date(assignment.nextReplacementAt) : undefined,
-        status: assignment.status,
+      setAssignments(assignmentData.map((assignment, index) => ({
+        id: assignment.id ?? `${normalizedEmployeeId}-${assignment.sku ?? 'sku'}-${index}`,
+        sku: assignment.sku ?? 'SIN SKU',
+        assignedAt: parseRequiredDate(assignment.assignedAt),
+        nextReplacementAt: parseOptionalDate(assignment.nextReplacementAt),
+        status: assignment.status ?? 'active',
       })));
     } catch (error) {
       console.error(error);
@@ -106,7 +143,7 @@ export default function UserPortal() {
         return;
       }
 
-      const localEmployee = getLocalKioskEmployee(employeeId.trim());
+      const localEmployee = getLocalKioskEmployee(normalizedEmployeeId);
       if (!localEmployee || localEmployee.active !== true) {
         toast.error('Error de conexión con el servidor corporativo');
         return;
@@ -175,14 +212,15 @@ export default function UserPortal() {
                         placeholder="Número de Nómina"
                         className="pl-16 py-7 text-xl rounded-lg border-white/10 bg-white/5 focus-visible:ring-[#F40009] text-white placeholder:text-white/30 transition-all font-black text-center"
                         value={employeeId}
-                        onChange={(e) => setEmployeeId(e.target.value)}
+                        onChange={(e) => setEmployeeId(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                        inputMode="numeric"
                         autoFocus
                       />
                     </div>
                     <Button 
                       type="submit" 
                       className="w-full h-14 text-sm font-black bg-[#F40009] hover:bg-red-700 text-white transition-all active:scale-[0.98] rounded-lg uppercase tracking-widest group shadow-lg shadow-red-950/30"
-                      disabled={loading || !employeeId}
+                      disabled={loading || !employeeId.trim()}
                     >
                       {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
                         <>
