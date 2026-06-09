@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { buildPortalEmployeeResponse } from "@/lib/portal-employee-response";
 import {
   PublicRateLimitHttpError,
   publicRateLimitResponse,
@@ -31,8 +32,10 @@ export async function POST(req: NextRequest) {
     await requirePublicRateLimit(db, req, "portal_employee_lookup");
 
     const employeeSnap = await db.collection("kiosk_employees").doc(employeeId).get();
-    const employee = employeeSnap.data();
-    if (!employeeSnap.exists || employee?.active !== true) {
+    const employee = employeeSnap.exists
+      ? buildPortalEmployeeResponse(employeeSnap.id, employeeSnap.data() ?? {})
+      : null;
+    if (!employee) {
       return Response.json({ employee: null, assignments: [] });
     }
 
@@ -56,11 +59,7 @@ export async function POST(req: NextRequest) {
 
     return Response.json(
       {
-        employee: {
-          id: employeeSnap.id,
-          name: readText(employee.name),
-          area: readText(employee.area) || readText(employee.plantArea) || "SIN AREA",
-        },
+        employee,
         assignments,
       },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
