@@ -62,6 +62,8 @@ export interface PpeItem {
   createdAt?: Date;
 }
 
+export type StockFilter = 'all' | 'critical' | 'out' | 'other';
+
 /* ── Constants ─────────────────────────────────── */
 
 export const CATEGORIES = [
@@ -108,6 +110,7 @@ export function useInventoryData() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterStock, setFilterStock] = useState<StockFilter>('all');
 
   // Add-item dialog state
   const [addOpen, setAddOpen] = useState(false);
@@ -224,7 +227,12 @@ export function useInventoryData() {
     const matchSearch = it.name.toLowerCase().includes(search.toLowerCase()) ||
       it.sku.toLowerCase().includes(search.toLowerCase());
     const matchCat = filterCategory === 'all' || it.category === filterCategory;
-    return matchSearch && matchCat;
+    const matchStock =
+      filterStock === 'all' ||
+      (filterStock === 'critical' && it.stock > 0 && it.stock <= LOW_STOCK_THRESHOLD) ||
+      (filterStock === 'out' && it.stock === 0) ||
+      (filterStock === 'other' && it.stock > LOW_STOCK_THRESHOLD);
+    return matchSearch && matchCat && matchStock;
   });
 
   const totalStock = items.reduce((sum, i) => sum + i.stock, 0);
@@ -487,6 +495,8 @@ export function useInventoryData() {
     setSearch,
     filterCategory,
     setFilterCategory,
+    filterStock,
+    setFilterStock,
 
     // Add dialog
     addOpen,

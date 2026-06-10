@@ -9,7 +9,7 @@ import { Search, RefreshCw, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { usePagination } from '@/hooks/usePagination';
 import { PaginationControls } from '@/components/ui/pagination-controls';
-import { type PpeItem, LOW_STOCK_THRESHOLD, stockColor } from '../_hooks/useInventoryData';
+import { type PpeItem, type StockFilter, LOW_STOCK_THRESHOLD, stockColor } from '../_hooks/useInventoryData';
 import { useEffect, useRef } from 'react';
 
 export interface CatalogTableProps {
@@ -18,6 +18,8 @@ export interface CatalogTableProps {
   setSearch: (v: string) => void;
   filterCategory: string;
   setFilterCategory: (v: string) => void;
+  filterStock: StockFilter;
+  setFilterStock: (v: StockFilter) => void;
   uniqueCategories: string[];
   onAdjust: (item: PpeItem) => void;
 }
@@ -28,6 +30,8 @@ export function CatalogTable({
   setSearch,
   filterCategory,
   setFilterCategory,
+  filterStock,
+  setFilterStock,
   uniqueCategories,
   onAdjust,
 }: CatalogTableProps) {
@@ -39,13 +43,19 @@ export function CatalogTable({
   // Reset to page 1 when filters change
   const prevSearch = useRef(search);
   const prevCategory = useRef(filterCategory);
+  const prevStock = useRef(filterStock);
   useEffect(() => {
-    if (prevSearch.current !== search || prevCategory.current !== filterCategory) {
+    if (
+      prevSearch.current !== search ||
+      prevCategory.current !== filterCategory ||
+      prevStock.current !== filterStock
+    ) {
       pagination.setPage(1);
       prevSearch.current = search;
       prevCategory.current = filterCategory;
+      prevStock.current = filterStock;
     }
-  }, [search, filterCategory, pagination]);
+  }, [search, filterCategory, filterStock, pagination]);
 
   return (
     <div className="enterprise-panel">
@@ -68,6 +78,18 @@ export function CatalogTable({
             <SelectContent className="rounded-lg bg-[#10151d] border-white/10 text-white">
               <SelectItem value="all" className="font-bold text-white/70">TODAS LAS CATEGORÍAS</SelectItem>
               {uniqueCategories.map(c => <SelectItem key={c} value={c} className="font-medium">{c.toUpperCase()}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          <Select value={filterStock} onValueChange={(v) => setFilterStock((v || 'all') as StockFilter)}>
+            <SelectTrigger className="w-full md:w-[240px] h-12 bg-white/5 border-white/10 rounded-lg text-white font-medium px-5">
+              <SelectValue placeholder="Stock" />
+            </SelectTrigger>
+            <SelectContent className="rounded-lg bg-[#10151d] border-white/10 text-white">
+              <SelectItem value="all" className="font-bold text-white/70">TODO EL STOCK</SelectItem>
+              <SelectItem value="critical" className="font-medium text-orange-300">STOCK CRITICO</SelectItem>
+              <SelectItem value="out" className="font-medium text-red-300">AGOTADO TOTAL</SelectItem>
+              <SelectItem value="other" className="font-medium text-emerald-300">OTROS / NORMAL</SelectItem>
             </SelectContent>
           </Select>
       </div>

@@ -19,6 +19,29 @@ function serializeDate(value: unknown) {
   return value instanceof Timestamp ? value.toDate().toISOString() : undefined;
 }
 
+function readCatalogDescription(data: Record<string, unknown> | undefined) {
+  if (!data) return "";
+  return readText(data.name) || readText(data.description);
+}
+
+async function loadCatalogDescriptions(db: FirebaseFirestore.Firestore, itemKeys: string[]) {
+  const uniqueKeys = Array.from(new Set(itemKeys.filter(Boolean)));
+  const descriptions = new Map<string, string>();
+
+  await Promise.all(uniqueKeys.map(async (itemKey) => {
+    const [catalogSnap, kioskCatalogSnap] = await Promise.all([
+      db.collection("ppe_catalog").doc(itemKey).get(),
+      db.collection("kiosk_catalog").doc(itemKey).get(),
+    ]);
+    const description =
+      readCatalogDescription(catalogSnap.exists ? catalogSnap.data() : undefined) ||
+      readCatalogDescription(kioskCatalogSnap.exists ? kioskCatalogSnap.data() : undefined);
+    if (description) descriptions.set(itemKey, description);
+  }));
+
+  return descriptions;
+}
+
 export async function POST(req: NextRequest) {
   try {
     await requireAppCheck(req);
@@ -44,12 +67,32 @@ export async function POST(req: NextRequest) {
       .limit(100)
       .get();
 
-    const assignments = assignmentsSnap.docs
-      .map((doc) => {
-        const data = doc.data();
+    const assignmentRows = assignmentsSnap.docs.map((doc) => ({
+      id: doc.id,
+      data: doc.data(),
+    }));
+    const catalogDescriptions = await loadCatalogDescriptions(
+      db,
+      assignmentRows.flatMap(({ data }) => [readText(data.itemId), readText(data.sku)])
+    );
+
+    const assignments = assignmentRows
+      .map(({ id, data }) => {
+        const sku = readText(data.sku);
+        const itemId = readText(data.itemId);
+        const itemName =
+          readText(data.itemName) ||
+          readText(data.description) ||
+          catalogDescriptions.get(itemId) ||
+          catalogDescriptions.get(sku) ||
+          "";
+
         return {
-          id: doc.id,
-          sku: readText(data.sku),
+          id,
+          sku,
+          itemId,
+          itemName,
+          size: readText(data.size),
           assignedAt: serializeDate(data.assignedAt),
           nextReplacementAt: serializeDate(data.nextReplacementAt),
           status: readText(data.status),
