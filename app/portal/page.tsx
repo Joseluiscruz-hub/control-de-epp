@@ -10,11 +10,14 @@ import { es } from 'date-fns/locale';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
-import { canUseLocalFallback, getLocalKioskEmployee, listLocalAssignmentsForEmployee } from '@/lib/kiosk-local-store';
+import { canUseLocalFallback, getLocalKioskEmployee, getLocalPPECatalog, listLocalAssignmentsForEmployee } from '@/lib/kiosk-local-store';
 
 interface Assignment {
   id: string;
   sku: string;
+  itemId?: string;
+  itemName?: string;
+  size?: string;
   assignedAt: Date;
   nextReplacementAt?: Date;
   status: string;
@@ -37,6 +40,10 @@ type PortalEmployeeData = {
 type PortalAssignmentData = {
   id?: string;
   sku?: string;
+  itemId?: string;
+  itemName?: string;
+  description?: string;
+  size?: string;
   assignedAt?: string;
   nextReplacementAt?: string;
   status?: string;
@@ -58,6 +65,29 @@ function parseOptionalDate(value: unknown) {
   if (typeof value !== 'string') return undefined;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function buildLocalAssignments(employeeId: string): Assignment[] {
+  const catalog = getLocalPPECatalog();
+
+  return listLocalAssignmentsForEmployee(employeeId).map((assignment) => {
+    const item = catalog.find((candidate) => (
+      candidate.id === assignment.itemId ||
+      candidate.sku === assignment.sku ||
+      Object.values(candidate.sizes ?? {}).some((variant) => variant.sku === assignment.sku)
+    ));
+
+    return {
+      id: assignment.id,
+      sku: assignment.sku,
+      itemId: assignment.itemId,
+      itemName: item?.name,
+      size: assignment.size,
+      assignedAt: assignment.assignedAt,
+      nextReplacementAt: assignment.nextReplacementAt,
+      status: assignment.status,
+    };
+  });
 }
 
 export default function UserPortal() {
@@ -112,13 +142,7 @@ export default function UserPortal() {
           name: localEmployee.name,
           area: localEmployee.area ?? localEmployee.plantArea ?? 'SIN ÁREA',
         });
-        setAssignments(listLocalAssignmentsForEmployee(localEmployee.id).map((assignment) => ({
-          id: assignment.id,
-          sku: assignment.sku,
-          assignedAt: assignment.assignedAt,
-          nextReplacementAt: assignment.nextReplacementAt,
-          status: assignment.status,
-        })));
+        setAssignments(buildLocalAssignments(localEmployee.id));
         return;
       }
 
@@ -132,6 +156,9 @@ export default function UserPortal() {
       setAssignments(assignmentData.map((assignment, index) => ({
         id: assignment.id ?? `${normalizedEmployeeId}-${assignment.sku ?? 'sku'}-${index}`,
         sku: assignment.sku ?? 'SIN SKU',
+        itemId: assignment.itemId,
+        itemName: assignment.itemName || assignment.description || assignment.sku || 'SIN DESCRIPCION',
+        size: assignment.size,
         assignedAt: parseRequiredDate(assignment.assignedAt),
         nextReplacementAt: parseOptionalDate(assignment.nextReplacementAt),
         status: assignment.status ?? 'active',
@@ -153,13 +180,7 @@ export default function UserPortal() {
         name: localEmployee.name,
         area: localEmployee.area ?? localEmployee.plantArea ?? 'SIN ÁREA',
       });
-      setAssignments(listLocalAssignmentsForEmployee(localEmployee.id).map((assignment) => ({
-        id: assignment.id,
-        sku: assignment.sku,
-        assignedAt: assignment.assignedAt,
-        nextReplacementAt: assignment.nextReplacementAt,
-        status: assignment.status,
-      })));
+      setAssignments(buildLocalAssignments(localEmployee.id));
       toast.warning('Modo offline: datos locales cargados');
     } finally {
       setLoading(false);
@@ -296,8 +317,14 @@ export default function UserPortal() {
                               <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${isActive ? (isOverdue ? 'bg-[#F40009]/20 text-[#F40009]' : 'bg-emerald-500/20 text-emerald-400') : 'bg-white/10 text-white/40'}`}>
                                 <ShieldCheck className="h-6 w-6" />
                               </div>
-                              <div>
-                                <h4 className="text-lg font-black text-white tracking-tight">{ass.sku}</h4>
+                              <div className="min-w-0">
+                                <h4 className="text-lg font-black text-white tracking-tight leading-tight break-words">
+                                  {ass.itemName || ass.sku}
+                                </h4>
+                                <p className="text-[10px] text-white/35 font-bold uppercase tracking-widest mt-1">
+                                  SKU: {ass.sku}
+                                  {ass.size && ass.size !== 'N/A' ? ` · Talla: ${ass.size}` : ''}
+                                </p>
                                 <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest mt-0.5">
                                   Entrega: {format(ass.assignedAt, "dd MMM, yyyy", { locale: es })}
                                 </p>

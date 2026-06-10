@@ -64,6 +64,8 @@ export default function InventarioPage() {
         setSearch={data.setSearch}
         filterCategory={data.filterCategory}
         setFilterCategory={data.setFilterCategory}
+        filterStock={data.filterStock}
+        setFilterStock={data.setFilterStock}
         uniqueCategories={data.uniqueCategories}
         onAdjust={data.openAdjust}
       />
