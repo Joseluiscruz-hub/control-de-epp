@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin";
-import type { AdminRole, UserProfile } from "@/lib/admin-profile";
-import type { PlantScope } from "@/lib/plants";
-import { buildBootstrapAdminProfile, normalizeUserProfile } from "@/lib/user-profile";
+import { getAdminAuth, getAdminDb } from "./firebase-admin";
+import type { AdminRole, UserProfile } from "./admin-profile";
+import type { PlantScope } from "./plants";
+import { buildBootstrapAdminProfile, normalizeUserProfile } from "./user-profile";
 
 export class AuthHttpError extends Error {
   status: number;
