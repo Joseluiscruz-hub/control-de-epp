@@ -182,21 +182,27 @@ export async function getPPECatalog(plantId?: string): Promise<PPECatalogItem[]>
 
 export async function getActiveAssignment(employeeId: string, sku: string): Promise<{ id: string } & Record<string, unknown> | null> {
   try {
-    await ensureFirebaseReady();
-    const q = query(
-      collection(db, "assignments"),
-      where("employeeId", "==", employeeId),
-      where("sku", "==", sku),
-      where("status", "==", "active"),
-      limit(1)
+    const response = await fetch("/api/kiosk/assignment", {
+      method: "POST",
+      headers: await kioskApiHeaders(),
+      body: JSON.stringify({ employeeId, sku }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (response.ok) {
+      return payload?.assignment ?? (canUseLocalFallback() ? getLocalActiveAssignment(employeeId, sku) : null);
+    }
+
+    throw new KioskApiError(
+      typeof payload?.error === "string" ? payload.error : "No se pudo consultar la asignacion activa.",
+      response.status
     );
-    const snap = await getDocs(q);
-    if (snap.empty) return getLocalActiveAssignment(employeeId, sku);
-    const d = snap.docs[0];
-    return { id: d.id, ...d.data() };
   } catch (error) {
-    console.warn("[Kiosko] Consultando asignacion local por error de Firebase.", error);
-    return getLocalActiveAssignment(employeeId, sku);
+    if (canFallbackToLocal(error)) {
+      console.warn("[Kiosko] Consultando asignacion local por error de Firebase.", error);
+      return getLocalActiveAssignment(employeeId, sku);
+    }
+    throw error;
   }
 }
 

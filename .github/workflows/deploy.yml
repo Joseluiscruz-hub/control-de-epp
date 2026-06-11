@@ -121,6 +121,9 @@ jobs:
         id: deploy
         continue-on-error: true
         run: |
+          set +e
+          deploy_log="$(mktemp)"
+
           gcloud run deploy "${SERVICE_NAME}" \
             --source . \
             --region="${REGION}" \
@@ -135,8 +138,18 @@ jobs:
             --port=8080 \
             --build-env-vars-file=/tmp/build-env-vars.yaml \
             --env-vars-file=/tmp/runtime-env-vars.yaml \
-            --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest"
-          echo "deploy_exit_code=$?" >> "${GITHUB_OUTPUT}"
+            --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" 2>&1 | tee "${deploy_log}"
+
+          deploy_exit_code="${PIPESTATUS[0]}"
+          echo "deploy_exit_code=${deploy_exit_code}" >> "${GITHUB_OUTPUT}"
+
+          if grep -Eiq "run\.googleapis\.com|Cloud Run Admin API|SERVICE_DISABLED|has not been used|is disabled" "${deploy_log}"; then
+            echo "missing_run_api=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "missing_run_api=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+          exit 0
 
       - name: Instrucciones para habilitar Cloud Run Admin API
         if: steps.deploy.outputs.missing_run_api == 'true'
