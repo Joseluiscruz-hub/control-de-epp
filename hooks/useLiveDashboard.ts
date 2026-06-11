@@ -1,23 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  collection,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  where,
-  type DocumentData,
-  type Query,
-  type QuerySnapshot,
-} from "firebase/firestore";
 import { useAuth } from "@/components/auth-context";
-import { db, ensureFirebaseReady } from "@/lib/firebase";
 import { DEFAULT_PLANT_ID, isPlantId, plantLabel, type ActivePlantId } from "@/lib/plants";
 import { usePlantStore } from "@/store/usePlantStore";
 
 type LiveDoc = { id: string; data: Record<string, unknown> };
+
+type LiveMonitoringPayload = {
+  activePlantId?: ActivePlantId;
+  requests?: LiveDoc[];
+  assignments?: LiveDoc[];
+  inventory?: LiveDoc[];
+  alerts?: LiveDoc[];
+  error?: string;
+};
 
 export interface LiveActivity {
   id: string;
@@ -56,6 +53,7 @@ export interface LiveDashboardState {
 
 const LOW_STOCK_THRESHOLD = 20;
 const RECENT_WINDOW_DAYS = 30;
+const REFRESH_INTERVAL_MS = 15_000;
 
 function toDate(value: unknown) {
   if (value instanceof Date) return value;
@@ -97,26 +95,22 @@ function isWithinLastDays(date: Date, days: number) {
   return date >= threshold;
 }
 
-function snapshotDocs(snapshot: QuerySnapshot<DocumentData>): LiveDoc[] {
-  return snapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    data: docSnap.data(),
-  }));
-}
-
-function scopedLiveQuery(
-  collectionName: string,
-  activePlantId: ActivePlantId,
-  options: { orderField?: string; maxDocs: number }
-): Query<DocumentData> {
-  const ref = collection(db, collectionName);
-  if (activePlantId === "todas") {
-    return options.orderField
-      ? query(ref, orderBy(options.orderField, "desc"), limit(options.maxDocs))
-      : query(ref, limit(options.maxDocs));
-  }
-
-  return query(ref, where("plantaId", "==", activePlantId), limit(options.maxDocs));
+function normalizeDocs(input: unknown): LiveDoc[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((doc): LiveDoc | null => {
+      if (!doc || typeof doc !== "object") return null;
+      const candidate = doc as Record<string, unknown>;
+      if (typeof candidate.id !== "string") return null;
+      const data = candidate.data;
+      return {
+        id: candidate.id,
+        data: data && typeof data === "object" && !Array.isArray(data)
+          ? data as Record<string, unknown>
+          : {},
+      };
+    })
+    .filter((doc): doc is LiveDoc => doc !== null);
 }
 
 function requestToActivity(doc: LiveDoc): LiveActivity {
@@ -151,7 +145,7 @@ function readStock(data: Record<string, unknown>) {
 
 export function useLiveDashboard(): LiveDashboardState {
   const { activePlantId } = usePlantStore();
-  const { profile, isGlobalAdmin, loading: authLoading } = useAuth();
+  const { user, profile, isGlobalAdmin, loading: authLoading, isOfflineSession } = useAuth();
   const [requests, setRequests] = useState<LiveDoc[]>([]);
   const [assignments, setAssignments] = useState<LiveDoc[]>([]);
   const [inventory, setInventory] = useState<LiveDoc[]>([]);
@@ -159,15 +153,17 @@ export function useLiveDashboard(): LiveDashboardState {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const scopedPlantId: ActivePlantId = useMemo(() => (
+    isGlobalAdmin
+      ? activePlantId
+      : isPlantId(profile?.plantaId)
+        ? profile.plantaId
+        : DEFAULT_PLANT_ID
+  ), [activePlantId, isGlobalAdmin, profile]);
+
   useEffect(() => {
     let cancelled = false;
-    let unsubscribers: Array<() => void> = [];
-    const ready = {
-      requests: false,
-      assignments: false,
-      inventory: false,
-      alerts: false,
-    };
+    let intervalId: number | undefined;
 
     if (authLoading) {
       return () => {
@@ -175,14 +171,16 @@ export function useLiveDashboard(): LiveDashboardState {
       };
     }
 
-    if (!profile) {
+    if (!profile || !user || isOfflineSession) {
       const timeout = window.setTimeout(() => {
         if (cancelled) return;
         setRequests([]);
         setAssignments([]);
         setInventory([]);
         setAlerts([]);
-        setError("Sesion administrativa requerida.");
+        setError(isOfflineSession
+          ? "La torre de control requiere sesion online para sincronizar Firebase."
+          : "Sesion administrativa requerida.");
         setLoading(false);
       }, 0);
       return () => {
@@ -191,91 +189,58 @@ export function useLiveDashboard(): LiveDashboardState {
       };
     }
 
-    const scopedPlantId: ActivePlantId = isGlobalAdmin
-      ? activePlantId
-      : isPlantId(profile.plantaId)
-        ? profile.plantaId
-        : DEFAULT_PLANT_ID;
-
-    const markReady = (key: keyof typeof ready) => {
-      ready[key] = true;
-      if (Object.values(ready).every(Boolean)) setLoading(false);
-    };
-
-    const handleError = (source: string) => (syncError: unknown) => {
-      if (cancelled) return;
-      console.error(`[Live dashboard ${source} listener error]`, syncError);
-      setError("No se pudo sincronizar la torre de control en vivo.");
-      setLoading(false);
-    };
-
-    const startListeners = async () => {
-      setLoading(true);
-      setError(null);
-
+    const syncDashboard = async (initialLoad: boolean) => {
       try {
-        await ensureFirebaseReady();
+        if (initialLoad) setLoading(true);
+
+        const token = await user.getIdToken();
+        const response = await fetch(`/api/monitoring/live?plant=${encodeURIComponent(scopedPlantId)}`, {
+          cache: "no-store",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
+        const payload = await response.json().catch(() => ({})) as LiveMonitoringPayload;
+
+        if (!response.ok) {
+          throw new Error(typeof payload.error === "string" ? payload.error : "live_monitoring_sync_failed");
+        }
         if (cancelled) return;
 
-        unsubscribers = [
-          onSnapshot(
-            scopedLiveQuery("kiosk_requests", scopedPlantId, { orderField: "createdAt", maxDocs: 500 }),
-            (snapshot) => {
-              if (cancelled) return;
-              setRequests(snapshotDocs(snapshot)
-                .filter((doc) => isWithinLastDays(toDate(doc.data.createdAt), RECENT_WINDOW_DAYS))
-                .sort((a, b) => toDate(b.data.createdAt).getTime() - toDate(a.data.createdAt).getTime())
-                .slice(0, 200));
-              markReady("requests");
-            },
-            handleError("requests")
-          ),
-          onSnapshot(
-            scopedLiveQuery("assignments", scopedPlantId, { orderField: "assignedAt", maxDocs: 500 }),
-            (snapshot) => {
-              if (cancelled) return;
-              setAssignments(snapshotDocs(snapshot)
-                .filter((doc) => isWithinLastDays(toDate(doc.data.assignedAt), RECENT_WINDOW_DAYS))
-                .sort((a, b) => toDate(b.data.assignedAt).getTime() - toDate(a.data.assignedAt).getTime())
-                .slice(0, 500));
-              markReady("assignments");
-            },
-            handleError("assignments")
-          ),
-          onSnapshot(
-            scopedLiveQuery("ppe_catalog", scopedPlantId, { maxDocs: 500 }),
-            (snapshot) => {
-              if (cancelled) return;
-              setInventory(snapshotDocs(snapshot));
-              markReady("inventory");
-            },
-            handleError("inventory")
-          ),
-          onSnapshot(
-            scopedLiveQuery("kiosk_alerts", scopedPlantId, { orderField: "createdAt", maxDocs: 200 }),
-            (snapshot) => {
-              if (cancelled) return;
-              setAlerts(snapshotDocs(snapshot)
-                .filter((doc) => isWithinLastDays(toDate(doc.data.createdAt), RECENT_WINDOW_DAYS))
-                .sort((a, b) => toDate(b.data.createdAt).getTime() - toDate(a.data.createdAt).getTime())
-                .slice(0, 100));
-              markReady("alerts");
-            },
-            handleError("alerts")
-          ),
-        ];
+        setRequests(normalizeDocs(payload.requests)
+          .filter((doc) => isWithinLastDays(toDate(doc.data.createdAt), RECENT_WINDOW_DAYS))
+          .sort((a, b) => toDate(b.data.createdAt).getTime() - toDate(a.data.createdAt).getTime())
+          .slice(0, 200));
+        setAssignments(normalizeDocs(payload.assignments)
+          .filter((doc) => isWithinLastDays(toDate(doc.data.assignedAt), RECENT_WINDOW_DAYS))
+          .sort((a, b) => toDate(b.data.assignedAt).getTime() - toDate(a.data.assignedAt).getTime())
+          .slice(0, 500));
+        setInventory(normalizeDocs(payload.inventory));
+        setAlerts(normalizeDocs(payload.alerts)
+          .filter((doc) => isWithinLastDays(toDate(doc.data.createdAt), RECENT_WINDOW_DAYS))
+          .sort((a, b) => toDate(b.data.createdAt).getTime() - toDate(a.data.createdAt).getTime())
+          .slice(0, 100));
+        setError(null);
       } catch (syncError) {
-        handleError("startup")(syncError);
+        if (cancelled) return;
+        console.error("[Live dashboard API sync error]", syncError);
+        setError("No se pudo sincronizar la torre de control en vivo.");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
 
-    void startListeners();
+    void syncDashboard(true);
+    intervalId = window.setInterval(() => {
+      void syncDashboard(false);
+    }, REFRESH_INTERVAL_MS);
 
     return () => {
       cancelled = true;
-      unsubscribers.forEach((unsubscribe) => unsubscribe());
+      if (intervalId) window.clearInterval(intervalId);
     };
-  }, [activePlantId, authLoading, isGlobalAdmin, profile]);
+  }, [authLoading, isOfflineSession, profile, scopedPlantId, user]);
 
   return useMemo(() => {
     const recentActivity = requests
@@ -328,7 +293,7 @@ export function useLiveDashboard(): LiveDashboardState {
     return {
       loading,
       error,
-      activePlantId,
+      activePlantId: scopedPlantId,
       recentActivity,
       plantSummaries: Array.from(summaries.values()).sort((a, b) => a.label.localeCompare(b.label, "es")),
       pendingRequests,
@@ -338,5 +303,5 @@ export function useLiveDashboard(): LiveDashboardState {
       lowStockItems,
       totalStock,
     };
-  }, [activePlantId, alerts, assignments, error, inventory, loading, requests]);
+  }, [alerts, assignments, error, inventory, loading, requests, scopedPlantId]);
 }
