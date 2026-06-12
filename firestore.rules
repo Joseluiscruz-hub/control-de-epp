@@ -68,6 +68,18 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // ── Metas y acumulados presupuestales ─────────────────────────────────
+    match /budget_goals/{goalId} {
+      allow read: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
+      allow create, update: if request.auth != null && isGlobalAdmin() && isValidBudgetGoal(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /budget_spending/{counterId} {
+      allow read: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
+      allow write: if false;
+    }
+
     // ── Cobros por Extravío ─────────────────────────────────────────────────
     match /loss_charges/{chargeId} {
       allow read: if request.auth != null && isAdmin() && hasPlantAccess(resource.data);
@@ -174,6 +186,26 @@ service cloud.firestore {
         && optionalString(data.displayName)
         && (data.createdAt == null || data.createdAt is timestamp)
         && (data.updatedAt == null || data.updatedAt is timestamp);
+    }
+
+    function isValidBudgetGoal(data) {
+      return data.keys().hasOnly([
+          "plantaId", "year", "annualLimit", "monthlyLimits", "alertThresholds", "currency",
+          "createdAt", "updatedAt", "createdBy", "updatedBy"
+        ])
+        && data.keys().hasAll([
+          "plantaId", "year", "annualLimit", "alertThresholds", "currency", "updatedAt", "updatedBy"
+        ])
+        && isValidPlantScope(data.plantaId)
+        && data.year is int && data.year >= 2020 && data.year <= 2100
+        && data.annualLimit is number && data.annualLimit > 0
+        && (data.monthlyLimits == null || data.monthlyLimits is map)
+        && data.alertThresholds is list && data.alertThresholds.size() > 0 && data.alertThresholds.size() <= 5
+        && data.currency == "MXN"
+        && (data.createdAt == null || data.createdAt is timestamp)
+        && data.updatedAt is timestamp
+        && optionalString(data.createdBy)
+        && data.updatedBy is string && data.updatedBy.size() > 0;
     }
 
     function isValidEmployee(data) {

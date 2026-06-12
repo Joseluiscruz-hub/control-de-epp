@@ -92,6 +92,12 @@ export async function POST(req: NextRequest) {
       const newStock = previousStock - 1;
       const sku = readText(variant?.sku) || readText(item.sku) || itemId;
       const itemName = readText(item.name) || itemId;
+      const unitCost = Math.max(0, readNumber(variant?.unitCost ?? item.unitCost));
+      const category = readText(item.category) || "Sin categoria";
+      const employeeArea = readText(employee.area)
+        || readText(employee.personnelArea)
+        || readText(employee.plantArea)
+        || "Sin area";
       const replacementDays = resolveEppReplacementDays(
         {
           sku,
@@ -129,11 +135,15 @@ export async function POST(req: NextRequest) {
       transaction.set(assignmentRef, {
         employeeId,
         employeeName: readText(employee.name),
-        employeeArea: readText(employee.area),
+        employeeArea,
+        area: employeeArea,
         plantaId,
         sku,
         itemId,
         itemName,
+        unitCost,
+        category,
+        quantity: 1,
         replacementDays,
         size: hasSizes ? requestedSize : "N/A",
         assignedAt: FieldValue.serverTimestamp(),
@@ -175,7 +185,16 @@ export async function POST(req: NextRequest) {
         actorEmail: adminUser.email,
         targetCollection: "assignments",
         targetId: assignmentRef.id,
-        after: { employeeId, itemId, sku, size: hasSizes ? requestedSize : "N/A", stock: newStock, plantaId },
+        after: {
+          employeeId,
+          itemId,
+          sku,
+          size: hasSizes ? requestedSize : "N/A",
+          stock: newStock,
+          unitCost,
+          category,
+          plantaId,
+        },
       }, req));
 
       return { assignmentId: assignmentRef.id, stock: newStock, plantaId };

@@ -60,6 +60,7 @@ type FulfillableKioskItem = KioskRequestItem & {
 
 type SanitizedKioskItem = KioskRequestItem & {
   unitCost: number;
+  category: string;
   signatureDataUrl?: string | null;
 };
 
@@ -179,6 +180,8 @@ function normalizeFulfillableItems(input: unknown): FulfillableKioskItem[] {
         replacementDays,
         requiredQuantity: readNumber(item.requiredQuantity, 1),
         requiredUnit: readText(item.requiredUnit),
+        unitCost: Math.max(0, readNumber(item.unitCost)),
+        category: readText(item.category) || "Sin categoria",
         ...(VALID_REASONS.has(replacementReason) ? { replacementReason: replacementReason as ReplacementReason } : {}),
         ...(readNumber(item.chargeAmount) > 0 ? { chargeAmount: readNumber(item.chargeAmount) } : {}),
         ...(typeof item.signatureDataUrl === "string" ? { signatureDataUrl: item.signatureDataUrl } : {}),
@@ -398,10 +401,14 @@ async function fulfillApprovedKioskRequest(params: {
         employeeId,
         employeeName,
         employeeArea,
+        area: employeeArea || "Sin area",
         plantaId,
         sku: item.sku,
         itemId: item.itemId,
         itemName: item.itemName,
+        unitCost: Math.max(0, readNumber(item.unitCost)),
+        category: readText(item.category) || readText(catalogData.category) || "Sin categoria",
+        quantity: stockChange.consumedQuantity,
         replacementDays: item.replacementDays,
         size: item.size || "N/A",
         assignedAt: FieldValue.serverTimestamp(),
@@ -614,6 +621,7 @@ async function sanitizeRequestItem(
     size,
     replacementDays,
     unitCost: readNumber(variant?.unitCost ?? catalog.unitCost),
+    category: readText(catalog.category) || "Sin categoria",
     ...(replacementReason ? { replacementReason } : {}),
     ...(signatureDataUrl ? { signatureDataUrl } : {}),
     ...getEppDurationRulePayload(ruleInput),
@@ -732,7 +740,7 @@ export async function POST(req: NextRequest) {
         candidate.size === item.size
       ));
       const chargeAmount = resolveServerChargeAmount(item, matchingAssignment);
-      const { unitCost: _unitCost, signatureDataUrl, ...requestItem } = item;
+      const { signatureDataUrl, ...requestItem } = item;
       return {
         ...requestItem,
         ...(chargeAmount > 0 ? { chargeAmount } : {}),

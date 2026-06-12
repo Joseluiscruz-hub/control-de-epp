@@ -79,6 +79,8 @@ export interface KioskRequestItem {
   durationRuleSapMaterial?: string | null;
   requiredQuantity?: number;
   requiredUnit?: string;
+  unitCost?: number;
+  category?: string;
   replacementReason?: ReplacementReason;
   chargeAmount?: number;
   signatureDataUrl?: string | null;

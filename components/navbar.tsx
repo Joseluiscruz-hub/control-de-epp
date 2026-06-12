@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './auth-provider';
 import { Button } from './ui/button';
-import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X, HardHat, FileSpreadsheet, RadioTower, UserCog } from 'lucide-react';
+import { LogOut, ShieldCheck, LayoutDashboard, Users, Package, Bot, ExternalLink, Menu, X, HardHat, FileSpreadsheet, RadioTower, UserCog, WalletCards } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -16,6 +16,7 @@ const NAV_LINKS = [
   { href: '/empleados', label: 'Empleados', icon: <Users className="h-4 w-4" /> },
   { href: '/inventario', label: 'Inventario', icon: <Package className="h-4 w-4" /> },
   { href: '/reportes', label: 'Reportes', icon: <FileSpreadsheet className="h-4 w-4" /> },
+  { href: '/presupuesto', label: 'Presupuesto', icon: <WalletCards className="h-4 w-4" />, globalOnly: true },
   { href: '/administradores', label: 'Admins', icon: <UserCog className="h-4 w-4" /> },
 ];
 
@@ -26,6 +27,7 @@ export function NavBar() {
   const [scrolled, setScrolled] = useState(false);
   const [online, setOnline] = useState(true);
   const hideNav = pathname === '/portal' || pathname?.startsWith('/kiosko');
+  const visibleNavLinks = NAV_LINKS.filter(link => !link.globalOnly || isGlobalAdmin);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
@@ -82,7 +84,7 @@ export function NavBar() {
 
               {/* Desktop Nav */}
               <nav className="hidden lg:flex items-center gap-0.5 p-1 rounded-lg" style={{background:'rgba(255,255,255,0.055)', border:'1px solid rgba(255,255,255,0.1)'}} aria-label="Navegación principal">
-                {NAV_LINKS.map(link => {
+                {visibleNavLinks.map(link => {
                   const isActive = pathname === link.href;
                   return (
                     <Link
@@ -235,7 +237,7 @@ export function NavBar() {
                 <div className="px-1 pb-3">
                   <PlantContextSwitcher compact />
                 </div>
-                {NAV_LINKS.map(link => {
+                {visibleNavLinks.map(link => {
                   const isActive = pathname === link.href;
                   return (
                     <Link
