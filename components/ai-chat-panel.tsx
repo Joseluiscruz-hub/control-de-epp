@@ -12,6 +12,8 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 import { canUseLocalFallback, getLocalDashboardSnapshot } from '@/lib/kiosk-local-store';
+import { plantLabel } from '@/lib/plants';
+import { usePlantStore } from '@/store/usePlantStore';
 
 interface Message {
   id: string;
@@ -20,11 +22,26 @@ interface Message {
   timestamp: Date;
 }
 
+function buildRequestHistory(messages: Message[]) {
+  const selected: Array<{ role: Message['role']; content: string }> = [];
+  let totalLength = 0;
+
+  for (const message of [...messages].reverse()) {
+    if (message.id === '0' || selected.length >= 8) continue;
+    const content = message.content.slice(0, 1000);
+    if (totalLength + content.length > 5000) continue;
+    selected.push({ role: message.role, content });
+    totalLength += content.length;
+  }
+
+  return selected.reverse();
+}
+
 const QUICK_PROMPTS = [
-  { icon: <AlertTriangle className="h-3.5 w-3.5" />, text: '¿Qué EPP está a punto de agotarse?' },
-  { icon: <TrendingUp className="h-3.5 w-3.5" />, text: '¿Qué área consume más equipo?' },
-  { icon: <ShoppingCart className="h-3.5 w-3.5" />, text: 'Genera una orden de compra sugerida' },
-  { icon: <BarChart3 className="h-3.5 w-3.5" />, text: 'Resumen ejecutivo del estado actual' },
+  { icon: <AlertTriangle className="h-3.5 w-3.5" />, text: '¿Qué EPP tiene menor cobertura y por qué?' },
+  { icon: <TrendingUp className="h-3.5 w-3.5" />, text: '¿Qué áreas presentan consumo inusual en los últimos 30 días?' },
+  { icon: <ShoppingCart className="h-3.5 w-3.5" />, text: 'Sugiere una compra para cubrir los próximos 60 días' },
+  { icon: <BarChart3 className="h-3.5 w-3.5" />, text: 'Dame un resumen ejecutivo de inventario y presupuesto' },
 ];
 
 function buildOfflineReply() {
@@ -48,6 +65,7 @@ function buildOfflineReply() {
 }
 
 export function AiChatPanel() {
+  const activePlantId = usePlantStore((state) => state.activePlantId);
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -62,6 +80,7 @@ export function AiChatPanel() {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const requestControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -72,6 +91,8 @@ export function AiChatPanel() {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [open, minimized]);
+
+  useEffect(() => () => requestControllerRef.current?.abort(), []);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
@@ -84,6 +105,10 @@ export function AiChatPanel() {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setLoading(true);
+
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+    const requestTimeout = window.setTimeout(() => controller.abort(), 45_000);
 
     try {
       const offlineMode =
@@ -109,17 +134,24 @@ export function AiChatPanel() {
 
       const res = await fetch('/api/chat', {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          message: text,
+          plantaId: activePlantId,
+          history: buildRequestHistory(messages),
+        }),
       });
-      const data = await res.json();
+      const data = await res.json() as { text?: string; error?: string };
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.text || data.error || 'Error al procesar la respuesta.',
+        content: res.ok
+          ? data.text || 'ARIA no generó una respuesta útil.'
+          : data.error || 'No se pudo procesar la consulta.',
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botMsg]);
@@ -127,7 +159,9 @@ export function AiChatPanel() {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: error instanceof Error && error.message === 'missing_auth'
+        content: error instanceof DOMException && error.name === 'AbortError'
+          ? 'La consulta tardó demasiado. Intenta una pregunta más específica.'
+          : error instanceof Error && error.message === 'missing_auth'
           ? 'Necesito una sesión administrativa online para responder.'
           : canUseLocalFallback()
             ? `No pude conectar con el servidor de IA. Te dejo el resumen local disponible:\n\n${buildOfflineReply()}`
@@ -135,9 +169,11 @@ export function AiChatPanel() {
         timestamp: new Date(),
       }]);
     } finally {
+      window.clearTimeout(requestTimeout);
+      requestControllerRef.current = null;
       setLoading(false);
     }
-  }, [loading]);
+  }, [activePlantId, loading, messages]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,8 +200,9 @@ export function AiChatPanel() {
             exit={{ scale: 0, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
             onClick={() => setOpen(true)}
-            className="fixed bottom-6 right-6 z-50 group flex items-center gap-2.5 bg-[#10151d] text-white px-5 py-4 rounded-xl shadow-2xl shadow-black/30 hover:shadow-red-950/20 transition-all duration-500 hover:scale-105 active:scale-95 border border-white/10"
+            className="fixed bottom-3 right-3 z-50 group flex items-center gap-2.5 bg-[#10151d] text-white px-4 py-3 sm:bottom-6 sm:right-6 sm:px-5 sm:py-4 rounded-xl shadow-2xl shadow-black/30 hover:shadow-red-950/20 transition-all duration-500 hover:scale-105 active:scale-95 border border-white/10"
             title="Abrir ARIA - Asistente IA"
+            aria-label="Abrir ARIA - Asistente IA"
           >
             <div className="relative">
               <div className="h-9 w-9 rounded-lg bg-[#F40009] flex items-center justify-center shadow-lg shadow-red-950/20 group-hover:shadow-red-950/40 transition-shadow">
@@ -190,10 +227,10 @@ export function AiChatPanel() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className={`fixed right-6 z-50 bg-[#f8fafc] rounded-xl shadow-2xl shadow-black/25 border border-white/20 flex flex-col overflow-hidden ${
+            className={`fixed z-50 bg-[#f8fafc] rounded-xl shadow-2xl shadow-black/25 border border-white/20 flex flex-col overflow-hidden ${
               minimized
-                ? 'bottom-6 h-16 w-72'
-                : 'bottom-6 w-[420px] h-[640px] max-h-[85vh]'
+                ? 'bottom-3 left-3 right-3 h-16 sm:bottom-6 sm:left-auto sm:right-6 sm:w-72'
+                : 'bottom-3 left-3 right-3 h-[calc(100dvh-1.5rem)] sm:bottom-6 sm:left-auto sm:right-6 sm:h-[640px] sm:max-h-[85vh] sm:w-[420px]'
             }`}
           >
             {/* Header - FEMSA branded */}
@@ -207,26 +244,32 @@ export function AiChatPanel() {
                 </div>
                 <div>
                   <p className="font-black text-white text-sm leading-none tracking-tight">ARIA IA</p>
-                  <p className="text-[9px] text-red-500 font-bold uppercase tracking-widest mt-0.5">Seguridad Industrial</p>
+                  <p className="text-[9px] text-red-500 font-bold uppercase tracking-widest mt-0.5">
+                    {plantLabel(activePlantId)}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
                 <button
                   onClick={clearChat}
+                  disabled={loading}
                   className="p-2 rounded-lg hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
                   title="Limpiar chat"
+                  aria-label="Limpiar chat"
                 >
                   <RefreshCw className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setMinimized(!minimized)}
                   className="p-2 rounded-lg hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
+                  aria-label={minimized ? 'Maximizar ARIA' : 'Minimizar ARIA'}
                 >
                   {minimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
                 </button>
                 <button
                   onClick={() => setOpen(false)}
                   className="p-2 rounded-lg hover:bg-red-500/20 transition-colors text-slate-400 hover:text-red-400"
+                  aria-label="Cerrar ARIA"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -236,7 +279,7 @@ export function AiChatPanel() {
             {!minimized && (
               <>
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4" aria-live="polite">
                   {messages.map(msg => (
                     <motion.div
                       key={msg.id}
@@ -312,6 +355,7 @@ export function AiChatPanel() {
                     onChange={e => setInput(e.target.value)}
                     placeholder="Pregunta sobre inventario o EPP..."
                     disabled={loading}
+                    maxLength={2000}
                     className="flex-1 text-sm h-11 rounded-lg border-slate-200 bg-white focus:border-red-300 focus:ring-red-100 font-medium"
                   />
                   <Button
@@ -319,6 +363,7 @@ export function AiChatPanel() {
                     size="sm"
                     disabled={loading || !input.trim()}
                     className="h-11 w-11 p-0 rounded-lg bg-[#0d1117] hover:bg-[#F40009] shadow-lg transition-all duration-300"
+                    aria-label="Enviar mensaje a ARIA"
                   >
                     {loading
                       ? <Loader2 className="h-4 w-4 animate-spin" />
