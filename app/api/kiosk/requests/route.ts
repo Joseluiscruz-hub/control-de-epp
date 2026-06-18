@@ -5,6 +5,11 @@ import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { AuthHttpError, canAdminUsePlant, requireAdminUser, type AdminSession } from "@/lib/server-auth";
 import {
+  buildKioskApprovalActor,
+  canApproveKioskAlert,
+  type KioskApprovalActor,
+} from "@/lib/kiosk-alert-approvers";
+import {
   getEppDurationRulePayload,
   resolveEppReplacementDays,
 } from "@/lib/epp-duration-rules";
@@ -81,6 +86,10 @@ function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function optionalAuditText(value: string | null | undefined) {
+  return value && value.length > 0 ? value : null;
+}
+
 function readPackageUnit(value: unknown): "CAJA" | "BOLSA" | undefined {
   return value === "CAJA" || value === "BOLSA" ? value : undefined;
 }
@@ -111,6 +120,41 @@ function addDays(date: Date, days: number) {
 function readNumber(value: unknown, fallback = 0) {
   const parsed = Number(value ?? fallback);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function hasEarlyReplacementSignal(data: Record<string, unknown>) {
+  if (data.hasEarlyReplacementAlert === true) return true;
+  if (Array.isArray(data.earlyReplacementWarnings) && data.earlyReplacementWarnings.length > 0) return true;
+  if (!Array.isArray(data.items)) return false;
+
+  return data.items.some((item) => (
+    item &&
+    typeof item === "object" &&
+    "earlyReplacementAlert" in item &&
+    Boolean((item as { earlyReplacementAlert?: unknown }).earlyReplacementAlert)
+  ));
+}
+
+function buildApprovalPatch(actor: KioskApprovalActor, approvedWithAlert: boolean) {
+  return {
+    approvedByUserId: actor.uid,
+    approvedByEmail: actor.email,
+    approvedByEmployeeId: actor.employeeId,
+    approvedByName: actor.name,
+    approvedByRole: actor.role,
+    approvedByPlantId: actor.plantaId,
+    approvedWithAlert,
+    ...(approvedWithAlert
+      ? {
+          approvedAlertAt: FieldValue.serverTimestamp(),
+          approvedAlertByUserId: actor.uid,
+          approvedAlertByEmail: actor.email,
+          approvedAlertByEmployeeId: actor.employeeId,
+          approvedAlertByName: actor.name,
+          approvedAlertPermissionSource: actor.permissionSource,
+        }
+      : {}),
+  };
 }
 
 function sanitizeSignatureDataUrl(value: unknown) {
@@ -320,6 +364,8 @@ async function fulfillApprovedKioskRequest(params: {
     const employeeArea = readText(requestData.employeeArea);
     const plantaId = normalizePlantId(requestData.plantaId);
     const items = normalizeFulfillableItems(requestData.items);
+    const approvedWithAlert = hasEarlyReplacementSignal(requestData);
+    const approvalActor = buildKioskApprovalActor(adminUser, plantaId);
     const existingAssignmentIds = Array.isArray(requestData.assignmentIds)
       ? requestData.assignmentIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
       : [];
@@ -356,11 +402,17 @@ async function fulfillApprovedKioskRequest(params: {
         },
         { merge: true }
       );
-      return { assignmentIds: alreadyFulfilledIds, fulfilled: false, plantaId };
+      return { assignmentIds: alreadyFulfilledIds, fulfilled: false, plantaId, approvedWithAlert: false, approvalActor };
     }
 
     if (currentStatus !== "pending" && currentStatus !== "approved") {
       throw new KioskRequestError(`La solicitud ya esta ${currentStatus}.`, 409);
+    }
+    if (approvedWithAlert && !canApproveKioskAlert(adminUser, plantaId)) {
+      throw new KioskRequestError(
+        "Este usuario no esta autorizado para aprobar solicitudes con alerta de vida util.",
+        403
+      );
     }
 
     const catalogRefs = items.map((item) => db.collection("ppe_catalog").doc(item.itemId));
@@ -420,7 +472,11 @@ async function fulfillApprovedKioskRequest(params: {
         signatureDataUrl: item.signatureDataUrl ?? null,
         issuedByKiosk: true,
         issuedByUserId: adminUser.uid,
+        approvedByUserId: approvalActor.uid,
         approvedByEmail: adminUser.email,
+        approvedByEmployeeId: approvalActor.employeeId,
+        approvedByName: approvalActor.name,
+        approvedWithAlert,
         kioskRequestId: requestId,
       });
 
@@ -482,8 +538,7 @@ async function fulfillApprovedKioskRequest(params: {
       assignmentIds,
       plantaId,
       approvedAt: FieldValue.serverTimestamp(),
-      approvedByUserId: adminUser.uid,
-      approvedByEmail: adminUser.email,
+      ...buildApprovalPatch(approvalActor, approvedWithAlert),
       syncedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -499,7 +554,7 @@ async function fulfillApprovedKioskRequest(params: {
       { merge: true }
     );
 
-    return { assignmentIds, fulfilled: true, plantaId };
+    return { assignmentIds, fulfilled: true, plantaId, approvedWithAlert, approvalActor };
   });
 }
 
@@ -549,7 +604,13 @@ async function rejectKioskRequest(params: {
       { merge: true }
     );
 
-    return { assignmentIds: [], fulfilled: false, plantaId };
+    return {
+      assignmentIds: [],
+      fulfilled: false,
+      plantaId,
+      approvedWithAlert: false,
+      approvalActor: buildKioskApprovalActor(adminUser, plantaId),
+    };
   });
 }
 
@@ -873,25 +934,59 @@ export async function PATCH(req: NextRequest) {
       .get();
 
     const batch = db.batch();
+    const resolutionActor = status === "approved"
+      ? result.approvalActor
+      : buildKioskApprovalActor(adminUser, result.plantaId);
+    const approvedWithAlert = status === "approved" && alertsSnap.size > 0;
     alertsSnap.docs.forEach((alertDoc) => {
       batch.update(alertDoc.ref, {
         status: status === "approved" ? "acknowledged" : "dismissed",
         requestStatus: status,
+        resolvedByUserId: resolutionActor.uid,
+        resolvedByEmail: resolutionActor.email,
+        resolvedByEmployeeId: optionalAuditText(resolutionActor.employeeId),
+        resolvedByName: resolutionActor.name,
+        resolvedByRole: resolutionActor.role,
+        resolvedByPlantId: resolutionActor.plantaId,
+        ...(status === "approved"
+          ? {
+              approvedByUserId: resolutionActor.uid,
+              approvedByEmail: resolutionActor.email,
+              approvedByEmployeeId: optionalAuditText(resolutionActor.employeeId),
+              approvedByName: resolutionActor.name,
+              approvedAlertPermissionSource: resolutionActor.permissionSource,
+            }
+          : {}),
         resolvedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
     });
     batch.set(db.collection("audit_events").doc(), buildAuditEvent({
-      type: status === "approved" ? "kiosk.request.approve" : "kiosk.request.reject",
+      type: approvedWithAlert
+        ? "kiosk.request.approve_with_alert"
+        : status === "approved"
+          ? "kiosk.request.approve"
+          : "kiosk.request.reject",
       actorUid: adminUser.uid,
       actorEmail: adminUser.email,
       targetCollection: "kiosk_requests",
       targetId: requestId,
-      after: { status, assignmentIds: result.assignmentIds },
+      after: {
+        status,
+        assignmentIds: result.assignmentIds,
+        approvedWithAlert,
+        approvedByEmployeeId: optionalAuditText(resolutionActor.employeeId),
+        approvedByName: resolutionActor.name,
+      },
       metadata: {
         plantaId: result.plantaId,
         fulfilled: result.fulfilled,
         alertCount: alertsSnap.size,
+        actorEmployeeId: optionalAuditText(resolutionActor.employeeId),
+        actorName: resolutionActor.name,
+        actorRole: resolutionActor.role,
+        actorPlantId: resolutionActor.plantaId,
+        alertApprovalPermissionSource: resolutionActor.permissionSource,
       },
     }, req));
 

@@ -54,6 +54,55 @@ describe("normalizeUserProfile", () => {
       plantaId: "nacional",
     })?.plantaId, "cuautitlan");
   });
+
+  it("normaliza identidad operativa y permisos administrativos", () => {
+    assert.deepEqual(
+      normalizeUserProfile("u4", "local@example.com", {
+        role: "admin_local",
+        plantaId: "cuautitlan",
+        employeeId: "1013135",
+        permissions: {
+          canApproveKioskRequests: true,
+          canApproveKioskAlerts: true,
+          unexpected: true,
+        },
+      }),
+      {
+        uid: "u4",
+        email: "local@example.com",
+        role: "admin_local",
+        plantaId: "cuautitlan",
+        displayName: undefined,
+        employeeId: "1013135",
+        permissions: {
+          canApproveKioskRequests: true,
+          canApproveKioskAlerts: true,
+        },
+        active: true,
+      }
+    );
+  });
+
+  it("descarta employeeId invalido y permisos falsos", () => {
+    assert.deepEqual(
+      normalizeUserProfile("u5", "local@example.com", {
+        role: "admin_local",
+        plantaId: "cuautitlan",
+        employeeId: "ABC-123",
+        permissions: {
+          canApproveKioskAlerts: false,
+        },
+      }),
+      {
+        uid: "u5",
+        email: "local@example.com",
+        role: "admin_local",
+        plantaId: "cuautitlan",
+        displayName: undefined,
+        active: true,
+      }
+    );
+  });
 });
 
 describe("bootstrap admin", () => {

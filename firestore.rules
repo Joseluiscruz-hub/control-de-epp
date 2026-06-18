@@ -175,7 +175,10 @@ service cloud.firestore {
     }
 
     function isValidUserProfile(data, userId) {
-      return data.keys().hasOnly(["uid", "email", "role", "plantaId", "displayName", "active", "createdAt", "updatedAt"])
+      return data.keys().hasOnly([
+          "uid", "email", "role", "plantaId", "displayName", "employeeId", "permissions",
+          "active", "createdAt", "updatedAt"
+        ])
         && data.keys().hasAll(["uid", "email", "role", "plantaId", "active"])
         && data.uid == userId
         && data.email is string && data.email.size() > 3
@@ -184,8 +187,24 @@ service cloud.firestore {
         && (data.role == "admin_global" || data.plantaId in ["cuautitlan", "toluca"])
         && data.active is bool
         && optionalString(data.displayName)
+        && optionalEmployeeId(data.employeeId)
+        && isValidAdminPermissions(data.permissions)
         && (data.createdAt == null || data.createdAt is timestamp)
         && (data.updatedAt == null || data.updatedAt is timestamp);
+    }
+
+    function optionalEmployeeId(value) {
+      return value == null || (value is string && value.matches("^[0-9]{1,12}$"));
+    }
+
+    function isValidAdminPermissions(value) {
+      return value == null
+        || (
+          value is map
+          && value.keys().hasOnly(["canApproveKioskRequests", "canApproveKioskAlerts"])
+          && (value.canApproveKioskRequests == null || value.canApproveKioskRequests is bool)
+          && (value.canApproveKioskAlerts == null || value.canApproveKioskAlerts is bool)
+        );
     }
 
     function isValidBudgetGoal(data) {

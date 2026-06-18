@@ -2,12 +2,19 @@ import type { PlantScope } from "@/lib/plants";
 
 export type AdminRole = "admin_local" | "admin_global";
 
+export interface AdminPermissions {
+  canApproveKioskRequests?: boolean;
+  canApproveKioskAlerts?: boolean;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
   role: AdminRole;
   plantaId: PlantScope;
   displayName?: string;
+  employeeId?: string;
+  permissions?: AdminPermissions;
   active?: boolean;
 }
 

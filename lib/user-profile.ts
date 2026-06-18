@@ -1,4 +1,4 @@
-import type { AdminRole, UserProfile } from "@/lib/admin-profile";
+import type { AdminPermissions, AdminRole, UserProfile } from "@/lib/admin-profile";
 import { isPlantId, type PlantScope } from "@/lib/plants";
 
 export type ProfileUserLike = {
@@ -11,6 +11,27 @@ export type BootstrapAdminConfig = {
   enabled: boolean;
   email?: string | null;
 };
+
+export function normalizeAdminEmployeeId(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return /^\d{1,12}$/.test(trimmed) ? trimmed : undefined;
+}
+
+function normalizePermissions(value: unknown): AdminPermissions | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const input = value as Record<string, unknown>;
+  const permissions: AdminPermissions = {};
+
+  if (input.canApproveKioskRequests === true) {
+    permissions.canApproveKioskRequests = true;
+  }
+  if (input.canApproveKioskAlerts === true) {
+    permissions.canApproveKioskAlerts = true;
+  }
+
+  return Object.keys(permissions).length > 0 ? permissions : undefined;
+}
 
 export function normalizeUserProfile(
   uid: string,
@@ -29,12 +50,17 @@ export function normalizeUserProfile(
       ? rawPlant
       : "cuautitlan";
 
+  const employeeId = normalizeAdminEmployeeId(data.employeeId);
+  const permissions = normalizePermissions(data.permissions);
+
   return {
     uid,
     email: typeof data.email === "string" && data.email ? data.email.toLowerCase() : fallbackEmail,
     role,
     plantaId,
     displayName: typeof data.displayName === "string" ? data.displayName : undefined,
+    ...(employeeId ? { employeeId } : {}),
+    ...(permissions ? { permissions } : {}),
     active: data.active !== false,
   };
 }

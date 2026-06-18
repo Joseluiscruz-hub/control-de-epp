@@ -15,12 +15,20 @@ import type { UserProfile } from "@/lib/admin-profile";
 type RescueAction = "reset_mfa" | "revoke_sessions";
 
 function readProfile(id: string, data: Record<string, unknown>): UserProfile {
+  const permissions = data.permissions && typeof data.permissions === "object" && !Array.isArray(data.permissions)
+    ? data.permissions as Record<string, unknown>
+    : {};
   return {
     uid: typeof data.uid === "string" && data.uid ? data.uid : id,
     email: typeof data.email === "string" ? data.email : "",
     role: data.role === "admin_local" ? "admin_local" : "admin_global",
     plantaId: data.plantaId === "toluca" || data.plantaId === "cuautitlan" ? data.plantaId : "nacional",
     displayName: typeof data.displayName === "string" ? data.displayName : undefined,
+    employeeId: typeof data.employeeId === "string" && /^\d{1,12}$/.test(data.employeeId) ? data.employeeId : undefined,
+    permissions: {
+      ...(permissions.canApproveKioskRequests === true ? { canApproveKioskRequests: true } : {}),
+      ...(permissions.canApproveKioskAlerts === true ? { canApproveKioskAlerts: true } : {}),
+    },
     active: data.active !== false,
   };
 }
@@ -229,6 +237,16 @@ export default function AdministradoresPage() {
                                 <Badge className="rounded-md border border-white/10 bg-white/5 text-white/60">
                                   {plantLabel(admin.plantaId)}
                                 </Badge>
+                                {admin.employeeId && (
+                                  <Badge className="rounded-md border border-white/10 bg-white/5 text-white/60">
+                                    Nomina {admin.employeeId}
+                                  </Badge>
+                                )}
+                                {admin.permissions?.canApproveKioskAlerts && (
+                                  <Badge className="rounded-md border border-amber-400/25 bg-amber-400/10 text-amber-200">
+                                    Aprueba alertas
+                                  </Badge>
+                                )}
                                 {!admin.active && (
                                   <Badge className="rounded-md border border-red-400/25 bg-red-500/10 text-red-200">
                                     Inactivo
