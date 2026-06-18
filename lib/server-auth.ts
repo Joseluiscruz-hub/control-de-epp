@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { getAdminAuth, getAdminDb } from "./firebase-admin";
+import { buildProvisionedKioskAlertApproverProfile } from "./kiosk-alert-approvers";
 import type { AdminRole, UserProfile } from "./admin-profile";
 import type { PlantScope } from "./plants";
 import { buildBootstrapAdminProfile, normalizeUserProfile } from "./user-profile";
@@ -38,8 +40,20 @@ function getBearerToken(req: NextRequest) {
 
 async function readUserProfile(uid: string, email: string) {
   try {
-    const snap = await getAdminDb().collection("users").doc(uid).get();
-    if (!snap.exists) return null;
+    const userRef = getAdminDb().collection("users").doc(uid);
+    const snap = await userRef.get();
+    if (!snap.exists) {
+      const provisionedProfile = buildProvisionedKioskAlertApproverProfile(uid, email);
+      if (!provisionedProfile) return null;
+
+      await userRef.set({
+        ...provisionedProfile,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        source: "kiosk_alert_approver_allowlist",
+      }, { merge: true });
+      return provisionedProfile;
+    }
     return normalizeUserProfile(uid, email, snap.data() ?? {});
   } catch (error) {
     console.warn("[Server auth profile read failed]", error);

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  buildProvisionedKioskAlertApproverProfile,
   buildKioskApprovalActor,
   canApproveKioskAlert,
+  findKioskAlertApproverByEmail,
   kioskAlertApproverIdsForPlant,
 } from "./kiosk-alert-approvers";
 import type { AdminSession } from "./server-auth";
@@ -56,8 +58,31 @@ describe("kiosk alert approvers", () => {
       "1013135",
       "5412880",
       "3506166",
-      "5839977",
       "5680899",
     ]);
+  });
+
+  it("resuelve aprobador por correo y excluye usuarios no autorizados", () => {
+    assert.equal(findKioskAlertApproverByEmail("JULIOCESAR.VAZQUEZM@KOF.COM")?.employeeId, "1013135");
+    assert.equal(findKioskAlertApproverByEmail("angel.bautista@example.com"), null);
+  });
+
+  it("construye perfil admin local para auto-provisionar aprobadores por correo", () => {
+    assert.deepEqual(
+      buildProvisionedKioskAlertApproverProfile("uid-1013135", "juliocesar.vazquezm@kof.com"),
+      {
+        uid: "uid-1013135",
+        email: "juliocesar.vazquezm@kof.com",
+        role: "admin_local",
+        plantaId: "cuautitlan",
+        displayName: "Julio Cesar Vazquez Morlan",
+        employeeId: "1013135",
+        permissions: {
+          canApproveKioskRequests: true,
+          canApproveKioskAlerts: true,
+        },
+        active: true,
+      }
+    );
   });
 });

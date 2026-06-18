@@ -177,7 +177,7 @@ service cloud.firestore {
     function isValidUserProfile(data, userId) {
       return data.keys().hasOnly([
           "uid", "email", "role", "plantaId", "displayName", "employeeId", "permissions",
-          "active", "createdAt", "updatedAt"
+          "active", "source", "createdAt", "updatedAt"
         ])
         && data.keys().hasAll(["uid", "email", "role", "plantaId", "active"])
         && data.uid == userId
@@ -187,6 +187,7 @@ service cloud.firestore {
         && (data.role == "admin_global" || data.plantaId in ["cuautitlan", "toluca"])
         && data.active is bool
         && optionalString(data.displayName)
+        && optionalString(data.source)
         && optionalEmployeeId(data.employeeId)
         && isValidAdminPermissions(data.permissions)
         && (data.createdAt == null || data.createdAt is timestamp)

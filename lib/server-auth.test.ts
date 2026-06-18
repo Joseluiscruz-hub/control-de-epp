@@ -4,12 +4,13 @@ import type { NextRequest } from "next/server";
 
 const mockVerifyIdToken = mock.fn();
 const mockGet = mock.fn();
+const mockSet = mock.fn();
 
 mock.module("./firebase-admin", {
   namedExports: {
     getAdminAuth: () => ({ verifyIdToken: mockVerifyIdToken }),
     getAdminDb: () => ({
-      collection: () => ({ doc: () => ({ get: mockGet }) }),
+      collection: () => ({ doc: () => ({ get: mockGet, set: mockSet }) }),
     }),
   },
 });
@@ -93,6 +94,28 @@ describe("requireAdminUser", () => {
     assert.equal(session.email, "admin@example.com");
     assert.equal(session.role, "admin_local");
     assert.equal(session.plantaId, "cuautitlan");
+  });
+
+  it("auto-provisiona aprobador de alerta por correo permitido", async () => {
+    const { requireAdminUser } = await getServerAuth();
+    mockVerifyIdToken.mock.mockImplementationOnce(async () =>
+      makeDecodedToken({
+        uid: "uid-julio",
+        email: "juliocesar.vazquezm@kof.com",
+        name: "Julio Cesar Vazquez Morlan",
+      })
+    );
+    mockGet.mock.mockImplementationOnce(async () => makeProfileSnap(null));
+    mockSet.mock.mockImplementationOnce(async () => undefined);
+
+    const session = await requireAdminUser(makeRequest("valid-token"));
+
+    assert.equal(session.uid, "uid-julio");
+    assert.equal(session.role, "admin_local");
+    assert.equal(session.plantaId, "cuautitlan");
+    assert.equal(session.profile.employeeId, "1013135");
+    assert.equal(session.profile.permissions?.canApproveKioskAlerts, true);
+    assert.equal(mockSet.mock.callCount(), 1);
   });
 });
 
