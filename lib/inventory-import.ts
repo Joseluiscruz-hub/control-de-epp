@@ -5,6 +5,7 @@ import {
   type EppDurationRule,
 } from "./epp-duration-rules";
 import { resolveStockFromPackageRule } from "./epp-package-rules";
+import { getEppReorderPoint } from "./epp-reorder-points";
 import { parsePlantId, plantLabel, type PlantId } from "./plants";
 
 export const INVENTORY_IMPORT_SOURCE = "plant_epp_inventory";
@@ -29,6 +30,7 @@ export interface InventoryVariant {
   material: string;
   stock: number;
   minStock: number;
+  reorderPoint?: number;
   available: boolean;
   location: string;
   unit: string;
@@ -55,6 +57,8 @@ export interface InventoryImportItem {
   requiredQuantity?: number;
   requiredUnit?: string;
   stock: number;
+  minStock: number;
+  reorderPoint?: number;
   hasSizes: boolean;
   sizes?: Record<string, Omit<InventoryVariant, "size">>;
   material: string;
@@ -350,13 +354,15 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
       size,
       stockInput: stockInput ?? 0,
     });
+    const reorderPoint = getEppReorderPoint(material, sku);
 
     const variant: InventoryVariant = {
       size,
       sku,
       material,
       stock: stockConversion.stock,
-      minStock: DEFAULT_MIN_STOCK,
+      minStock: reorderPoint ?? DEFAULT_MIN_STOCK,
+      ...(reorderPoint !== undefined ? { reorderPoint } : {}),
       available: stockConversion.stock > 0,
       location: read("Ubicación"),
       unit: (stockConversion.metadata?.stockUnit ?? read("Umb")) || "PZA",
@@ -411,6 +417,10 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
       totalStock += stock;
       incrementCounter(byCategory, group.category);
       incrementCounter(byPlant, plantLabel(group.plantaId));
+      const reorderPoint = getEppReorderPoint(primary.material, primary.sku);
+      const minStock = hasSizes
+        ? variants.reduce((sum, variant) => sum + variant.minStock, 0)
+        : reorderPoint ?? DEFAULT_MIN_STOCK;
 
       const sizes = hasSizes
         ? Object.fromEntries(
@@ -432,6 +442,8 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
           resolveEppReplacementDays(ruleInput, defaultReplacementDays(group.category)),
         ...rulePayload,
         stock,
+        minStock,
+        reorderPoint,
         hasSizes,
         sizes,
         material: primary.material,
@@ -477,6 +489,7 @@ function cleanUndefined<T extends Record<string, unknown>>(input: T) {
 }
 
 export function buildInventoryCatalogPayload(item: InventoryImportItem) {
+  const reorderPoint = item.reorderPoint ?? getEppReorderPoint(item.material, item.sku);
   return cleanUndefined({
     sku: item.sku,
     plantaId: item.plantaId,
@@ -490,7 +503,8 @@ export function buildInventoryCatalogPayload(item: InventoryImportItem) {
     requiredQuantity: item.requiredQuantity,
     requiredUnit: item.requiredUnit,
     stock: item.stock,
-    minStock: DEFAULT_MIN_STOCK,
+    minStock: item.minStock ?? reorderPoint ?? DEFAULT_MIN_STOCK,
+    reorderPoint,
     hasSizes: item.hasSizes,
     sizes: item.sizes,
     material: item.material,

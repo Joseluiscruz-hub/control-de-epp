@@ -5,11 +5,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Search, RefreshCw, Plus } from 'lucide-react';
+import { AlertTriangle, Search, RefreshCw, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { usePagination } from '@/hooks/usePagination';
 import { PaginationControls } from '@/components/ui/pagination-controls';
-import { type PpeItem, type StockFilter, LOW_STOCK_THRESHOLD, stockColor } from '../_hooks/useInventoryData';
+import { type PpeItem, type ReorderAlert, type StockFilter, LOW_STOCK_THRESHOLD, stockColor } from '../_hooks/useInventoryData';
 import { useEffect, useRef } from 'react';
 
 export interface CatalogTableProps {
@@ -21,6 +21,7 @@ export interface CatalogTableProps {
   filterStock: StockFilter;
   setFilterStock: (v: StockFilter) => void;
   uniqueCategories: string[];
+  reorderAlertByDocId: Record<string, ReorderAlert[]>;
   onAdjust: (item: PpeItem) => void;
 }
 
@@ -33,6 +34,7 @@ export function CatalogTable({
   filterStock,
   setFilterStock,
   uniqueCategories,
+  reorderAlertByDocId,
   onAdjust,
 }: CatalogTableProps) {
   const pagination = usePagination(filtered, 20);
@@ -87,6 +89,7 @@ export function CatalogTable({
             </SelectTrigger>
             <SelectContent className="rounded-lg bg-[#10151d] border-white/10 text-white">
               <SelectItem value="all" className="font-bold text-white/70">TODO EL STOCK</SelectItem>
+              <SelectItem value="reorder" className="font-medium text-amber-300">REQUIERE SOLPED</SelectItem>
               <SelectItem value="critical" className="font-medium text-orange-300">STOCK CRITICO</SelectItem>
               <SelectItem value="out" className="font-medium text-red-300">AGOTADO TOTAL</SelectItem>
               <SelectItem value="other" className="font-medium text-emerald-300">OTROS / NORMAL</SelectItem>
@@ -108,15 +111,19 @@ export function CatalogTable({
           </thead>
           <tbody className="divide-y divide-white/5">
             <AnimatePresence mode="popLayout">
-              {pagination.paginatedItems.map((item, idx) => (
-                <motion.tr 
+              {pagination.paginatedItems.map((item, idx) => {
+                const reorderAlerts = reorderAlertByDocId[item.docId] ?? [];
+                return (
+                <motion.tr
                   layout
                   key={item.docId}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ delay: Math.min(idx, 10) * 0.03 }}
-                  className="group hover:bg-white/[0.02] transition-colors cursor-default"
+                  className={`group transition-colors cursor-default ${
+                    reorderAlerts.length > 0 ? 'bg-amber-500/[0.04] hover:bg-amber-500/[0.07]' : 'hover:bg-white/[0.02]'
+                  }`}
                 >
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
@@ -129,6 +136,25 @@ export function CatalogTable({
                           ID: {item.sku}
                           {item.hasSizes && item.sizes ? ` · ${Object.keys(item.sizes).length} tallas` : ''}
                         </p>
+                        {reorderAlerts.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {reorderAlerts.slice(0, 3).map((alert) => (
+                              <span
+                                key={`${alert.material}-${alert.size ?? 'na'}`}
+                                className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-amber-200"
+                                title={`Punto de pedido ${alert.reorderPoint} PZA`}
+                              >
+                                <AlertTriangle className="h-3 w-3" />
+                                SOLPED {alert.material}{alert.size ? ` T${alert.size}` : ''}
+                              </span>
+                            ))}
+                            {reorderAlerts.length > 3 && (
+                              <span className="rounded-md bg-white/5 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white/45">
+                                +{reorderAlerts.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -179,7 +205,8 @@ export function CatalogTable({
                     </Button>
                   </td>
                 </motion.tr>
-              ))}
+                );
+              })}
             </AnimatePresence>
           </tbody>
         </table>

@@ -55,4 +55,17 @@ describe("parseInventoryTsv", () => {
     assert.deepEqual(parsed.items.map((item) => item.plantaId).sort(), ["cuautitlan", "toluca"]);
     assert.equal(new Set(parsed.items.map((item) => item.id)).size, 1);
   });
+
+  it("aplica punto de pedido configurado por material", () => {
+    const parsed = parseInventoryTsv([
+      HEADERS,
+      row(["CTTOPMN001", "1000", "26149605", "GUANTE NITRILO T M", "M", "A1", "PZA", "10", "4"]),
+    ].join("\n"));
+
+    assert.equal(hasBlockingInventoryIssues(parsed), false);
+    assert.equal(parsed.items[0]?.reorderPoint, 5);
+    assert.equal(parsed.items[0]?.minStock, 5);
+    assert.equal(parsed.items[0]?.sizes?.M?.reorderPoint, 5);
+    assert.equal(parsed.items[0]?.sizes?.M?.minStock, 5);
+  });
 });

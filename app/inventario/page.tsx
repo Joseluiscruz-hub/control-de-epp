@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Package, Plus, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useInventoryData } from './_hooks/useInventoryData';
 import { InventoryStatsGrid } from './_components/InventoryStatsGrid';
@@ -9,9 +11,23 @@ import { CatalogTable } from './_components/CatalogTable';
 import { AddItemDialog } from './_components/AddItemDialog';
 import { InventoryImportDialog } from './_components/InventoryImportDialog';
 import { AdjustStockDialog } from './_components/AdjustStockDialog';
+import { ReorderAlertBanner } from './_components/ReorderAlertBanner';
 
 export default function InventarioPage() {
   const data = useInventoryData();
+  const warnedReorderKey = useRef('');
+
+  useEffect(() => {
+    if (data.reorderAlerts.length === 0) return;
+    const key = data.reorderAlerts
+      .map((alert) => `${alert.material}:${alert.size ?? ''}:${alert.stock}:${alert.reorderPoint}`)
+      .join('|');
+    if (key === warnedReorderKey.current) return;
+    warnedReorderKey.current = key;
+    toast.warning('SOLPED requerida', {
+      description: `${data.reorderAlerts.length} material(es) alcanzaron su punto de pedido.`,
+    });
+  }, [data.reorderAlerts]);
 
   return (
     <div className="space-y-6 pb-20">
@@ -54,7 +70,13 @@ export default function InventarioPage() {
       <InventoryStatsGrid
         lowStockCount={data.lowStockItems.length}
         outOfStockCount={data.outOfStock.length}
+        reorderCount={data.reorderAlerts.length}
         totalStock={data.totalStock}
+      />
+
+      <ReorderAlertBanner
+        alerts={data.reorderAlerts}
+        onReview={() => data.setFilterStock('reorder')}
       />
 
       {/* ── Table with Search/Filter + Pagination ── */}
@@ -67,6 +89,7 @@ export default function InventarioPage() {
         filterStock={data.filterStock}
         setFilterStock={data.setFilterStock}
         uniqueCategories={data.uniqueCategories}
+        reorderAlertByDocId={data.reorderAlertByDocId}
         onAdjust={data.openAdjust}
       />
 

@@ -21,6 +21,7 @@ export interface PPESizeVariant {
   material?: string;
   stock?: number;
   minStock?: number;
+  reorderPoint?: number;
   available?: boolean;
   location?: string;
   unit?: string;
@@ -55,6 +56,7 @@ export interface PPECatalogItem {
   unit?: string;
   stock?: number;
   minStock?: number;
+  reorderPoint?: number;
   available?: boolean;
   stockUnit?: "PZA";
   packageUnit?: "CAJA" | "BOLSA";

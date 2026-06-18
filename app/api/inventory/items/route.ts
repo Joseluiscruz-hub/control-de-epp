@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { buildAuditEvent } from "@/lib/audit-events";
 import { getEppDurationRulePayload, resolveEppReplacementDays } from "@/lib/epp-duration-rules";
 import { resolveStockFromPackageRule } from "@/lib/epp-package-rules";
+import { getEppReorderPoint } from "@/lib/epp-reorder-points";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
 import {
@@ -48,6 +49,8 @@ export async function GET(req: NextRequest) {
           category: readText(data.category),
           replacementDays: readNumber(data.replacementDays, 365),
           stock: readStock(data),
+          minStock: readNumber(data.minStock, 2),
+          reorderPoint: typeof data.reorderPoint === "number" ? data.reorderPoint : undefined,
           hasSizes: data.hasSizes === true,
           sizes: data.sizes && typeof data.sizes === "object" ? data.sizes : undefined,
           material: readText(data.material),
@@ -108,6 +111,8 @@ export async function POST(req: NextRequest) {
       stockInput,
     });
     const stock = stockConversion.stock;
+    const reorderPoint = getEppReorderPoint(sku);
+    const minStock = reorderPoint ?? 2;
 
     await db.runTransaction(async (transaction) => {
       const currentSnap = await transaction.get(itemRef);
@@ -124,7 +129,8 @@ export async function POST(req: NextRequest) {
         stock,
         ...stockConversion.metadata,
         unit: stockConversion.metadata?.stockUnit ?? "PZA",
-        minStock: 2,
+        minStock,
+        ...(reorderPoint !== undefined ? { reorderPoint } : {}),
         hasSizes: false,
         active: true,
         available: stock > 0,

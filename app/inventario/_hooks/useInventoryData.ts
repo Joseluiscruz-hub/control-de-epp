@@ -18,6 +18,7 @@ import {
 import { PPECatalogItem } from '@/lib/kiosk-types';
 import { getEppDurationRulePayload, resolveEppReplacementDays } from '@/lib/epp-duration-rules';
 import { resolveStockFromPackageRule } from '@/lib/epp-package-rules';
+import { getEppReorderPoint } from '@/lib/epp-reorder-points';
 import { normalizePlantId, plantLabel } from '@/lib/plants';
 import { usePlantStore } from '@/store/usePlantStore';
 
@@ -27,6 +28,7 @@ export interface PpeSizeVariant {
   sku: string;
   stock?: number;
   minStock?: number;
+  reorderPoint?: number;
   available?: boolean;
   material?: string;
   location?: string;
@@ -47,6 +49,8 @@ export interface PpeItem {
   category: string;
   replacementDays: number;
   stock: number;
+  minStock?: number;
+  reorderPoint?: number;
   hasSizes?: boolean;
   sizes?: Record<string, PpeSizeVariant>;
   material?: string;
@@ -62,7 +66,19 @@ export interface PpeItem {
   createdAt?: Date;
 }
 
-export type StockFilter = 'all' | 'critical' | 'out' | 'other';
+export type StockFilter = 'all' | 'critical' | 'reorder' | 'out' | 'other';
+
+export interface ReorderAlert {
+  itemDocId: string;
+  itemName: string;
+  sku: string;
+  material: string;
+  size?: string;
+  stock: number;
+  reorderPoint: number;
+  shortage: number;
+  plantaId?: string;
+}
 
 /* ── Constants ─────────────────────────────────── */
 
@@ -80,6 +96,54 @@ export function stockColor(stock: number) {
   if (stock === 0) return 'text-red-400 bg-red-400/10 border-red-400/20';
   if (stock <= LOW_STOCK_THRESHOLD) return 'text-orange-400 bg-orange-400/10 border-orange-400/20';
   return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
+}
+
+function readEffectiveReorderPoint(explicit: unknown, ...codes: unknown[]) {
+  return typeof explicit === 'number' && Number.isFinite(explicit)
+    ? explicit
+    : getEppReorderPoint(...codes);
+}
+
+function numberValue(value: unknown) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function getItemReorderAlerts(item: PpeItem): ReorderAlert[] {
+  if (item.hasSizes && item.sizes) {
+    return Object.entries(item.sizes)
+      .map<ReorderAlert | null>(([size, variant]) => {
+        const stock = numberValue(variant.stock);
+        const reorderPoint = readEffectiveReorderPoint(variant.reorderPoint, variant.material, variant.sku);
+        if (reorderPoint === undefined || stock > reorderPoint) return null;
+        return {
+          itemDocId: item.docId,
+          itemName: item.name,
+          sku: variant.sku || item.sku,
+          material: variant.material || variant.sku || item.material || item.sku,
+          size,
+          stock,
+          reorderPoint,
+          shortage: Math.max(0, reorderPoint - stock),
+          plantaId: item.plantaId,
+        };
+      })
+      .filter((alert): alert is ReorderAlert => alert !== null);
+  }
+
+  const stock = numberValue(item.stock);
+  const reorderPoint = readEffectiveReorderPoint(item.reorderPoint, item.material, item.sku);
+  if (reorderPoint === undefined || stock > reorderPoint) return [];
+  return [{
+    itemDocId: item.docId,
+    itemName: item.name,
+    sku: item.sku,
+    material: item.material || item.sku,
+    stock,
+    reorderPoint,
+    shortage: Math.max(0, reorderPoint - stock),
+    plantaId: item.plantaId,
+  }];
 }
 
 async function requireAdminToken() {
@@ -188,6 +252,8 @@ export function useInventoryData() {
             category: item.category,
             replacementDays,
             stock: typeof item.stock === 'number' ? item.stock : sizeStock,
+            minStock: item.minStock,
+            reorderPoint: item.reorderPoint,
             hasSizes: item.hasSizes,
             sizes,
             material: item.material,
@@ -224,20 +290,29 @@ export function useInventoryData() {
 
   /* ── Computed values ─────────────────────────── */
   const filtered = items.filter(it => {
+    const itemReorderAlerts = getItemReorderAlerts(it);
     const matchSearch = it.name.toLowerCase().includes(search.toLowerCase()) ||
       it.sku.toLowerCase().includes(search.toLowerCase());
     const matchCat = filterCategory === 'all' || it.category === filterCategory;
     const matchStock =
       filterStock === 'all' ||
       (filterStock === 'critical' && it.stock > 0 && it.stock <= LOW_STOCK_THRESHOLD) ||
+      (filterStock === 'reorder' && itemReorderAlerts.length > 0) ||
       (filterStock === 'out' && it.stock === 0) ||
-      (filterStock === 'other' && it.stock > LOW_STOCK_THRESHOLD);
+      (filterStock === 'other' && it.stock > LOW_STOCK_THRESHOLD && itemReorderAlerts.length === 0);
     return matchSearch && matchCat && matchStock;
   });
 
   const totalStock = items.reduce((sum, i) => sum + i.stock, 0);
   const lowStockItems = items.filter(i => i.stock <= LOW_STOCK_THRESHOLD && i.stock > 0);
   const outOfStock = items.filter(i => i.stock === 0);
+  const reorderAlerts = items
+    .flatMap(getItemReorderAlerts)
+    .sort((a, b) => a.stock - b.stock || b.reorderPoint - a.reorderPoint || a.material.localeCompare(b.material, 'es'));
+  const reorderAlertByDocId = reorderAlerts.reduce<Record<string, ReorderAlert[]>>((acc, alert) => {
+    acc[alert.itemDocId] = [...(acc[alert.itemDocId] ?? []), alert];
+    return acc;
+  }, {});
   const uniqueCategories = Array.from(new Set(items.map(i => i.category)));
   const importHasBlockingIssues = importPreview ? hasBlockingInventoryIssues(importPreview) : false;
 
@@ -343,6 +418,7 @@ export function useInventoryData() {
       const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
       const rulePayload = getEppDurationRulePayload(ruleInput);
       const stockConversion = resolveStockFromPackageRule({ name: form.name, stockInput: initialStock });
+      const reorderPoint = getEppReorderPoint(form.sku);
       const token = await requireAdminToken();
       const response = await fetch('/api/inventory/items', {
         method: 'POST',
@@ -374,7 +450,8 @@ export function useInventoryData() {
           stock: stockConversion.stock,
           ...stockConversion.metadata,
           unit: stockConversion.metadata?.stockUnit ?? 'PZA',
-          minStock: 2,
+          minStock: reorderPoint ?? 2,
+          ...(reorderPoint !== undefined ? { reorderPoint } : {}),
           hasSizes: false,
           active: true,
           available: stockConversion.stock > 0,
@@ -390,6 +467,7 @@ export function useInventoryData() {
       const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
       const rulePayload = getEppDurationRulePayload(ruleInput);
       const stockConversion = resolveStockFromPackageRule({ name: form.name, stockInput: initialStock });
+      const reorderPoint = getEppReorderPoint(form.sku);
       if (canUseLocalFallback()) {
         upsertLocalCatalogItem({
           id: form.sku,
@@ -402,7 +480,8 @@ export function useInventoryData() {
           stock: stockConversion.stock,
           ...stockConversion.metadata,
           unit: stockConversion.metadata?.stockUnit ?? 'PZA',
-          minStock: 2,
+          minStock: reorderPoint ?? 2,
+          ...(reorderPoint !== undefined ? { reorderPoint } : {}),
           hasSizes: false,
           active: true,
           available: stockConversion.stock > 0,
@@ -488,6 +567,8 @@ export function useInventoryData() {
     totalStock,
     lowStockItems,
     outOfStock,
+    reorderAlerts,
+    reorderAlertByDocId,
     uniqueCategories,
 
     // Search & filter
