@@ -4,6 +4,7 @@ import {
   buildProvisionedKioskAlertApproverProfile,
   buildKioskApprovalActor,
   canApproveKioskAlert,
+  findGlobalKioskAlertApproverByEmail,
   findKioskAlertApproverByEmail,
   kioskAlertApproverIdsForPlant,
 } from "./kiosk-alert-approvers";
@@ -32,6 +33,31 @@ describe("kiosk alert approvers", () => {
 
     assert.equal(canApproveKioskAlert(admin, "cuautitlan"), true);
     assert.equal(buildKioskApprovalActor(admin, "cuautitlan").name, "Julio Cesar Vazquez Morlan");
+  });
+
+  it("autoriza administradores globales sin exigir employeeId", () => {
+    const admin: AdminSession = {
+      uid: "uid-global",
+      email: "global@example.com",
+      role: "admin_global",
+      plantaId: "nacional",
+      profile: {
+        uid: "uid-global",
+        email: "global@example.com",
+        role: "admin_global",
+        plantaId: "nacional",
+        displayName: "Admin Global",
+        active: true,
+      },
+    };
+
+    const actor = buildKioskApprovalActor(admin, "cuautitlan");
+
+    assert.equal(canApproveKioskAlert(admin, "cuautitlan"), true);
+    assert.equal(canApproveKioskAlert(admin, "toluca"), true);
+    assert.equal(actor.permissionSource, "global_admin");
+    assert.equal(actor.employeeId, null);
+    assert.equal(actor.name, "Admin Global");
   });
 
   it("permite permiso explicito si existe employeeId trazable", () => {
@@ -67,6 +93,11 @@ describe("kiosk alert approvers", () => {
     assert.equal(findKioskAlertApproverByEmail("angel.bautista@example.com"), null);
   });
 
+  it("resuelve aprobador global por correo", () => {
+    assert.equal(findGlobalKioskAlertApproverByEmail("MIMONKB222@GMAIL.COM")?.email, "mimonkb222@gmail.com");
+    assert.equal(findGlobalKioskAlertApproverByEmail("angel.bautista@example.com"), null);
+  });
+
   it("construye perfil admin local para auto-provisionar aprobadores por correo", () => {
     assert.deepEqual(
       buildProvisionedKioskAlertApproverProfile("uid-1013135", "juliocesar.vazquezm@kof.com"),
@@ -77,6 +108,24 @@ describe("kiosk alert approvers", () => {
         plantaId: "cuautitlan",
         displayName: "Julio Cesar Vazquez Morlan",
         employeeId: "1013135",
+        permissions: {
+          canApproveKioskRequests: true,
+          canApproveKioskAlerts: true,
+        },
+        active: true,
+      }
+    );
+  });
+
+  it("construye perfil admin global para auto-provisionar correo global permitido", () => {
+    assert.deepEqual(
+      buildProvisionedKioskAlertApproverProfile("uid-global", "mimonkb222@gmail.com"),
+      {
+        uid: "uid-global",
+        email: "mimonkb222@gmail.com",
+        role: "admin_global",
+        plantaId: "nacional",
+        displayName: "Administrador global",
         permissions: {
           canApproveKioskRequests: true,
           canApproveKioskAlerts: true,

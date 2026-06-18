@@ -117,6 +117,29 @@ describe("requireAdminUser", () => {
     assert.equal(session.profile.permissions?.canApproveKioskAlerts, true);
     assert.equal(mockSet.mock.callCount(), 1);
   });
+
+  it("auto-provisiona aprobador global por correo permitido", async () => {
+    const { requireAdminUser } = await getServerAuth();
+    const initialSetCount = mockSet.mock.callCount();
+
+    mockVerifyIdToken.mock.mockImplementationOnce(async () =>
+      makeDecodedToken({
+        uid: "uid-mimonkb",
+        email: "mimonkb222@gmail.com",
+        name: "Admin Global",
+      })
+    );
+    mockGet.mock.mockImplementationOnce(async () => makeProfileSnap(null));
+    mockSet.mock.mockImplementationOnce(async () => undefined);
+
+    const session = await requireAdminUser(makeRequest("valid-token"));
+
+    assert.equal(session.uid, "uid-mimonkb");
+    assert.equal(session.role, "admin_global");
+    assert.equal(session.plantaId, "nacional");
+    assert.equal(session.profile.permissions?.canApproveKioskAlerts, true);
+    assert.equal(mockSet.mock.callCount(), initialSetCount + 1);
+  });
 });
 
 describe("requireGlobalAdminUser", () => {

@@ -9,8 +9,17 @@ export const CUATITLAN_KIOSK_ALERT_APPROVERS = [
   { employeeId: "5680899", name: "Adriana Sanchez Cruz", email: "adriana.sanchezc@kof.com" },
 ] as const;
 
+export const GLOBAL_KIOSK_ALERT_APPROVERS = [
+  { name: "Administrador global", email: "mimonkb222@gmail.com" },
+] as const;
+
 type ConfiguredAlertApprover = {
   employeeId: string;
+  name: string;
+  email: string;
+};
+
+type ConfiguredGlobalAlertApprover = {
   name: string;
   email: string;
 };
@@ -30,7 +39,7 @@ export type KioskApprovalActor = {
   plantaId: AdminSession["plantaId"];
   employeeId: string | null;
   name: string;
-  permissionSource: "plant_allowlist" | "explicit_permission" | "standard_admin";
+  permissionSource: "plant_allowlist" | "global_admin" | "explicit_permission" | "standard_admin";
 };
 
 function findPlantApprover(plantaId: PlantScope, employeeId: string | undefined) {
@@ -47,17 +56,38 @@ export function findKioskAlertApproverByEmail(email: string) {
   return null;
 }
 
+export function findGlobalKioskAlertApproverByEmail(email: string): ConfiguredGlobalAlertApprover | null {
+  const normalizedEmail = normalizeEmail(email);
+  return GLOBAL_KIOSK_ALERT_APPROVERS.find((approver) => normalizeEmail(approver.email) === normalizedEmail) ?? null;
+}
+
 export function buildProvisionedKioskAlertApproverProfile(uid: string, email: string): UserProfile | null {
   const approver = findKioskAlertApproverByEmail(email);
-  if (!approver || approver.plantaId === "nacional") return null;
+  if (approver && approver.plantaId !== "nacional") {
+    return {
+      uid,
+      email: normalizeEmail(email),
+      role: "admin_local",
+      plantaId: approver.plantaId,
+      displayName: approver.name,
+      employeeId: approver.employeeId,
+      permissions: {
+        canApproveKioskRequests: true,
+        canApproveKioskAlerts: true,
+      },
+      active: true,
+    };
+  }
+
+  const globalApprover = findGlobalKioskAlertApproverByEmail(email);
+  if (!globalApprover) return null;
 
   return {
     uid,
     email: normalizeEmail(email),
-    role: "admin_local",
-    plantaId: approver.plantaId,
-    displayName: approver.name,
-    employeeId: approver.employeeId,
+    role: "admin_global",
+    plantaId: "nacional",
+    displayName: globalApprover.name,
     permissions: {
       canApproveKioskRequests: true,
       canApproveKioskAlerts: true,
@@ -69,6 +99,7 @@ export function buildProvisionedKioskAlertApproverProfile(uid: string, email: st
 export function buildKioskApprovalActor(adminUser: AdminSession, requestPlantId: PlantScope): KioskApprovalActor {
   const profileEmployeeId = adminUser.profile.employeeId;
   const configuredApprover = findPlantApprover(requestPlantId, profileEmployeeId);
+  const isGlobalAdmin = adminUser.role === "admin_global";
   const hasExplicitPermission = adminUser.profile.permissions?.canApproveKioskAlerts === true;
 
   return {
@@ -80,6 +111,8 @@ export function buildKioskApprovalActor(adminUser: AdminSession, requestPlantId:
     name: configuredApprover?.name ?? adminUser.profile.displayName ?? adminUser.email,
     permissionSource: configuredApprover
       ? "plant_allowlist"
+      : isGlobalAdmin
+        ? "global_admin"
       : hasExplicitPermission
         ? "explicit_permission"
         : "standard_admin",
@@ -87,6 +120,8 @@ export function buildKioskApprovalActor(adminUser: AdminSession, requestPlantId:
 }
 
 export function canApproveKioskAlert(adminUser: AdminSession, requestPlantId: PlantScope) {
+  if (adminUser.role === "admin_global") return true;
+
   const employeeId = adminUser.profile.employeeId;
   if (findPlantApprover(requestPlantId, employeeId)) return true;
 
