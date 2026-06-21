@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminKioskRequest, listAdminKioskRequests, updateKioskRequestStatus } from "@/lib/kiosk-api";
+import { playNotificationSound } from "@/lib/notification-sounds";
 import { toast } from "sonner";
 import { usePlantStore } from "@/store/usePlantStore";
 
@@ -60,6 +61,10 @@ export function KioskRequestsPanel() {
       if (newEarlyAlerts.length > 0) {
         newEarlyAlerts.forEach((request) => warnedRequestIds.current.add(request.id));
         const first = newEarlyAlerts[0];
+        const hasCriticalAlert = newEarlyAlerts.some((request) =>
+          request.earlyReplacementWarnings?.some((warning) => warning.severity === "critical")
+        );
+        playNotificationSound(hasCriticalAlert ? "critical" : "warning");
         toast.warning("Alerta de vida util en kiosko", {
           description: `${first.employeeName}: ${buildAlertSummary(first)}${
             newEarlyAlerts.length > 1 ? ` (+${newEarlyAlerts.length - 1} mas)` : ""

@@ -1,15 +1,16 @@
 "use client";
 
-import { AlertTriangle, FileText } from "lucide-react";
+import { AlertTriangle, Download, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ReorderAlert } from "../_hooks/useInventoryData";
 
 interface ReorderAlertBannerProps {
   alerts: ReorderAlert[];
   onReview: () => void;
+  onDownload: () => void;
 }
 
-export function ReorderAlertBanner({ alerts, onReview }: ReorderAlertBannerProps) {
+export function ReorderAlertBanner({ alerts, onReview, onDownload }: ReorderAlertBannerProps) {
   if (alerts.length === 0) return null;
 
   const preview = alerts.slice(0, 6);
@@ -45,13 +46,23 @@ export function ReorderAlertBanner({ alerts, onReview }: ReorderAlertBannerProps
             </div>
           </div>
         </div>
-        <Button
-          onClick={onReview}
-          className="h-11 shrink-0 rounded-xl bg-amber-400 px-5 text-[10px] font-black uppercase tracking-widest text-black hover:bg-amber-300"
-        >
-          <FileText className="mr-2 h-4 w-4" />
-          Ver SOLPED
-        </Button>
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+          <Button
+            onClick={onReview}
+            className="h-11 rounded-xl bg-amber-400 px-5 text-[10px] font-black uppercase tracking-widest text-black hover:bg-amber-300"
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            Ver SOLPED
+          </Button>
+          <Button
+            onClick={onDownload}
+            variant="outline"
+            className="h-11 rounded-xl border-amber-300/30 bg-black/20 px-5 text-[10px] font-black uppercase tracking-widest text-amber-100 hover:bg-amber-400/10 hover:text-amber-50"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Descargar
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { auth } from '@/lib/firebase';
 import { toast } from 'sonner';
+import { playNotificationSound } from '@/lib/notification-sounds';
 import {
   buildInventoryCatalogPayload,
   hasBlockingInventoryIssues,
@@ -274,6 +275,7 @@ export function useInventoryData() {
       setLoading(false);
     } catch (error) {
       console.error('[Inventory load error]', error);
+      playNotificationSound('sync_error');
       toast.error('No se pudo sincronizar el inventario desde Firebase.');
       loadLocalInventory();
     }
@@ -570,6 +572,7 @@ export function useInventoryData() {
     reorderAlerts,
     reorderAlertByDocId,
     uniqueCategories,
+    plantId: writePlantId,
 
     // Search & filter
     search,

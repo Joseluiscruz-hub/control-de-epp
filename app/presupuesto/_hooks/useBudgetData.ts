@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
+import { playNotificationSound } from "@/lib/notification-sounds";
 import {
   calculateBudgetMetrics,
   type BudgetGoal,
@@ -127,6 +128,7 @@ export function useBudgetData(plantaId: PlantScope, year: number) {
       const key = `budget-alert:${plantaId}:${year}:${alert.threshold}`;
       if (window.sessionStorage.getItem(key)) continue;
       window.sessionStorage.setItem(key, "shown");
+      playNotificationSound(alert.threshold >= 100 ? "critical" : "budget");
       toast.warning(`Presupuesto al ${alert.pct}%: se alcanzo el umbral de ${alert.threshold}%.`);
     }
   }, [goal, metrics.alerts, plantaId, spending, year]);

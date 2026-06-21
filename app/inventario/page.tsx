@@ -5,6 +5,9 @@ import { motion } from 'motion/react';
 import { Package, Plus, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { playNotificationSound } from '@/lib/notification-sounds';
+import { plantLabel } from '@/lib/plants';
+import { downloadSolpedCsv } from '@/lib/solped-export';
 import { useInventoryData } from './_hooks/useInventoryData';
 import { InventoryStatsGrid } from './_components/InventoryStatsGrid';
 import { CatalogTable } from './_components/CatalogTable';
@@ -24,10 +27,25 @@ export default function InventarioPage() {
       .join('|');
     if (key === warnedReorderKey.current) return;
     warnedReorderKey.current = key;
+    playNotificationSound('solped');
     toast.warning('SOLPED requerida', {
       description: `${data.reorderAlerts.length} material(es) alcanzaron su punto de pedido.`,
     });
   }, [data.reorderAlerts]);
+
+  const handleDownloadSolped = () => {
+    const downloaded = downloadSolpedCsv(data.reorderAlerts, {
+      plantName: plantLabel(data.plantId),
+    });
+
+    if (!downloaded) {
+      toast.error('No hay materiales para descargar en SOLPED.');
+      return;
+    }
+
+    playNotificationSound('success');
+    toast.success('SOLPED descargada.');
+  };
 
   return (
     <div className="space-y-6 pb-20">
@@ -77,6 +95,7 @@ export default function InventarioPage() {
       <ReorderAlertBanner
         alerts={data.reorderAlerts}
         onReview={() => data.setFilterStock('reorder')}
+        onDownload={handleDownloadSolped}
       />
 
       {/* ── Table with Search/Filter + Pagination ── */}
