@@ -50,7 +50,7 @@ export default function TorreDeControlPage() {
 
   return (
     <div className="space-y-6 pb-20">
-      <section className="enterprise-panel overflow-hidden">
+      <section className="enterprise-panel enterprise-hero overflow-hidden">
         <div className="flex flex-col gap-5 border-b border-white/10 p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-red-500/25 bg-red-500/10 text-red-200">

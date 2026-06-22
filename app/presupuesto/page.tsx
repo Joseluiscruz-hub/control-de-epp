@@ -59,7 +59,7 @@ export default function PresupuestoPage() {
 
   return (
     <div className="space-y-6 pb-20">
-      <section className="enterprise-panel p-5 sm:p-6">
+      <section className="enterprise-panel enterprise-hero p-5 sm:p-6">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#F40009] shadow-lg shadow-red-950/30">

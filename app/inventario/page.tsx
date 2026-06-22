@@ -55,7 +55,7 @@ export default function InventarioPage() {
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="enterprise-panel p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6"
+        className="enterprise-panel enterprise-hero p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6"
       >
         <div className="flex items-center gap-5">
           <div className="h-16 w-16 rounded-2xl bg-[#F40009] flex items-center justify-center shadow-xl shadow-red-950/30">

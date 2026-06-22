@@ -58,32 +58,37 @@ export function NavBar() {
     <>
       <header className={`sticky top-0 z-40 transition-all duration-300 ${
         scrolled
-          ? 'navbar-glass shadow-xl shadow-black/30'
+          ? 'navbar-glass'
           : 'bg-transparent'
       }`}>
         <div className="w-full px-3 sm:px-4 lg:px-6">
-          <div className="flex h-16 items-center justify-between gap-2 lg:gap-3">
+          <div className="flex h-[4.25rem] items-center justify-between gap-2 lg:gap-3">
 
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group relative shrink-0" aria-label="Ir al dashboard de AssetGuard">
               <div className="relative">
-                <div className="relative h-9 w-9 rounded-lg bg-[#F40009] flex items-center justify-center shadow-lg shadow-red-950/30 group-hover:scale-105 active:scale-95 transition-all duration-300">
+                <div className="relative h-10 w-10 rounded-xl bg-[#F40009] flex items-center justify-center shadow-xl shadow-red-950/40 ring-1 ring-white/20 group-hover:scale-[1.04] active:scale-95 transition-all duration-300">
                   <ShieldCheck className="h-5 w-5 text-white" />
                 </div>
               </div>
-              <div className="hidden sm:block">
+              <div className="hidden sm:block leading-none">
                 <span className="font-black text-white text-base leading-none block tracking-tight">AssetGuard</span>
-                <span className="text-[9px] font-bold tracking-[0.15em] uppercase leading-none mt-0.5 flex items-center gap-1" style={{color: 'rgba(244,0,9,0.7)'}}>
+                <span className="text-[9px] font-bold tracking-[0.17em] uppercase leading-none mt-1 flex items-center gap-1" style={{color: 'rgba(244,0,9,0.75)'}}>
                   Coca-Cola FEMSA
                   <span className="text-[8px] font-bold" style={{color:'rgba(255,255,255,0.25)'}}>· EPP</span>
                 </span>
               </div>
             </Link>
 
+            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 shadow-inner shadow-white/5">
+              <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-white/65">Corporate Security Command</span>
+            </div>
+
             <div className="flex items-center gap-1.5 lg:gap-2 min-w-0 overflow-hidden">
 
               {/* Desktop Nav */}
-              <nav className="hidden lg:flex items-center gap-0.5 p-1 rounded-lg" style={{background:'rgba(255,255,255,0.055)', border:'1px solid rgba(255,255,255,0.1)'}} aria-label="Navegación principal">
+              <nav className="hidden lg:flex items-center gap-1 p-1 rounded-xl" style={{background:'rgba(255,255,255,0.055)', border:'1px solid rgba(255,255,255,0.12)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)'}} aria-label="Navegación principal">
                 {visibleNavLinks.map(link => {
                   const isActive = pathname === link.href;
                   return (
@@ -91,14 +96,14 @@ export function NavBar() {
                       key={link.href}
                       href={link.href}
                       aria-current={isActive ? 'page' : undefined}
-                      className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all duration-300 whitespace-nowrap ${
+                      className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 whitespace-nowrap ${
                         isActive
                           ? 'text-white shadow-lg'
-                          : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+                          : 'text-white/50 hover:text-white/90 hover:bg-white/8'
                       }`}
-                      style={isActive ? {background: 'rgba(244,0,9,0.16)', border: '1px solid rgba(244,0,9,0.28)'} : {}}
+                      style={isActive ? {background: 'linear-gradient(180deg, rgba(244,0,9,0.2), rgba(244,0,9,0.12))', border: '1px solid rgba(244,0,9,0.34)'} : {}}
                     >
-                      <span className={`transition-colors duration-300 ${isActive ? 'text-[#F40009]' : ''}`}>
+                      <span className={`transition-colors duration-300 ${isActive ? 'text-[#ff5d61]' : ''}`}>
                         {link.icon}
                       </span>
                       {link.label}
@@ -120,14 +125,14 @@ export function NavBar() {
 
               {/* External links */}
               <Link href="/portal" target="_blank">
-                <Button variant="ghost" size="sm" className="hidden xl:flex items-center gap-1.5 text-white/40 hover:text-white/75 hover:bg-white/5 rounded-lg font-semibold transition-all text-xs">
+                <Button variant="ghost" size="sm" className="hidden xl:flex items-center gap-1.5 text-white/55 hover:text-white hover:bg-white/10 rounded-lg font-semibold transition-all text-xs border border-white/8">
                   <ExternalLink className="h-3.5 w-3.5" />
                   Portal
                 </Button>
               </Link>
 
               <Link href="/kiosko" target="_blank">
-                <Button variant="ghost" size="sm" className="hidden xl:flex items-center gap-1.5 text-white/40 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg font-semibold transition-all text-xs">
+                <Button variant="ghost" size="sm" className="hidden xl:flex items-center gap-1.5 text-white/55 hover:text-amber-300 hover:bg-amber-500/12 rounded-lg font-semibold transition-all text-xs border border-white/8">
                   <HardHat className="h-3.5 w-3.5" />
                   Kiosko
                 </Button>
@@ -135,7 +140,7 @@ export function NavBar() {
 
               {/* ARIA + Live combined indicator */}
               <div className="hidden lg:flex items-center gap-1.5 shrink-0">
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md" style={{background:'rgba(212,160,23,0.09)', border:'1px solid rgba(212,160,23,0.18)'}}>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{background:'rgba(212,160,23,0.1)', border:'1px solid rgba(212,160,23,0.24)', boxShadow:'inset 0 1px 0 rgba(255,255,255,0.08)'}}>
                   <div className="relative">
                     <Bot className="h-3 w-3" style={{color:'#D4A017'}} />
                     <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-emerald-500 rounded-full border border-[#040813]" />
@@ -143,10 +148,10 @@ export function NavBar() {
                   <span className="text-[9px] font-bold uppercase tracking-wider hidden xl:inline" style={{color:'#D4A017'}}>ARIA</span>
                 </div>
                 <div
-                  className="flex items-center gap-1 px-2 py-1 rounded-md"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg"
                   style={{
-                    background: online && !isOfflineSession ? 'rgba(16,185,129,0.06)' : 'rgba(245,158,11,0.08)',
-                    border: online && !isOfflineSession ? '1px solid rgba(16,185,129,0.12)' : '1px solid rgba(245,158,11,0.18)',
+                    background: online && !isOfflineSession ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.09)',
+                    border: online && !isOfflineSession ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(245,158,11,0.22)',
                   }}
                 >
                   <span className="relative flex h-1.5 w-1.5">
@@ -190,7 +195,7 @@ export function NavBar() {
                   size="icon"
                   onClick={logOut}
                   aria-label="Cerrar sesión"
-                  className="h-7 w-7 text-white/35 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all shrink-0"
+                  className="h-8 w-8 text-white/45 hover:text-red-300 hover:bg-red-500/12 rounded-lg transition-all shrink-0 border border-transparent hover:border-red-500/25"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                 </Button>
@@ -200,7 +205,7 @@ export function NavBar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden h-9 w-9 rounded-lg text-white/45 hover:text-white hover:bg-white/5"
+                className="lg:hidden h-9 w-9 rounded-xl text-white/55 hover:text-white hover:bg-white/10 border border-white/10"
                 onClick={() => setMobileOpen(open => !open)}
                 aria-expanded={mobileOpen}
                 aria-controls="mobile-navigation"

@@ -88,7 +88,7 @@
     --chart-3: #10B981;
     --chart-4: #3B82F6;
     --chart-5: #8B5CF6;
-    --radius: 0.5rem;
+    --radius: 0.65rem;
     --sidebar: #0d1117;
     --sidebar-foreground: #F8FAFC;
     --sidebar-primary: #F40009;
@@ -119,6 +119,7 @@
   }
   body {
     background-color: #07090d;
+    background-image: radial-gradient(circle at 16% -8%, rgba(244, 0, 9, 0.16), transparent 34%), radial-gradient(circle at 88% -20%, rgba(212, 160, 23, 0.1), transparent 38%);
     color: #f6f8fb;
     @apply antialiased;
   }
@@ -133,11 +134,14 @@
   .mesh-bg {
     background-color: #07090d;
     background-image:
+      radial-gradient(circle at 12% -14%, rgba(244,0,9,0.22) 0%, transparent 34%),
+      radial-gradient(circle at 86% -18%, rgba(212,160,23,0.12) 0%, transparent 38%),
       linear-gradient(180deg, rgba(255,255,255,0.045) 0%, transparent 22rem),
       linear-gradient(120deg, rgba(244,0,9,0.09) 0%, transparent 34%),
       linear-gradient(290deg, rgba(212,160,23,0.055) 0%, transparent 30%),
       linear-gradient(180deg, #07090d 0%, #0b0f15 46%, #080a0f 100%);
     position: relative;
+    isolation: isolate;
     min-height: 100vh;
   }
 
@@ -146,9 +150,9 @@
     position: fixed;
     inset: 0;
     background-image:
-      linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
-    background-size: 48px 48px;
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 52px 52px;
     pointer-events: none;
     z-index: 0;
     mask-image: linear-gradient(180deg, black 0%, transparent 82%);
@@ -243,11 +247,44 @@
   }
 
   .enterprise-panel {
-    background: linear-gradient(180deg, rgba(255,255,255,0.068), rgba(255,255,255,0.032));
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 10px;
-    box-shadow: 0 18px 60px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.08);
+    background: linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.03));
+    border: 1px solid rgba(255,255,255,0.13);
+    border-radius: 14px;
+    box-shadow: 0 22px 68px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+    position: relative;
+    transition: border-color 0.24s ease, transform 0.24s ease, box-shadow 0.24s ease;
     overflow: hidden;
+  }
+
+  .enterprise-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(244,0,9,0.5), rgba(212,160,23,0.35), transparent);
+    pointer-events: none;
+  }
+
+  .enterprise-panel:hover {
+    border-color: rgba(255,255,255,0.17);
+    transform: translateY(-1px);
+    box-shadow: 0 28px 86px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.12);
+  }
+
+  .enterprise-hero {
+    background:
+      linear-gradient(120deg, rgba(244,0,9,0.16) 0%, rgba(244,0,9,0.07) 28%, rgba(255,255,255,0.07) 58%, rgba(212,160,23,0.09) 100%),
+      linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+    border: 1px solid rgba(255,255,255,0.16);
+    box-shadow: 0 30px 92px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.12);
+  }
+
+  .enterprise-hero::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 3px;
+    background: linear-gradient(90deg, rgba(244,0,9,0.85), rgba(212,160,23,0.6), rgba(255,255,255,0));
   }
 
   .surface-action {
@@ -527,10 +564,30 @@
 
 /* ── Navbar ─────────────────────────────── */
 .navbar-glass {
-  background: rgba(7,9,13,0.84);
+  background: linear-gradient(180deg, rgba(6,8,13,0.96), rgba(6,8,13,0.82));
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 14px 38px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.navbar-glass::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(244,0,9,0.45), rgba(212,160,23,0.28), transparent);
+}
+
+[data-slot='button'] {
+  letter-spacing: 0.01em;
+  text-rendering: geometricPrecision;
+}
+
+[data-slot='button']:not(:disabled):hover {
+  box-shadow: 0 12px 30px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.12);
 }
 
 /* ── Premium scrollbar ───────────────────── */
