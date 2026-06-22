@@ -77,18 +77,19 @@ export function NavBar() {
                   Coca-Cola FEMSA
                   <span className="text-[8px] font-bold" style={{color:'rgba(255,255,255,0.25)'}}>· EPP</span>
                 </span>
+                <span className="hidden xl:block text-[8px] font-semibold uppercase tracking-[0.17em] text-white/35 mt-1">Plataforma corporativa</span>
               </div>
             </Link>
 
-            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 shadow-inner shadow-white/5">
+            <div className="hidden xl:flex status-pill items-center gap-2 px-3 py-1.5 rounded-xl">
               <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-white/65">Corporate Security Command</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-white/70">Corporate Security Command</span>
             </div>
 
             <div className="flex items-center gap-1.5 lg:gap-2 min-w-0 overflow-hidden">
 
               {/* Desktop Nav */}
-              <nav className="hidden lg:flex items-center gap-1 p-1 rounded-xl" style={{background:'rgba(255,255,255,0.055)', border:'1px solid rgba(255,255,255,0.12)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)'}} aria-label="Navegación principal">
+              <nav className="hidden lg:flex corporate-nav-shell items-center gap-1 p-1 rounded-xl" aria-label="Navegación principal">
                 {visibleNavLinks.map(link => {
                   const isActive = pathname === link.href;
                   return (
@@ -96,12 +97,11 @@ export function NavBar() {
                       key={link.href}
                       href={link.href}
                       aria-current={isActive ? 'page' : undefined}
-                      className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 whitespace-nowrap ${
+                      className={`relative corporate-nav-link flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-300 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 ${
                         isActive
-                          ? 'text-white shadow-lg'
+                          ? 'corporate-nav-link-active text-white shadow-lg'
                           : 'text-white/50 hover:text-white/90 hover:bg-white/8'
                       }`}
-                      style={isActive ? {background: 'linear-gradient(180deg, rgba(244,0,9,0.2), rgba(244,0,9,0.12))', border: '1px solid rgba(244,0,9,0.34)'} : {}}
                     >
                       <span className={`transition-colors duration-300 ${isActive ? 'text-[#ff5d61]' : ''}`}>
                         {link.icon}
@@ -140,7 +140,7 @@ export function NavBar() {
 
               {/* ARIA + Live combined indicator */}
               <div className="hidden lg:flex items-center gap-1.5 shrink-0">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{background:'rgba(212,160,23,0.1)', border:'1px solid rgba(212,160,23,0.24)', boxShadow:'inset 0 1px 0 rgba(255,255,255,0.08)'}}>
+                <div className="status-pill flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{background:'rgba(212,160,23,0.1)', border:'1px solid rgba(212,160,23,0.24)'}}>
                   <div className="relative">
                     <Bot className="h-3 w-3" style={{color:'#D4A017'}} />
                     <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-emerald-500 rounded-full border border-[#040813]" />
@@ -148,7 +148,7 @@ export function NavBar() {
                   <span className="text-[9px] font-bold uppercase tracking-wider hidden xl:inline" style={{color:'#D4A017'}}>ARIA</span>
                 </div>
                 <div
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg"
+                  className="status-pill flex items-center gap-1 px-2.5 py-1 rounded-lg"
                   style={{
                     background: online && !isOfflineSession ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.09)',
                     border: online && !isOfflineSession ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(245,158,11,0.22)',

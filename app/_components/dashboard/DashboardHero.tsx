@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from 'motion/react';
-import { Activity, HardHat } from 'lucide-react';
+import { Activity, HardHat, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Link from 'next/link';
@@ -65,15 +65,15 @@ export function DashboardHero({ authDisplayName, stats, insights }: DashboardHer
             transition={{ delay: 0.3 }}
           >
             <h1 className="text-4xl lg:text-6xl font-black tracking-tight text-white leading-[0.95]">
-              Operación segura,{' '}
-              <span className="text-gradient-red">
-                visible y bajo control
+              Seguridad operativa,
+              <span className="block text-gradient-red">
+                inteligente y corporativa
               </span>
             </h1>
-            <p className="text-white/55 text-base font-medium mt-4 leading-relaxed max-w-2xl">
+            <p className="text-white/60 text-base font-medium mt-4 leading-relaxed max-w-2xl">
               Hola {authDisplayName?.split(' ')[0] || 'Admin'}. Monitoreo activo de{' '}
-              <span className="text-white/70 font-semibold">{stats.activeEmployees} colaboradores</span>
-              {' '}con inventario, solicitudes de kiosko y análisis ARIA en una sola consola ejecutiva.
+              <span className="text-white/80 font-semibold">{stats.activeEmployees} colaboradores</span>
+              {' '}con inventario, solicitudes de kiosko y análisis ARIA en un centro de control unificado.
             </p>
           </motion.div>
 
@@ -89,6 +89,10 @@ export function DashboardHero({ authDisplayName, stats, insights }: DashboardHer
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
               Sistemas Operativos
+            </div>
+            <div className="command-strip flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white/55">
+              <Sparkles className="h-3.5 w-3.5" style={{color:'rgba(212,160,23,0.9)'}} />
+              Cumplimiento {insights.complianceRate}%
             </div>
             <div className="command-strip flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white/50">
               <Activity className="h-3.5 w-3.5" style={{color:'rgba(244,0,9,0.7)'}} />
