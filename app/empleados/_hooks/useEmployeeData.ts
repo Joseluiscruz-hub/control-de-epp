@@ -473,7 +473,7 @@ export function useEmployeeData() {
           }))
         );
         setKioskRequests(
-          listLocalKioskQequestsForEmployee(emp.id).map((request) => ({
+          listLocalKioskRequestsForEmployee(emp.id).map((request) => ({
             id: request.id,
             status: request.status,
             items: request.items.map((item) => ({
