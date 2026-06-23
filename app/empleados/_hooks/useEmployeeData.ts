@@ -7,6 +7,7 @@ import {
   canUseLocalFallback,
   listLocalAssignmentsForEmployee,
   listLocalEmployees,
+  listLocalKioskRequestsForEmployee,
   setLocalEmployeeActive,
   syncLocalKioskEmployees,
   upsertLocalEmployee,
@@ -39,9 +40,33 @@ export interface Employee {
 export interface Assignment {
   id: string;
   sku: string;
+  itemName?: string;
+  size?: string;
   assignedAt: Date;
   nextReplacementAt?: Date;
   status: string;
+}
+
+export interface KioskRequestHistoryItem {
+  itemId: string;
+  itemName: string;
+  sku: string;
+  size: string;
+  replacementDays: number;
+  replacementReason?: string;
+  chargeAmount?: number;
+}
+
+export interface KioskRequestHistory {
+  id: string;
+  status: 'pending' | 'approved' | 'rejected' | string;
+  items: KioskRequestHistoryItem[];
+  createdAt?: Date;
+  updatedAt?: Date;
+  approvedAt?: Date;
+  rejectedAt?: Date;
+  hasEarlyReplacementAlert?: boolean;
+  assignmentIds?: string[];
 }
 
 export const AREAS = [
@@ -71,6 +96,7 @@ export function useEmployeeData() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [history, setHistory] = useState<Assignment[]>([]);
+  const [kioskRequests, setKioskRequests] = useState<KioskRequestHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const [confirmToggle, setConfirmToggle] = useState<Employee | null>(null);
@@ -131,7 +157,7 @@ export function useEmployeeData() {
     };
   }, [activePlantId, loadLocalEmployees]);
 
-  /* ── Add single employee ───────────────────────── */
+  /* ── Add single employee ──────────────────────── */
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -374,10 +400,16 @@ export function useEmployeeData() {
     setSelectedEmployee(emp);
     setHistoryOpen(true);
     setHistoryLoading(true);
+    setHistory([]);
+    setKioskRequests([]);
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error('missing_admin_session');
-      const response = await fetch(`/api/employees/history?employeeId=${encodeURIComponent(emp.docId)}`, {
+      const params = new URLSearchParams({
+        employeeId: emp.id,
+        employeeDocId: emp.docId,
+      });
+      const response = await fetch(`/api/employees/history?${params.toString()}`, {
         cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -394,26 +426,75 @@ export function useEmployeeData() {
           .map((assignment: Assignment & { assignedAt?: string; nextReplacementAt?: string }) => ({
             id: assignment.id,
             sku: assignment.sku,
+            itemName: assignment.itemName,
+            size: assignment.size,
             assignedAt: assignment.assignedAt ? new Date(assignment.assignedAt) : new Date(),
             nextReplacementAt: assignment.nextReplacementAt ? new Date(assignment.nextReplacementAt) : undefined,
             status: assignment.status,
           })) as Assignment[])
           .sort((a, b) => b.assignedAt.getTime() - a.assignedAt.getTime())
       );
+      setKioskRequests(
+        ((Array.isArray(result?.requests) ? result.requests : [])
+          .map((request: {
+            id: string;
+            status: string;
+            items?: KioskRequestHistoryItem[];
+            createdAt?: string;
+            updatedAt?: string;
+            approvedAt?: string;
+            rejectedAt?: string;
+            hasEarlyReplacementAlert?: boolean;
+            assignmentIds?: string[];
+          }) => ({
+            id: request.id,
+            status: request.status,
+            items: Array.isArray(request.items) ? request.items : [],
+            createdAt: request.createdAt ? new Date(request.createdAt) : undefined,
+            updatedAt: request.updatedAt ? new Date(request.updatedAt) : undefined,
+            approvedAt: request.approvedAt ? new Date(request.approvedAt) : undefined,
+            rejectedAt: request.rejectedAt ? new Date(request.rejectedAt) : undefined,
+            hasEarlyReplacementAlert: request.hasEarlyReplacementAlert,
+            assignmentIds: request.assignmentIds,
+          })) as KioskRequestHistory[])
+          .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))
+      );
     } catch {
       if (canUseLocalFallback()) {
         setHistory(
-          listLocalAssignmentsForEmployee(emp.docId).map((assignment) => ({
+          listLocalAssignmentsForEmployee(emp.id).map((assignment) => ({
             id: assignment.id,
             sku: assignment.sku,
+            itemName: assignment.itemId,
+            size: assignment.size,
             assignedAt: assignment.assignedAt,
             nextReplacementAt: assignment.nextReplacementAt,
             status: assignment.status,
           }))
         );
-        toast.warning('Historial local cargado sin conexión corporativa');
+        setKioskRequests(
+          listLocalKioskQequestsForEmployee(emp.id).map((request) => ({
+            id: request.id,
+            status: request.status,
+            items: request.items.map((item) => ({
+              itemId: item.itemId,
+              itemName: item.itemName,
+              sku: item.sku,
+              size: item.size,
+              replacementDays: item.replacementDays,
+              replacementReason: item.replacementReason,
+              chargeAmount: item.chargeAmount,
+            })),
+            createdAt: request.createdAt,
+            updatedAt: request.updatedAt,
+            hasEarlyReplacementAlert: request.hasEarlyReplacementAlert,
+            assignmentIds: request.assignmentIds,
+          }))
+        );
+        toast.warning('Historial local cargado sin conexion corporativa');
       } else {
         setHistory([]);
+        setKioskRequests([]);
         toast.error('No se pudo cargar el historial desde Firebase.');
       }
     } finally {
@@ -487,6 +568,7 @@ export function useEmployeeData() {
     setHistoryOpen,
     selectedEmployee,
     history,
+    kioskRequests,
     historyLoading,
     openHistory,
 
