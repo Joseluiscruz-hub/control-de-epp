@@ -560,6 +560,28 @@ export function listLocalKioskRequests(status: KioskRequestStatus, max: number) 
     }));
 }
 
+export function listLocalKioskRequestsForEmployee(employeeId: string, max = 200) {
+  ensureLocalKioskSeed();
+  const requests = readJson<LocalKioskRequest[]>(REQUESTS_KEY, []);
+  return requests
+    .filter((request) => request.employeeId === employeeId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, Math.max(1, max))
+    .map((request) => ({
+      id: request.id,
+      employeeId: request.employeeId,
+      employeeName: request.employeeName,
+      employeeArea: request.employeeArea,
+      items: request.items,
+      status: request.status,
+      hasEarlyReplacementAlert: request.hasEarlyReplacementAlert === true,
+      earlyReplacementWarnings: request.earlyReplacementWarnings ?? [],
+      assignmentIds: request.assignmentIds ?? [],
+      createdAt: new Date(request.createdAt),
+      updatedAt: new Date(request.updatedAt),
+    }));
+}
+
 export function updateLocalKioskRequestStatus(requestId: string, status: Extract<KioskRequestStatus, "approved" | "rejected">) {
   ensureLocalKioskSeed();
   const requests = readJson<LocalKioskRequest[]>(REQUESTS_KEY, []);

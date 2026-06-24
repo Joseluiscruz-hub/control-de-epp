@@ -104,6 +104,7 @@ export default function EmpleadosPage() {
         onOpenChange={data.setHistoryOpen}
         selectedEmployee={data.selectedEmployee}
         history={data.history}
+        kioskRequests={data.kioskRequests}
         historyLoading={data.historyLoading}
       />
 
