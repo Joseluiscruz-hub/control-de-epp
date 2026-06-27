@@ -1,18 +1,39 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, KeyRound, Loader2, RotateCcw, ShieldCheck, UserCog } from "lucide-react";
+import { AlertTriangle, Factory, KeyRound, Loader2, RotateCcw, ShieldCheck, Trash2, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/components/auth-provider";
 import { auth } from "@/lib/firebase";
-import { plantLabel } from "@/lib/plants";
+import { PLANTS, plantLabel, type PlantId } from "@/lib/plants";
 import type { UserProfile } from "@/lib/admin-profile";
 
 type RescueAction = "reset_mfa" | "revoke_sessions";
+type PlantResetModule = "catalogos" | "alertas" | "inventario" | "empleados" | "presupuestos";
+
+const PLANT_RESET_MODULES: Array<{ id: PlantResetModule; label: string; description: string }> = [
+  { id: "catalogos", label: "Catalogos", description: "Materiales EPP y catalogo de kiosko." },
+  { id: "alertas", label: "Alertas", description: "Alertas, solicitudes y estados de kiosko." },
+  { id: "inventario", label: "Inventario", description: "Asignaciones, movimientos y cobros por extravio." },
+  { id: "empleados", label: "Empleados", description: "Directorio, snapshots de kiosko y secretos de PIN." },
+  { id: "presupuestos", label: "Presupuestos", description: "Metas y acumulados presupuestales." },
+];
+
+const CONFIRM_RESET_TEXT = "RESTABLECER";
 
 function readProfile(id: string, data: Record<string, unknown>): UserProfile {
   const permissions = data.permissions && typeof data.permissions === "object" && !Array.isArray(data.permissions)
@@ -45,6 +66,11 @@ export default function AdministradoresPage() {
   const [employeeId, setEmployeeId] = useState("");
   const [workingKey, setWorkingKey] = useState<string | null>(null);
   const [resettingEmployee, setResettingEmployee] = useState(false);
+  const [plantResetOpen, setPlantResetOpen] = useState(false);
+  const [plantResetPlant, setPlantResetPlant] = useState<PlantId>(PLANTS[0].id);
+  const [plantResetModules, setPlantResetModules] = useState<PlantResetModule[]>([]);
+  const [plantResetConfirm, setPlantResetConfirm] = useState("");
+  const [plantResetting, setPlantResetting] = useState(false);
 
   useEffect(() => {
     if (!isGlobalAdmin) {
@@ -157,6 +183,54 @@ export default function AdministradoresPage() {
     }
   }, [employeeId]);
 
+  const togglePlantResetModule = useCallback((moduleId: PlantResetModule, checked: boolean) => {
+    setPlantResetModules((current) => {
+      if (checked) return Array.from(new Set([...current, moduleId]));
+      return current.filter((module) => module !== moduleId);
+    });
+  }, []);
+
+  const executePlantReset = useCallback(async () => {
+    if (plantResetModules.length === 0 || plantResetConfirm.trim().toUpperCase() !== CONFIRM_RESET_TEXT) return;
+
+    setPlantResetting(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("missing_session");
+
+      const response = await fetch("/api/admin/plant-reset", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          plantaId: plantResetPlant,
+          modules: plantResetModules,
+          confirmText: plantResetConfirm,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof result?.error === "string" ? result.error : "plant_reset_failed");
+      }
+
+      const totalDeleted = Number(result?.totalDeleted ?? 0);
+      toast.success(`Restablecimiento completado. Documentos eliminados: ${totalDeleted}.`);
+      setPlantResetOpen(false);
+      setPlantResetModules([]);
+      setPlantResetConfirm("");
+    } catch (error) {
+      console.error("[Plant reset UI error]", error);
+      toast.error(error instanceof Error ? error.message : "No se pudo restablecer la planta.");
+    } finally {
+      setPlantResetting(false);
+    }
+  }, [plantResetConfirm, plantResetModules, plantResetPlant]);
+
+  const allPlantResetModulesSelected = plantResetModules.length === PLANT_RESET_MODULES.length;
+  const plantResetReady = plantResetModules.length > 0 && plantResetConfirm.trim().toUpperCase() === CONFIRM_RESET_TEXT;
   const employeeIdValid = /^\d{1,12}$/.test(employeeId.trim());
 
   if (!profile) {
@@ -351,9 +425,132 @@ export default function AdministradoresPage() {
                 </CardContent>
               </Card>
             )}
+
+            {isGlobalAdmin && (
+              <Card className="enterprise-panel gap-0 border-red-500/20 py-0">
+                <CardHeader className="border-b border-red-500/20 p-5">
+                  <CardTitle className="flex items-center gap-2 text-lg font-black text-white">
+                    <Factory className="h-5 w-5 text-red-300" />
+                    Restablecimiento de planta
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 p-5">
+                  <p className="text-xs font-semibold leading-relaxed text-white/45">
+                    Elimina informacion operativa de una planta. Solo una cuenta global puede ejecutar esta accion y queda auditada.
+                  </p>
+                  <Button
+                    className="h-11 rounded-lg bg-red-600 text-white hover:bg-red-700"
+                    onClick={() => setPlantResetOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Restablecer planta
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </section>
+
+      {isGlobalAdmin && (
+        <Dialog open={plantResetOpen} onOpenChange={setPlantResetOpen}>
+          <DialogContent className="max-w-2xl border-red-500/20 bg-[#0b0d12] text-white">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black text-white">Restablecimiento de planta</DialogTitle>
+              <DialogDescription className="text-white/50">
+                Selecciona la planta y la informacion que se eliminara de forma permanente.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-5">
+              <div className="grid gap-2">
+                <Label className="text-xs font-black uppercase tracking-widest text-white/40">Planta</Label>
+                <Select value={plantResetPlant} onValueChange={(value) => setPlantResetPlant(value as PlantId)}>
+                  <SelectTrigger className="h-11 w-full border-white/10 bg-white/5 text-white">
+                    <SelectValue>{plantLabel(plantResetPlant)}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="border-white/10 bg-[#10151d] text-white">
+                    {PLANTS.map((plant) => (
+                      <SelectItem key={plant.id} value={plant.id}>{plant.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Label className="text-xs font-black uppercase tracking-widest text-white/40">Informacion a eliminar</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-lg border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    onClick={() => setPlantResetModules(allPlantResetModulesSelected ? [] : PLANT_RESET_MODULES.map((module) => module.id))}
+                  >
+                    {allPlantResetModulesSelected ? "Limpiar todo" : "Todo"}
+                  </Button>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {PLANT_RESET_MODULES.map((module) => {
+                    const checked = plantResetModules.includes(module.id);
+                    return (
+                      <label
+                        key={module.id}
+                        className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition ${
+                          checked ? "border-red-400/40 bg-red-500/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(event) => togglePlantResetModule(module.id, event.target.checked)}
+                          className="mt-1 h-4 w-4 accent-red-500"
+                        />
+                        <span>
+                          <span className="block text-sm font-black text-white">{module.label}</span>
+                          <span className="mt-1 block text-xs font-semibold leading-relaxed text-white/40">{module.description}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-amber-400/20 bg-amber-500/10 p-4">
+                <p className="text-sm font-bold text-amber-100">
+                  Para confirmar escribe <span className="font-mono text-white">{CONFIRM_RESET_TEXT}</span>.
+                </p>
+                <Input
+                  value={plantResetConfirm}
+                  onChange={(event) => setPlantResetConfirm(event.target.value)}
+                  placeholder={CONFIRM_RESET_TEXT}
+                  className="mt-3 h-11 rounded-lg border-white/10 bg-black/20 font-mono text-white placeholder:text-white/25"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="border-white/10 bg-white/[0.03]">
+              <Button
+                variant="outline"
+                className="rounded-lg border-white/10 bg-white/5 text-white hover:bg-white/10"
+                disabled={plantResetting}
+                onClick={() => setPlantResetOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="rounded-lg bg-red-600 text-white hover:bg-red-700"
+                disabled={!plantResetReady || plantResetting}
+                onClick={() => void executePlantReset()}
+              >
+                {plantResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Eliminar informacion
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
