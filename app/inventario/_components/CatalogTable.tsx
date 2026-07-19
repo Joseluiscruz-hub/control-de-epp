@@ -1,5 +1,6 @@
 "use client";
 
+import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -9,6 +10,7 @@ import { AlertTriangle, Search, RefreshCw, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { usePagination } from '@/hooks/usePagination';
 import { PaginationControls } from '@/components/ui/pagination-controls';
+import { resolveEppImageUrl } from '@/lib/epp-images';
 import { type PpeItem, type ReorderAlert, type StockFilter, LOW_STOCK_THRESHOLD, stockColor } from '../_hooks/useInventoryData';
 import { useEffect, useRef } from 'react';
 
@@ -113,6 +115,7 @@ export function CatalogTable({
             <AnimatePresence mode="popLayout">
               {pagination.paginatedItems.map((item, idx) => {
                 const reorderAlerts = reorderAlertByDocId[item.docId] ?? [];
+                const imageUrl = resolveEppImageUrl(item);
                 return (
                 <motion.tr
                   layout
@@ -127,9 +130,21 @@ export function CatalogTable({
                 >
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/70 font-black text-xs group-hover:bg-[#F40009]/20 group-hover:text-[#F40009] transition-all">
-                        {item.sku.slice(0, 3)}
-                      </div>
+                      {imageUrl ? (
+                        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white">
+                          <Image
+                            src={imageUrl}
+                            alt={item.name}
+                            fill
+                            sizes="56px"
+                            className="object-contain p-1.5"
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-12 w-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/70 font-black text-xs group-hover:bg-[#F40009]/20 group-hover:text-[#F40009] transition-all">
+                          {item.sku.slice(0, 3)}
+                        </div>
+                      )}
                       <div>
                         <p className="font-bold text-white text-lg tracking-tight">{item.name}</p>
                         <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">

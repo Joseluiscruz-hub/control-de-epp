@@ -1,9 +1,11 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createKioskRequest, getPPECatalog } from "@/lib/kiosk-api";
 import { KioskRequestItem, PPECatalogItem, ReplacementReason } from "@/lib/kiosk-types";
+import { resolveEppImageUrl } from "@/lib/epp-images";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle, CheckCircle2, DollarSign, Footprints, Glasses, Hand, HardHat, Headphones, Loader2, Package, Search, Shirt, Wind } from "lucide-react";
 import { clearKioskSession, setKioskSessionBusy } from "@/lib/kiosk-session";
@@ -272,6 +274,7 @@ export default function KioskoCatalogoPage() {
               const statusText = statusMessage(status);
               const selected = !!selectedByItem[item.id];
               const selectedSize = sizeByItem[item.id];
+              const imageUrl = resolveEppImageUrl(item, selectedSize);
 
               return (
                 <div
@@ -287,22 +290,36 @@ export default function KioskoCatalogoPage() {
                         : "border-white/10 bg-white/5 hover:bg-white/10"
                     }`}
                 >
-                  <span className="h-11 w-11 rounded-lg border border-white/10 bg-white/5 text-amber-300 flex items-center justify-center">
-                    {CATEGORY_ICONS[item.category] ?? <Package className="h-5 w-5" />}
-                  </span>
-                  <div>
-                    <p className="font-semibold text-white text-base leading-tight">{item.name}</p>
-                    <p className="text-xs text-gray-500 mt-1">{item.category}</p>
-                    <p className="text-xs text-amber-300/85 mt-1 font-semibold">
-                      {item.requiredQuantity && item.requiredUnit
-                        ? `${item.requiredQuantity} ${item.requiredUnit} cada ${item.replacementDays} dias`
-                        : `Vigencia: ${item.replacementDays} dias`}
-                    </p>
-                    {status !== "ok" && (
-                      <p className="mt-2 inline-flex rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-white/35">
-                        {statusText}
-                      </p>
+                  <div className="flex items-start gap-3">
+                    {imageUrl ? (
+                      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white">
+                        <Image
+                          src={imageUrl}
+                          alt={item.name}
+                          fill
+                          sizes="96px"
+                          className="object-contain p-2"
+                        />
+                      </div>
+                    ) : (
+                      <span className="h-11 w-11 shrink-0 rounded-lg border border-white/10 bg-white/5 text-amber-300 flex items-center justify-center">
+                        {CATEGORY_ICONS[item.category] ?? <Package className="h-5 w-5" />}
+                      </span>
                     )}
+                    <div>
+                      <p className="font-semibold text-white text-base leading-tight">{item.name}</p>
+                      <p className="text-xs text-gray-500 mt-1">{item.category}</p>
+                      <p className="text-xs text-amber-300/85 mt-1 font-semibold">
+                        {item.requiredQuantity && item.requiredUnit
+                          ? `${item.requiredQuantity} ${item.requiredUnit} cada ${item.replacementDays} dias`
+                          : `Vigencia: ${item.replacementDays} dias`}
+                      </p>
+                      {status !== "ok" && (
+                        <p className="mt-2 inline-flex rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-white/35">
+                          {statusText}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {item.hasSizes && item.sizes && status !== "unauthorized" && (
