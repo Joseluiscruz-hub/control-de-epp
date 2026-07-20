@@ -1,3 +1,5 @@
+import { getEppDurationRule } from "./epp-duration-rules";
+
 type EppImageVariant = {
   sku?: string;
   material?: string;
@@ -112,6 +114,16 @@ function toPublicEppUrl(file: string) {
   return `/epp/${encodeURIComponent(file)}`;
 }
 
+function uniqueValues(values: Array<string | undefined | null>) {
+  const seen = new Set<string>();
+  return values.filter((value): value is string => {
+    const key = normalizeAssetKey(value ?? undefined);
+    if (key.length < 4 || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function findByName(value?: string) {
   const key = normalizeAssetKey(value);
   if (key.length < 8) return undefined;
@@ -141,21 +153,42 @@ function variantCandidates(item: EppImageItem, selectedSize?: string) {
   return variants.flatMap((variant) => [variant.sku, variant.material]);
 }
 
+function identifierCandidates(item: EppImageItem, selectedSize?: string) {
+  const selectedVariantCodes = variantCandidates(item, selectedSize);
+  const allVariantCodes = selectedSize ? variantCandidates(item) : [];
+  const durationRule = getEppDurationRule({
+    sku: item.sku,
+    material: item.material,
+    name: item.name,
+    sizes: item.sizes,
+    codes: [
+      ...selectedVariantCodes,
+      item.id,
+      item.docId,
+      ...allVariantCodes,
+    ],
+  });
+
+  return uniqueValues([
+    ...selectedVariantCodes,
+    item.sku,
+    item.material,
+    durationRule?.kofSku,
+    durationRule?.sapMaterial,
+    item.id,
+    item.docId,
+    ...allVariantCodes,
+  ]);
+}
+
 export function resolveEppImageUrl(item: EppImageItem, selectedSize?: string) {
   if (item.imageUrl) return item.imageUrl;
 
-  const nameAsset = findByName(item.name);
-  if (nameAsset) return toPublicEppUrl(nameAsset.file);
-
-  const identifierAsset = [
-    ...variantCandidates(item, selectedSize),
-    item.sku,
-    item.material,
-    item.id,
-    item.docId,
-  ]
+  const identifierAsset = identifierCandidates(item, selectedSize)
     .map(findByIdentifier)
     .find(Boolean);
+  if (identifierAsset) return toPublicEppUrl(identifierAsset.file);
 
-  return identifierAsset ? toPublicEppUrl(identifierAsset.file) : undefined;
+  const nameAsset = findByName(item.name);
+  return nameAsset ? toPublicEppUrl(nameAsset.file) : undefined;
 }
