@@ -419,7 +419,11 @@ export function useInventoryData() {
       const ruleInput = { sku: form.sku, name: form.name };
       const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
       const rulePayload = getEppDurationRulePayload(ruleInput);
-      const stockConversion = resolveStockFromPackageRule({ name: form.name, stockInput: initialStock });
+      const stockConversion = resolveStockFromPackageRule({
+        name: form.name,
+        sku: form.sku,
+        stockInput: initialStock,
+      });
       const reorderPoint = getEppReorderPoint(form.sku);
       const token = await requireAdminToken();
       const response = await fetch('/api/inventory/items', {
@@ -468,7 +472,11 @@ export function useInventoryData() {
       const ruleInput = { sku: form.sku, name: form.name };
       const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
       const rulePayload = getEppDurationRulePayload(ruleInput);
-      const stockConversion = resolveStockFromPackageRule({ name: form.name, stockInput: initialStock });
+      const stockConversion = resolveStockFromPackageRule({
+        name: form.name,
+        sku: form.sku,
+        stockInput: initialStock,
+      });
       const reorderPoint = getEppReorderPoint(form.sku);
       if (canUseLocalFallback()) {
         upsertLocalCatalogItem({

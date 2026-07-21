@@ -20,6 +20,7 @@ import {
 } from '@/lib/personnel-import';
 import { normalizePlantId } from '@/lib/plants';
 import { usePlantStore } from '@/store/usePlantStore';
+import { isEmployeeCostCenter } from '@/lib/employee-cost-centers';
 
 /* ── Shared types ────────────────────────────────── */
 
@@ -30,6 +31,7 @@ export interface Employee {
   area: string;
   personnelArea?: string;
   plantArea?: string;
+  costCenter?: string;
   position?: string;
   jobFunction?: string;
   plantaId?: string;
@@ -74,6 +76,20 @@ export const AREAS = [
   'Calidad', 'Almacén', 'Administración', 'Seguridad Industrial', 'Producción'
 ];
 
+export interface EmployeeForm {
+  id: string;
+  name: string;
+  area: string;
+  costCenter: string;
+}
+
+const EMPTY_EMPLOYEE_FORM: EmployeeForm = {
+  id: '',
+  name: '',
+  area: '',
+  costCenter: '',
+};
+
 /* ── Hook ─────────────────────────────────────────── */
 
 export function useEmployeeData() {
@@ -89,7 +105,7 @@ export function useEmployeeData() {
   const [saving, setSaving] = useState(false);
   const [syncingKiosk, setSyncingKiosk] = useState(false);
   const [importingPersonnel, setImportingPersonnel] = useState(false);
-  const [form, setForm] = useState({ id: '', name: '', area: '' });
+  const [form, setForm] = useState<EmployeeForm>(EMPTY_EMPLOYEE_FORM);
   const { activePlantId } = usePlantStore();
   const writePlantId = normalizePlantId(activePlantId);
 
@@ -161,7 +177,10 @@ export function useEmployeeData() {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.id || !form.name || !form.area) return;
+    if (!form.id || !form.name || !form.area || !isEmployeeCostCenter(form.costCenter)) {
+      toast.error('Selecciona un centro de costos válido.');
+      return;
+    }
     setSaving(true);
     try {
       const token = await auth.currentUser?.getIdToken();
@@ -177,7 +196,7 @@ export function useEmployeeData() {
         position: '',
         personnelArea: form.area.trim(),
         plantArea: form.area.trim(),
-        costCenter: '',
+        costCenter: form.costCenter,
         jobFunction: '',
         sex: '',
         sourceRow: 1,
@@ -189,7 +208,7 @@ export function useEmployeeData() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ records: [record], plantaId: writePlantId }),
+        body: JSON.stringify({ records: [record], plantaId: writePlantId, manualEntry: true }),
       });
 
       const result = await response.json().catch(() => ({}));
@@ -197,9 +216,15 @@ export function useEmployeeData() {
         throw new Error(typeof result?.error === 'string' ? result.error : 'employee_create_failed');
       }
 
-      upsertLocalEmployee({ id: form.id, name: form.name, area: form.area, active: true });
+      upsertLocalEmployee({
+        id: form.id,
+        name: form.name,
+        area: form.area,
+        costCenter: form.costCenter,
+        active: true,
+      });
       toast.success(`Empleado registrado: ${form.name}`);
-      setForm({ id: '', name: '', area: '' });
+      setForm(EMPTY_EMPLOYEE_FORM);
       setAddOpen(false);
     } catch (error) {
       console.error('[Employee admin create error]', error);
@@ -252,6 +277,7 @@ export function useEmployeeData() {
           area: record.area,
           personnelArea: record.personnelArea,
           plantArea: record.plantArea,
+          costCenter: record.costCenter,
           position: record.position,
           jobFunction: record.jobFunction,
           active: true,
@@ -353,6 +379,7 @@ export function useEmployeeData() {
           area: emp.area,
           personnelArea: emp.personnelArea,
           plantArea: emp.plantArea,
+          costCenter: emp.costCenter,
           position: emp.position,
           jobFunction: emp.jobFunction,
           active: emp.active,
@@ -511,6 +538,7 @@ export function useEmployeeData() {
       emp.area,
       emp.personnelArea,
       emp.plantArea,
+      emp.costCenter,
       emp.position,
       emp.jobFunction,
     ].filter(Boolean).join(' ').toLowerCase();

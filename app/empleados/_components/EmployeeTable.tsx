@@ -109,6 +109,11 @@ export function EmployeeTable({
                             {emp.personnelArea}
                           </span>
                         )}
+                        {emp.costCenter && (
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-amber-200/60">
+                            Centro de costos: {emp.costCenter}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-8 py-6">

@@ -5,6 +5,7 @@ import {
   KioskRequestStatus,
   PPECatalogItem,
 } from "./kiosk-types";
+import { resolveEppConsumption } from "./epp-consumption-rules";
 
 const EMPLOYEES_KEY = "assetguard.local.kiosk.employees";
 const CATALOG_KEY = "assetguard.local.kiosk.catalog";
@@ -33,8 +34,15 @@ export type LocalAssignmentRecord = {
   id: string;
   employeeId: string;
   sku: string;
+  material?: string;
   itemId?: string;
   size?: string;
+  quantity?: number;
+  issuedQuantity?: number;
+  quantityUnit?: "UMB" | "PZA";
+  consumptionRuleId?: string;
+  unitsPerPackage?: number;
+  unitDecrease?: number;
   assignedAt: string;
   nextReplacementAt?: string;
   status: string;
@@ -284,6 +292,7 @@ export function listLocalEmployees() {
       area: employee.area ?? employee.plantArea ?? "Local",
       personnelArea: employee.personnelArea,
       plantArea: employee.plantArea,
+      costCenter: employee.costCenter,
       position: employee.position,
       jobFunction: employee.jobFunction,
       active: employee.active,
@@ -298,6 +307,7 @@ export function upsertLocalEmployee(input: {
   area: string;
   personnelArea?: string;
   plantArea?: string;
+  costCenter?: string;
   position?: string;
   jobFunction?: string;
   active?: boolean;
@@ -313,6 +323,7 @@ export function upsertLocalEmployee(input: {
     area: input.area,
     personnelArea: input.personnelArea ?? current?.personnelArea,
     plantArea: input.plantArea ?? current?.plantArea ?? input.area,
+    costCenter: input.costCenter ?? current?.costCenter,
     position: input.position ?? current?.position,
     jobFunction: input.jobFunction ?? current?.jobFunction,
     active: input.active ?? current?.active ?? true,
@@ -348,6 +359,7 @@ export function syncLocalKioskEmployees(input: Array<{
   area?: string;
   personnelArea?: string;
   plantArea?: string;
+  costCenter?: string;
   position?: string;
   jobFunction?: string;
   active: boolean;
@@ -372,6 +384,7 @@ export function syncLocalKioskEmployees(input: Array<{
       area: employee.area ?? current?.area ?? "Local",
       personnelArea: employee.personnelArea ?? current?.personnelArea,
       plantArea: employee.plantArea ?? current?.plantArea,
+      costCenter: employee.costCenter ?? current?.costCenter,
       position: employee.position ?? current?.position,
       jobFunction: employee.jobFunction ?? current?.jobFunction,
       active: employee.active,
@@ -596,6 +609,9 @@ export function updateLocalKioskRequestStatus(requestId: string, status: Extract
       size: item.size || "N/A",
       itemId: item.itemId,
       replacementDays: item.replacementDays,
+      requiredQuantity: item.requiredQuantity,
+      durationRuleSku: item.durationRuleSku,
+      durationRuleSapMaterial: item.durationRuleSapMaterial,
       replacementReason: item.replacementReason,
       issuedByKiosk: true,
       issuedByUserId: "offline-admin",
@@ -663,6 +679,9 @@ export function createLocalAssignment(input: {
   size?: string;
   itemId: string;
   replacementDays: number;
+  requiredQuantity?: number;
+  durationRuleSku?: string;
+  durationRuleSapMaterial?: string | null;
   replacementReason?: string;
   chargeAmount?: number;
   signatureDataUrl?: string | null;
@@ -676,13 +695,23 @@ export function createLocalAssignment(input: {
 
   const item = normalizeCatalogItem(catalog[catalogIndex]);
   const requestedSize = input.size && input.size !== "N/A" ? input.size : undefined;
+  const issuedQuantity = Number.isFinite(Number(input.requiredQuantity)) && Number(input.requiredQuantity) > 0
+    ? Number(input.requiredQuantity)
+    : 1;
+  const variant = requestedSize && item.sizes ? item.sizes[requestedSize] : undefined;
+  const material = variant?.material || item.material || input.durationRuleSapMaterial || input.sku;
+  const consumption = resolveEppConsumption({
+    sku: input.sku,
+    material,
+    codes: [input.durationRuleSku, input.durationRuleSapMaterial],
+    issuedQuantity,
+  });
 
   if (requestedSize && item.sizes) {
-    const variant = item.sizes[requestedSize];
     const currentStock = Number(variant?.stock ?? 0);
-    if (!variant || currentStock <= 0) throw new Error("out_of_stock");
+    if (!variant || currentStock < issuedQuantity) throw new Error("out_of_stock");
 
-    const nextStock = currentStock - 1;
+    const nextStock = currentStock - issuedQuantity;
     item.sizes = {
       ...item.sizes,
       [requestedSize]: {
@@ -695,8 +724,8 @@ export function createLocalAssignment(input: {
     item.available = item.stock > 0;
   } else {
     const currentStock = Number(item.stock ?? 0);
-    if (!Number.isFinite(currentStock) || currentStock <= 0) throw new Error("out_of_stock");
-    item.stock = currentStock - 1;
+    if (!Number.isFinite(currentStock) || currentStock < issuedQuantity) throw new Error("out_of_stock");
+    item.stock = currentStock - issuedQuantity;
     item.available = item.stock > 0;
   }
 
@@ -717,8 +746,19 @@ export function createLocalAssignment(input: {
     id,
     employeeId: input.employeeId,
     sku: input.sku,
+    material,
     itemId: input.itemId,
     size: input.size || "N/A",
+    quantity: consumption.quantity,
+    issuedQuantity: consumption.issuedQuantity,
+    quantityUnit: consumption.quantityUnit,
+    ...(consumption.rule
+      ? {
+          consumptionRuleId: consumption.rule.id,
+          unitsPerPackage: consumption.rule.unitsPerPackage,
+          unitDecrease: consumption.rule.unitDecrease,
+        }
+      : {}),
     assignedAt: now,
     nextReplacementAt: addDaysIso(input.replacementDays),
     status: "active",

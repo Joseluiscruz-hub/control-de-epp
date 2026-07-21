@@ -7,6 +7,7 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { normalizePlantId } from "@/lib/plants";
 import { AuthHttpError, canAdminUsePlant, requireAdminUser } from "@/lib/server-auth";
 import { resolveEppReplacementDays } from "@/lib/epp-duration-rules";
+import { resolveEppConsumption } from "@/lib/epp-consumption-rules";
 
 export const runtime = "nodejs";
 
@@ -91,7 +92,14 @@ export async function POST(req: NextRequest) {
 
       const newStock = previousStock - 1;
       const sku = readText(variant?.sku) || readText(item.sku) || itemId;
+      const material = readText(variant?.material) || readText(item.material) || sku;
       const itemName = readText(item.name) || itemId;
+      const consumption = resolveEppConsumption({
+        sku,
+        material,
+        codes: [item.durationRuleSku, item.durationRuleSapMaterial],
+        issuedQuantity: 1,
+      });
       const unitCost = Math.max(0, readNumber(variant?.unitCost ?? item.unitCost));
       const category = readText(item.category) || "Sin categoria";
       const employeeArea = readText(employee.area)
@@ -139,11 +147,21 @@ export async function POST(req: NextRequest) {
         area: employeeArea,
         plantaId,
         sku,
+        material,
         itemId,
         itemName,
         unitCost,
         category,
-        quantity: 1,
+        quantity: consumption.quantity,
+        issuedQuantity: consumption.issuedQuantity,
+        quantityUnit: consumption.quantityUnit,
+        ...(consumption.rule
+          ? {
+              consumptionRuleId: consumption.rule.id,
+              unitsPerPackage: consumption.rule.unitsPerPackage,
+              unitDecrease: consumption.rule.unitDecrease,
+            }
+          : {}),
         replacementDays,
         size: hasSizes ? requestedSize : "N/A",
         assignedAt: FieldValue.serverTimestamp(),
@@ -174,8 +192,20 @@ export async function POST(req: NextRequest) {
           employeeId,
           employeeName: readText(employee.name),
           itemName,
+          material,
           aggregatePreviousStock,
           aggregateNewStock,
+          issuedQuantity: consumption.issuedQuantity,
+          issuedUnit: "PZA",
+          reportQuantity: consumption.quantity,
+          reportQuantityUnit: consumption.quantityUnit,
+          ...(consumption.rule
+            ? {
+                consumptionRuleId: consumption.rule.id,
+                unitsPerPackage: consumption.rule.unitsPerPackage,
+                unitDecrease: consumption.rule.unitDecrease,
+              }
+            : {}),
         },
       }));
 
@@ -189,8 +219,12 @@ export async function POST(req: NextRequest) {
           employeeId,
           itemId,
           sku,
+          material,
           size: hasSizes ? requestedSize : "N/A",
           stock: newStock,
+          quantity: consumption.quantity,
+          issuedQuantity: consumption.issuedQuantity,
+          quantityUnit: consumption.quantityUnit,
           unitCost,
           category,
           plantaId,

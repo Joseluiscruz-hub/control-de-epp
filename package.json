@@ -10,7 +10,7 @@
     "local:start": "next start -H 127.0.0.1 -p 3000",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "node --experimental-test-module-mocks --import tsx --test lib/app-check-flags.test.ts lib/aria-context.test.ts lib/budget.test.ts lib/chat-request.test.ts lib/epp-duration-rules.test.ts lib/epp-images.test.ts lib/epp-reorder-points.test.ts lib/employee-credential-reset.test.ts lib/inventory-document-id.test.ts lib/inventory-import.test.ts lib/kiosk-alert-approvers.test.ts lib/kiosk-pin-rate-limit.test.ts lib/notification-sounds.test.ts lib/portal-employee-response.test.ts lib/replacement-logic.test.ts lib/server-auth.test.ts lib/solped-export.test.ts lib/user-profile.test.ts",
+    "test": "node --experimental-test-module-mocks --import tsx --test lib/app-check-flags.test.ts lib/aria-context.test.ts lib/budget.test.ts lib/chat-request.test.ts lib/employee-cost-centers.test.ts lib/epp-consumption-rules.test.ts lib/epp-duration-rules.test.ts lib/epp-images.test.ts lib/epp-reorder-points.test.ts lib/employee-credential-reset.test.ts lib/inventory-document-id.test.ts lib/inventory-import.test.ts lib/kiosk-alert-approvers.test.ts lib/kiosk-pin-rate-limit.test.ts lib/notification-sounds.test.ts lib/portal-employee-response.test.ts lib/replacement-logic.test.ts lib/server-auth.test.ts lib/solped-export.test.ts lib/user-profile.test.ts",
     "clean": "next clean"
   },
   "dependencies": {

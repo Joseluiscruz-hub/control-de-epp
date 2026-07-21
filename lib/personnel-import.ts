@@ -96,6 +96,7 @@ export interface KioskEmployeeImportPayload {
   active: boolean;
   personnelArea: string;
   plantArea: string;
+  costCenter: string;
   position: string;
   jobFunction: string;
   source: typeof PERSONNEL_IMPORT_SOURCE;
@@ -307,6 +308,7 @@ export function buildKioskEmployeeImportPayload(record: PersonnelRecord): KioskE
     active: true,
     personnelArea: record.personnelArea,
     plantArea: record.plantArea,
+    costCenter: record.costCenter,
     position: record.position,
     jobFunction: record.jobFunction,
     source: PERSONNEL_IMPORT_SOURCE,

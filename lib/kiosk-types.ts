@@ -4,6 +4,7 @@ export interface KioskEmployee {
   area?: string;
   personnelArea?: string;
   plantArea?: string;
+  costCenter?: string;
   position?: string;
   jobFunction?: string;
   active: boolean;

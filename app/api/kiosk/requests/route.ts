@@ -13,6 +13,7 @@ import {
   getEppDurationRulePayload,
   resolveEppReplacementDays,
 } from "@/lib/epp-duration-rules";
+import { resolveEppConsumption } from "@/lib/epp-consumption-rules";
 import { KioskEarlyReplacementAlert, KioskRequestItem, ReplacementReason } from "@/lib/kiosk-types";
 import { normalizePlantId } from "@/lib/plants";
 import { buildInventoryMovement } from "@/app/api/inventory/_lib";
@@ -446,6 +447,19 @@ async function fulfillApprovedKioskRequest(params: {
         throw new KioskRequestError(`Material ${item.itemName} no pertenece a la planta de la solicitud.`, 409);
       }
       const stockChange = buildStockUpdates(catalogData, item);
+      const catalogVariant = item.size && item.size !== "N/A"
+        ? getSizes(catalogData)?.[item.size]
+        : undefined;
+      const material = readText(catalogVariant?.material)
+        || readText(catalogData.material)
+        || readText(item.durationRuleSapMaterial)
+        || item.sku;
+      const consumption = resolveEppConsumption({
+        sku: item.sku,
+        material,
+        codes: [item.durationRuleSku, item.durationRuleSapMaterial],
+        issuedQuantity: stockChange.consumedQuantity,
+      });
       const assignmentRef = db.collection("assignments").doc();
       assignmentRefs.push(assignmentRef);
 
@@ -456,11 +470,21 @@ async function fulfillApprovedKioskRequest(params: {
         area: employeeArea || "Sin area",
         plantaId,
         sku: item.sku,
+        material,
         itemId: item.itemId,
         itemName: item.itemName,
         unitCost: Math.max(0, readNumber(item.unitCost)),
         category: readText(item.category) || readText(catalogData.category) || "Sin categoria",
-        quantity: stockChange.consumedQuantity,
+        quantity: consumption.quantity,
+        issuedQuantity: consumption.issuedQuantity,
+        quantityUnit: consumption.quantityUnit,
+        ...(consumption.rule
+          ? {
+              consumptionRuleId: consumption.rule.id,
+              unitsPerPackage: consumption.rule.unitsPerPackage,
+              unitDecrease: consumption.rule.unitDecrease,
+            }
+          : {}),
         replacementDays: item.replacementDays,
         size: item.size || "N/A",
         assignedAt: FieldValue.serverTimestamp(),
@@ -505,16 +529,27 @@ async function fulfillApprovedKioskRequest(params: {
             employeeId,
             employeeName,
             itemName: item.itemName,
+            material,
             aggregatePreviousStock: stockChange.aggregatePreviousStock,
             aggregateNewStock: stockChange.aggregateNewStock,
-            consumedQuantity: stockChange.consumedQuantity,
-            consumedUnit: "PZA",
+            issuedQuantity: consumption.issuedQuantity,
+            issuedUnit: "PZA",
+            consumedQuantity: consumption.quantity,
+            consumedUnit: consumption.quantityUnit,
+            reportQuantity: consumption.quantity,
+            reportQuantityUnit: consumption.quantityUnit,
+            ...(consumption.rule
+              ? {
+                  consumptionRuleId: consumption.rule.id,
+                  unitDecrease: consumption.rule.unitDecrease,
+                }
+              : {}),
             ...(stockChange.packageRuleId ? { packageRuleId: stockChange.packageRuleId } : {}),
             ...(stockChange.packageUnit ? { packageUnit: stockChange.packageUnit } : {}),
             ...(typeof stockChange.unitsPerPackage === "number" && stockChange.unitsPerPackage > 0
               ? {
                   unitsPerPackage: stockChange.unitsPerPackage,
-                  packageEquivalentConsumed: stockChange.consumedQuantity / stockChange.unitsPerPackage,
+                  packageEquivalentConsumed: consumption.quantity,
                 }
               : {}),
           },

@@ -9,6 +9,11 @@ import {
   type PersonnelRecord,
 } from "@/lib/personnel-import";
 import { normalizePlantId } from "@/lib/plants";
+import {
+  EMPLOYEE_COST_CENTERS,
+  isEmployeeCostCenter,
+  normalizeEmployeeCostCenter,
+} from "@/lib/employee-cost-centers";
 
 export const runtime = "nodejs";
 
@@ -54,6 +59,7 @@ function parsePersonnelRecords(input: unknown): PersonnelRecord[] {
     record.id = record.id.trim();
     record.name = record.name.trim();
     record.area = record.area.trim() || record.plantArea.trim() || record.personnelArea.trim() || "SIN AREA";
+    record.costCenter = normalizeEmployeeCostCenter(record.costCenter);
 
     if (!record.id || !/^\d+$/.test(record.id)) {
       throw new AuthHttpError(`Registro ${index + 1}: numero de personal invalido.`, 400);
@@ -90,6 +96,16 @@ export async function POST(req: NextRequest) {
     const adminUser = await requireAdminUser(req);
     const body = await req.json();
     const records = parsePersonnelRecords(body?.records);
+    const manualEntry = body?.manualEntry === true;
+    if (manualEntry) {
+      const invalidRecordIndex = records.findIndex((record) => !isEmployeeCostCenter(record.costCenter));
+      if (invalidRecordIndex >= 0) {
+        throw new AuthHttpError(
+          `Registro ${invalidRecordIndex + 1}: selecciona un centro de costos válido (${EMPLOYEE_COST_CENTERS.join(", ")}).`,
+          400
+        );
+      }
+    }
     const plantaId = adminUser.plantaId === "nacional"
       ? normalizePlantId(body?.plantaId)
       : normalizePlantId(adminUser.plantaId);

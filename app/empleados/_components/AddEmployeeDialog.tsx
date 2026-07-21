@@ -10,13 +10,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
 import { UserPlus, Loader2 } from 'lucide-react';
-import { AREAS } from '../_hooks/useEmployeeData';
+import { EMPLOYEE_COST_CENTERS } from '@/lib/employee-cost-centers';
+import { AREAS, type EmployeeForm } from '../_hooks/useEmployeeData';
 
 export interface AddEmployeeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  form: { id: string; name: string; area: string };
-  setForm: React.Dispatch<React.SetStateAction<{ id: string; name: string; area: string }>>;
+  form: EmployeeForm;
+  setForm: React.Dispatch<React.SetStateAction<EmployeeForm>>;
   saving: boolean;
   onSubmit: (e: React.FormEvent) => void;
 }
@@ -75,10 +76,26 @@ export function AddEmployeeDialog({
               required
             />
           </div>
+          <div className="space-y-2">
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Centro de costos</Label>
+            <Select
+              value={form.costCenter}
+              onValueChange={value => setForm(current => ({ ...current, costCenter: value ?? '' }))}
+            >
+              <SelectTrigger className="h-12 rounded-xl bg-white/5 border-white/10 text-white">
+                <SelectValue placeholder="Selecciona el centro de costos..." />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0A1628] border-white/10 text-white rounded-xl">
+                {EMPLOYEE_COST_CENTERS.map(costCenter => (
+                  <SelectItem key={costCenter} value={costCenter}>{costCenter}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <DialogFooter className="pt-4">
             <Button
               type="submit"
-              disabled={saving || !form.id || !form.name || !form.area}
+              disabled={saving || !form.id || !form.name || !form.area || !form.costCenter}
               className="w-full h-14 rounded-xl bg-[#F40009] hover:bg-red-700 text-white font-bold uppercase tracking-widest transition-all"
             >
               {saving ? <Loader2 className="h-6 w-6 animate-spin" /> : "Vincular a la Red FEMSA"}

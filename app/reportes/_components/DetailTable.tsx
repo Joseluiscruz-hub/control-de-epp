@@ -79,7 +79,9 @@ export function DetailTable({ rows, loading }: DetailTableProps) {
                       {row.reason}
                     </Badge>
                   </TableCell>
-                  <TableCell className="py-4 text-right font-black text-white">{row.quantity}</TableCell>
+                  <TableCell className="py-4 text-right font-black text-white">
+                    {row.quantity} <span className="text-[10px] text-white/40">{row.quantityUnit}</span>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

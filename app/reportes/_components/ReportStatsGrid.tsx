@@ -57,7 +57,7 @@ export function ReportStatsGrid({
     <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-4">
       <StatTile
         icon={<PackageCheck className="h-4 w-4" />}
-        label="Piezas consumidas"
+        label="Cantidad para baja"
         value={totalQuantity}
         tone={totalQuantity > 0 ? "green" : "neutral"}
       />

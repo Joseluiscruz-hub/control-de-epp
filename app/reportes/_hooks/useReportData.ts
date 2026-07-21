@@ -23,6 +23,10 @@ import {
   listLocalInventory,
 } from "@/lib/kiosk-local-store";
 import { usePlantStore } from "@/store/usePlantStore";
+import {
+  resolveAssignmentReportConsumption,
+  roundEppConsumptionQuantity,
+} from "@/lib/epp-consumption-rules";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -57,6 +61,7 @@ export interface ConsumptionRow {
   category: string;
   size: string;
   quantity: number;
+  quantityUnit: "UMB" | "PZA";
   status: string;
   reason: string;
   source: string;
@@ -74,6 +79,7 @@ export interface SummaryRow {
   area: string;
   costCenter: string;
   quantity: number;
+  quantityUnit: "UMB" | "PZA";
   employeeCount: number;
 }
 
@@ -262,6 +268,14 @@ function buildRows(params: {
       const time = format(assignedAt, "HH:mm");
       const area = employee?.area ?? "SIN AREA";
       const itemName = item?.itemName ?? "Material no encontrado";
+      const consumption = resolveAssignmentReportConsumption({
+        sku,
+        material: item?.material ?? data.material,
+        codes: [data.durationRuleSku, data.durationRuleSapMaterial],
+        quantity: data.quantity,
+        issuedQuantity: data.issuedQuantity,
+        quantityUnit: data.quantityUnit,
+      });
 
       return {
         id: record.id,
@@ -277,7 +291,8 @@ function buildRows(params: {
         itemName,
         category: item?.category ?? "EPP",
         size: safeText(data.size, "N/A"),
-        quantity: 1,
+        quantity: consumption.quantity,
+        quantityUnit: consumption.quantityUnit,
         status,
         reason: REASON_LABELS[safeText(data.replacementReason)] ?? safeText(data.replacementReason, "Dotacion"),
         source: data.issuedByKiosk === true ? "Kiosko" : "Admin",
@@ -292,10 +307,10 @@ function summarizeRows(rows: ConsumptionRow[]) {
   const summary = new Map<string, SummaryRow & { employeeIds: Set<string> }>();
 
   for (const row of rows) {
-    const key = [row.date, row.material, row.size, row.area, row.costCenter].join("|");
+    const key = [row.date, row.material, row.size, row.area, row.costCenter, row.quantityUnit].join("|");
     const current = summary.get(key);
     if (current) {
-      current.quantity += row.quantity;
+      current.quantity = roundEppConsumptionQuantity(current.quantity + row.quantity);
       current.employeeIds.add(row.employeeId);
       current.employeeCount = current.employeeIds.size;
       continue;
@@ -312,6 +327,7 @@ function summarizeRows(rows: ConsumptionRow[]) {
       area: row.area,
       costCenter: row.costCenter,
       quantity: row.quantity,
+      quantityUnit: row.quantityUnit,
       employeeCount: 1,
       employeeIds: new Set([row.employeeId]),
     });
@@ -401,17 +417,20 @@ export function useReportData() {
   }, [allRows, areaFilter, employeeFilter, itemFilter]);
 
   const summaryRows = useMemo(() => summarizeRows(rows), [rows]);
-  const totalQuantity = rows.reduce((sum, row) => sum + row.quantity, 0);
+  const totalQuantity = roundEppConsumptionQuantity(rows.reduce((sum, row) => sum + row.quantity, 0));
   const uniqueEmployees = new Set(rows.map((row) => row.employeeId)).size;
   const missingRows = rows.filter((row) => row.hasMissingData).length;
 
   const topArea = useMemo(() => {
     const areas = new Map<string, number>();
-    for (const row of rows) areas.set(row.area, (areas.get(row.area) ?? 0) + row.quantity);
+    for (const row of rows) {
+      areas.set(row.area, roundEppConsumptionQuantity((areas.get(row.area) ?? 0) + row.quantity));
+    }
     return Array.from(areas.entries()).sort((a, b) => b[1] - a[1])[0] ?? null;
   }, [rows]);
 
-  const sapFolio = `SAP-EPP-${activePeriodSlug}-${String(totalQuantity).padStart(3, "0")}`;
+  const sapFolioQuantity = String(totalQuantity).replace(".", "_").padStart(3, "0");
+  const sapFolio = `SAP-EPP-${activePeriodSlug}-${sapFolioQuantity}`;
 
   /* ── Load report ─────────────────────────────────────────────── */
 
@@ -536,7 +555,7 @@ export function useReportData() {
         row.area,
         row.costCenter,
         row.quantity,
-        "PZA",
+        row.quantityUnit,
         `${sapFolio} ${row.area} ${row.itemName}`.slice(0, 80),
       ])
     );
@@ -560,6 +579,7 @@ export function useReportData() {
         "Categoria",
         "Talla",
         "Cantidad",
+        "Unidad",
         "Motivo",
         "Origen",
         "Estado",
@@ -579,6 +599,7 @@ export function useReportData() {
         row.category,
         row.size,
         row.quantity,
+        row.quantityUnit,
         row.reason,
         row.source,
         row.status,
@@ -589,10 +610,10 @@ export function useReportData() {
   const copySummary = useCallback(async () => {
     const lines = [
       `${sapFolio} | ${periodLabel}`,
-      `Total piezas: ${totalQuantity}`,
+      `Cantidad total para baja: ${totalQuantity}`,
       `Colaboradores: ${uniqueEmployees}`,
       `Area lider: ${topArea ? `${topArea[0]} (${topArea[1]})` : "Sin consumo"}`,
-      ...summaryRows.map((row) => `${row.material} | ${row.itemName} | ${row.area} | ${row.quantity} PZA`),
+      ...summaryRows.map((row) => `${row.material} | ${row.itemName} | ${row.area} | ${row.quantity} ${row.quantityUnit}`),
     ];
 
     await navigator.clipboard.writeText(lines.join("\n"));

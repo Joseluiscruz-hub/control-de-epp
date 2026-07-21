@@ -352,6 +352,9 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
     const stockConversion = resolveStockFromPackageRule({
       name: baseName || rawName,
       size,
+      sku,
+      material,
+      codes: [durationRule?.kofSku, durationRule?.sapMaterial],
       stockInput: stockInput ?? 0,
     });
     const reorderPoint = getEppReorderPoint(material, sku);

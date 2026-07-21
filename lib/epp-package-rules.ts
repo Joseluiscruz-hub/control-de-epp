@@ -109,9 +109,24 @@ export function buildPackageStockMetadata(
 export function resolveStockFromPackageRule(params: {
   name?: string | null;
   size?: string | null;
+  sku?: string | null;
+  material?: string | null;
+  codes?: readonly unknown[];
   stockInput: number;
 }) {
-  const rule = findEppPackageRule({ name: params.name, size: params.size });
+  const nameRule = findEppPackageRule({ name: params.name, size: params.size });
+  const consumptionRule = findEppConsumptionRule({
+    sku: params.sku,
+    material: params.material,
+    codes: params.codes,
+  });
+  const rule = consumptionRule
+    ? {
+        id: consumptionRule.id,
+        packageUnit: nameRule?.packageUnit ?? "CAJA" as const,
+        unitsPerPackage: consumptionRule.unitsPerPackage,
+      }
+    : nameRule;
   if (!rule) {
     return {
       stock: Number.isFinite(params.stockInput) ? params.stockInput : 0,
@@ -124,4 +139,5 @@ export function resolveStockFromPackageRule(params: {
     metadata: buildPackageStockMetadata(rule, params.stockInput),
   };
 }
+import { findEppConsumptionRule } from "./epp-consumption-rules";
 
