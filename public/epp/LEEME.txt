@@ -1,0 +1,11 @@
+PAQUETE DE IMAGENES EPP PARA APP WEB
+
+- 79 archivos PNG.
+- Resolucion uniforme: 512 x 512 px.
+- Fondo transparente con canal alfa.
+- Sin logotipos, marcas de agua ni texto incrustado.
+- Optimizados para tarjetas de producto, catalogos y buscadores web.
+- Las variantes de talla del mismo producto comparten una imagen maestra para mantener consistencia visual.
+
+El archivo MANIFIESTO.tsv relaciona cada nombre final con la imagen maestra utilizada.
+Estas imagenes son representaciones visuales generadas; valida el modelo fisico exacto si se usaran para compras o identificacion tecnica.
