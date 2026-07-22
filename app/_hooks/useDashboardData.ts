@@ -205,12 +205,19 @@ export function useDashboardData() {
     }
   }, [activePlantId, applyLocalDashboard, authLoading, firebaseAdminReady]);
 
+  useEffect(() => {
+    if (authLoading || firebaseAdminReady) return;
+
+    const timeout = window.setTimeout(() => {
+      applyLocalDashboard();
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [applyLocalDashboard, authLoading, firebaseAdminReady]);
+
   // ── Assignments listener (recent 10) ──────────────────────
   useEffect(() => {
-    if (!firebaseAdminReady) {
-      if (!authLoading) applyLocalDashboard();
-      return;
-    }
+    if (!firebaseAdminReady) return;
 
     try {
       const q = activePlantId === 'todas'
@@ -256,10 +263,7 @@ export function useDashboardData() {
 
   // ── Employees + Inventory + Assignments stats listener ────
   useEffect(() => {
-    if (!firebaseAdminReady) {
-      if (!authLoading) applyLocalDashboard();
-      return;
-    }
+    if (!firebaseAdminReady) return;
 
     let activeEmployees: Array<{ id: string; area: string }> = [];
     let inventoryItems: Array<Record<string, unknown>> = [];
