@@ -2,8 +2,9 @@ import { NextRequest } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { buildKioskEmployeeSyncPayload } from "@/lib/kiosk-employee-sync";
 import { AuthHttpError, canAdminUsePlant, requireAdminUser } from "@/lib/server-auth";
-import { isPlantId, normalizePlantId } from "@/lib/plants";
+import { isPlantId } from "@/lib/plants";
 
 export const runtime = "nodejs";
 
@@ -46,16 +47,8 @@ export async function POST(req: NextRequest) {
       const employee = doc.data();
       const kioskRef = db.collection("kiosk_employees").doc(doc.id);
       const kioskSnap = await kioskRef.get();
-      const plantaId = normalizePlantId(employee.plantaId ?? adminUser.plantaId);
       const payload = {
-        name: readText(employee.name),
-        area: readText(employee.area),
-        plantaId,
-        personnelArea: readText(employee.personnelArea),
-        plantArea: readText(employee.plantArea) || readText(employee.area),
-        position: readText(employee.position),
-        jobFunction: readText(employee.jobFunction),
-        active: employee.active === true,
+        ...buildKioskEmployeeSyncPayload(employee, adminUser.plantaId),
         updatedAt: FieldValue.serverTimestamp(),
       };
 
@@ -96,4 +89,3 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "No se pudo sincronizar el kiosko." }, { status: 500 });
   }
 }
-

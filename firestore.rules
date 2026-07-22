@@ -269,7 +269,7 @@ service cloud.firestore {
     function isValidKioskEmployeeSnapshot(data) {
       return data.keys().hasOnly([
           "id", "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt", "createdAt",
-          "updatedAt", "personnelArea", "plantArea", "position", "jobFunction", "source", "schemaVersion",
+          "updatedAt", "personnelArea", "plantArea", "costCenter", "position", "jobFunction", "source", "schemaVersion",
           "plantaId", "credentialResetAt", "credentialResetByUid", "credentialResetByEmail"
         ])
         && data.keys().hasAll(["name", "active", "updatedAt"])
@@ -286,6 +286,7 @@ service cloud.firestore {
         && optionalString(data.area)
         && optionalString(data.personnelArea)
         && optionalString(data.plantArea)
+        && optionalString(data.costCenter)
         && optionalString(data.position)
         && optionalString(data.jobFunction)
         && optionalString(data.source)
