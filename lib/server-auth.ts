@@ -42,19 +42,28 @@ async function readUserProfile(uid: string, email: string) {
   try {
     const userRef = getAdminDb().collection("users").doc(uid);
     const snap = await userRef.get();
-    if (!snap.exists) {
-      const provisionedProfile = buildProvisionedKioskAlertApproverProfile(uid, email);
-      if (!provisionedProfile) return null;
+    if (snap.exists) {
+      const data = snap.data() ?? {};
+      const profile = normalizeUserProfile(uid, email, data);
+      if (profile) return profile;
 
-      await userRef.set({
-        ...provisionedProfile,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-        source: "kiosk_alert_approver_allowlist",
-      }, { merge: true });
-      return provisionedProfile;
+      // Never reactivate an account that was explicitly disabled, even when
+      // its legacy document no longer matches the current profile schema.
+      if (data.active === false) return null;
     }
-    return normalizeUserProfile(uid, email, snap.data() ?? {});
+
+    const provisionedProfile = buildProvisionedKioskAlertApproverProfile(uid, email);
+    if (!provisionedProfile) return null;
+
+    await userRef.set({
+      ...provisionedProfile,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      source: snap.exists
+        ? "kiosk_alert_approver_profile_repair"
+        : "kiosk_alert_approver_allowlist",
+    }, { merge: true });
+    return provisionedProfile;
   } catch (error) {
     console.warn("[Server auth profile read failed]", error);
     return null;

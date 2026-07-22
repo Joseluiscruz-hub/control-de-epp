@@ -30,7 +30,8 @@ async function resolveUserProfile(user: User) {
   try {
     const snap = await getDoc(doc(db, 'users', user.uid));
     if (snap.exists()) {
-      return normalizeUserProfile(user.uid, email, snap.data());
+      const profile = normalizeUserProfile(user.uid, email, snap.data());
+      if (profile) return profile;
     }
   } catch (error) {
     console.warn('[Admin profile unavailable from Firestore, trying server profile]', error);

@@ -140,6 +140,51 @@ describe("requireAdminUser", () => {
     assert.equal(session.profile.permissions?.canApproveKioskAlerts, true);
     assert.equal(mockSet.mock.callCount(), initialSetCount + 1);
   });
+
+  it("repara un perfil legacy incompleto para un correo global permitido", async () => {
+    const { requireAdminUser } = await getServerAuth();
+    const initialSetCount = mockSet.mock.callCount();
+
+    mockVerifyIdToken.mock.mockImplementationOnce(async () =>
+      makeDecodedToken({
+        uid: "uid-legacy-global",
+        email: "mimonkb222@gmail.com",
+        name: "Admin Global",
+      })
+    );
+    mockGet.mock.mockImplementationOnce(async () =>
+      makeProfileSnap({ email: "mimonkb222@gmail.com", isAdmin: true, active: true })
+    );
+    mockSet.mock.mockImplementationOnce(async () => undefined);
+
+    const session = await requireAdminUser(makeRequest("valid-token"));
+
+    assert.equal(session.role, "admin_global");
+    assert.equal(session.plantaId, "nacional");
+    assert.equal(mockSet.mock.callCount(), initialSetCount + 1);
+    assert.equal(
+      (mockSet.mock.calls.at(-1)?.arguments[0] as { source?: string }).source,
+      "kiosk_alert_approver_profile_repair"
+    );
+  });
+
+  it("no reactiva un perfil legacy deshabilitado", async () => {
+    const { AuthHttpError, requireAdminUser } = await getServerAuth();
+    mockVerifyIdToken.mock.mockImplementationOnce(async () =>
+      makeDecodedToken({
+        uid: "uid-disabled-global",
+        email: "mimonkb222@gmail.com",
+      })
+    );
+    mockGet.mock.mockImplementationOnce(async () =>
+      makeProfileSnap({ email: "mimonkb222@gmail.com", isAdmin: true, active: false })
+    );
+
+    await assert.rejects(
+      () => requireAdminUser(makeRequest("valid-token")),
+      (error) => error instanceof AuthHttpError && error.status === 403
+    );
+  });
 });
 
 describe("requireGlobalAdminUser", () => {

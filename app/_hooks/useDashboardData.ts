@@ -10,6 +10,7 @@ import { handleFirestoreError, OperationType } from '@/lib/firestore-error';
 import { isToday, isBefore, addDays } from 'date-fns';
 import { canUseLocalFallback, getLocalDashboardSnapshot } from '@/lib/kiosk-local-store';
 import { usePlantStore } from '@/store/usePlantStore';
+import { useAuth } from '@/components/auth-context';
 
 // ── Interfaces ────────────────────────────────────────────────
 
@@ -83,6 +84,8 @@ function assignmentFromDoc(doc: LiveDoc): Assignment {
 
 export function useDashboardData() {
   const { activePlantId } = usePlantStore();
+  const { loading: authLoading, isAdmin, isOfflineSession } = useAuth();
+  const firebaseAdminReady = !authLoading && isAdmin && !isOfflineSession;
   const [recentAssignments, setRecentAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
@@ -129,6 +132,11 @@ export function useDashboardData() {
   }, []);
 
   const applyServerDashboard = useCallback(async () => {
+    if (!firebaseAdminReady) {
+      if (!authLoading) applyLocalDashboard();
+      return;
+    }
+
     try {
       await ensureFirebaseReady();
       const token = await auth.currentUser?.getIdToken();
@@ -195,10 +203,15 @@ export function useDashboardData() {
       console.error('[Dashboard server fallback error]', error);
       applyLocalDashboard();
     }
-  }, [activePlantId, applyLocalDashboard]);
+  }, [activePlantId, applyLocalDashboard, authLoading, firebaseAdminReady]);
 
   // ── Assignments listener (recent 10) ──────────────────────
   useEffect(() => {
+    if (!firebaseAdminReady) {
+      if (!authLoading) applyLocalDashboard();
+      return;
+    }
+
     try {
       const q = activePlantId === 'todas'
         ? query(collection(db, 'assignments'), orderBy('assignedAt', 'desc'), limit(10))
@@ -239,10 +252,15 @@ export function useDashboardData() {
       }, 0);
       return () => window.clearTimeout(timeout);
     }
-  }, [activePlantId, applyServerDashboard]);
+  }, [activePlantId, applyLocalDashboard, applyServerDashboard, authLoading, firebaseAdminReady]);
 
   // ── Employees + Inventory + Assignments stats listener ────
   useEffect(() => {
+    if (!firebaseAdminReady) {
+      if (!authLoading) applyLocalDashboard();
+      return;
+    }
+
     let activeEmployees: Array<{ id: string; area: string }> = [];
     let inventoryItems: Array<Record<string, unknown>> = [];
     let assignmentItems: Array<Record<string, unknown>> = [];
@@ -356,7 +374,7 @@ export function useDashboardData() {
       }, 0);
       return () => window.clearTimeout(timeout);
     }
-  }, [activePlantId, applyServerDashboard]);
+  }, [activePlantId, applyLocalDashboard, applyServerDashboard, authLoading, firebaseAdminReady]);
 
   return {
     recentAssignments,
