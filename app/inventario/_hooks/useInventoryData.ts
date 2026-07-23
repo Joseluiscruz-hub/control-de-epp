@@ -233,6 +233,31 @@ export function useInventoryData() {
     }
   }, []);
 
+  const handleAddFormChange = (nextForm: typeof EMPTY_ITEM_FORM) => {
+    if (nextForm.sku !== form.sku) {
+      const hasSku = normalizeManualSku(nextForm.sku) !== '';
+      setCatalogLookup(hasSku
+        ? {
+            status: 'loading',
+            message: 'Validando SKU...',
+            existsInPlant: false,
+          }
+        : EMPTY_CATALOG_LOOKUP);
+      setForm({
+        ...nextForm,
+        material: '',
+        name: '',
+        category: '',
+        replacementDays: '',
+        minStock: '',
+        unit: 'PZA',
+      });
+      return;
+    }
+
+    setForm(nextForm);
+  };
+
   useEffect(() => {
     if (!addOpen) return;
 
@@ -734,7 +759,7 @@ export function useInventoryData() {
     setAddOpen: handleAddOpenChange,
     saving,
     form,
-    setForm,
+    setForm: handleAddFormChange,
     catalogLookup,
     handleAdd,
 
