@@ -16,8 +16,13 @@ export interface EppConsumptionResult {
 }
 
 export const EPP_CONSUMPTION_RULES: readonly EppConsumptionRule[] = [
+  { id: "sap-26016863", sapMaterial: "26016863", unitsPerPackage: 25, unitDecrease: 0.04 },
   { id: "sap-26016866", sapMaterial: "26016866", unitsPerPackage: 25, unitDecrease: 0.04 },
   { id: "sap-26016869", sapMaterial: "26016869", unitsPerPackage: 25, unitDecrease: 0.04 },
+  { id: "sap-26016867", sapMaterial: "26016867", unitsPerPackage: 12, unitDecrease: 0.08 },
+  { id: "sap-26149605", sapMaterial: "26149605", kofSku: "2KPM0", unitsPerPackage: 25, unitDecrease: 0.04 },
+  { id: "sap-26149607", sapMaterial: "26149607", kofSku: "2KPM2", unitsPerPackage: 25, unitDecrease: 0.04 },
+  { id: "sap-26149608", sapMaterial: "26149608", kofSku: "2KPM3", unitsPerPackage: 25, unitDecrease: 0.04 },
   { id: "sap-26016897", sapMaterial: "26016897", unitsPerPackage: 25, unitDecrease: 0.04 },
   { id: "sap-26149610", sapMaterial: "26149610", kofSku: "3PPM0", unitsPerPackage: 12, unitDecrease: 0.08 },
   { id: "sap-26149609", sapMaterial: "26149609", kofSku: "3PNM9", unitsPerPackage: 12, unitDecrease: 0.08 },
