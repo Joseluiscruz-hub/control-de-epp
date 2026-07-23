@@ -56,6 +56,10 @@ export function assertPlantAccess(adminUser: AdminSession, plantaId: string | nu
   }
 }
 
+function cleanUndefinedFields(input: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+}
+
 export function buildInventoryMovement(params: {
   itemId: string;
   sku: string;
@@ -83,7 +87,7 @@ export function buildInventoryMovement(params: {
     plantaId: params.plantaId,
     performedByUid: params.performedByUid,
     performedByEmail: params.performedByEmail,
-    metadata: params.metadata ?? {},
+    metadata: params.metadata ? cleanUndefinedFields(params.metadata) : {},
     createdAt: FieldValue.serverTimestamp(),
   };
 }
