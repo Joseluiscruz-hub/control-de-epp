@@ -23,6 +23,7 @@ const EXPECTED_HEADERS = [
   "Precio variable",
   "Stock",
 ] as const;
+const OPTIONAL_HEADERS = new Set<string>(["Talla"]);
 
 export interface InventoryVariant {
   size: string;
@@ -106,6 +107,17 @@ function normalizeHeader(value: string) {
 
 function normalizeCell(value: string) {
   return value.replace(/^\uFEFF/, "").trim().replace(/\s+/g, " ");
+}
+
+function normalizeInventorySize(value: string) {
+  const size = normalizeCell(value).toUpperCase();
+  if (
+    !size ||
+    ["N/A", "NA", "S/T", "SIN TALLA", "UNITARIO", "UNICA", "ÚNICA", "UNICO", "ÚNICO"].includes(size)
+  ) {
+    return "N/A";
+  }
+  return size;
 }
 
 function parseNumber(value: string): number | undefined {
@@ -262,7 +274,7 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
   }
 
   const headers = lines[0].split("\t").map(normalizeHeader);
-  const missingHeaders = EXPECTED_HEADERS.filter((header) => !headers.includes(header));
+  const missingHeaders = EXPECTED_HEADERS.filter((header) => !OPTIONAL_HEADERS.has(header) && !headers.includes(header));
   if (missingHeaders.length > 0) {
     issues.push({
       row: 1,
@@ -302,7 +314,7 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
     const rawPlant = read("Planta");
     const plantaId = parsePlantId(rawPlant);
     const rawName = read("Texto breve de Material");
-    const size = read("Talla").toUpperCase() || "N/A";
+    const size = normalizeInventorySize(read("Talla"));
     const material = read("Material");
     const stockInput = parseNumber(read("Stock"));
     const unitCost = parseNumber(read("Precio variable"));
@@ -402,7 +414,7 @@ export function parseInventoryTsv(text: string): ParsedInventoryImport {
   const items = Array.from(groups.entries())
     .map(([, group]) => {
       const variants = group.variants.sort((a, b) => a.size.localeCompare(b.size, "es", { numeric: true }));
-      const hasSizes = variants.length > 1 || variants.some((variant) => variant.size !== "N/A");
+      const hasSizes = variants.some((variant) => variant.size !== "N/A");
       const primary = pickPrimaryVariant(variants);
       const stock = variants.reduce((sum, variant) => sum + variant.stock, 0);
       const ruleInput = {

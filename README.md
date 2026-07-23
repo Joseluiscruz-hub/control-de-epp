@@ -257,10 +257,12 @@ Comportamiento:
 - Rechaza en servidor archivos de inventario que no correspondan a la planta seleccionada o autorizada.
 - Agrupa filas por producto base.
 - Conserva tallas y variantes.
+- Permite inventario unitario sin talla: `Talla` puede venir vacía u omitirse del TSV.
 - Suma stock consolidado por artículo.
 - Genera SKU temporal estable si falta el código de material.
 - Carga stock vacío como `0`.
 - Escribe `ppe_catalog` y `kiosk_catalog`.
+- El alta manual de un material unitario captura SKU, material SAP, ubicación, unidad, costo unitario y stock mínimo para mantener el mismo contrato del catálogo.
 
 ## Seguridad
 

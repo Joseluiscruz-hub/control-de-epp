@@ -18,10 +18,15 @@ export interface AddItemDialogProps {
   saving: boolean;
   form: {
     sku: string;
+    material: string;
     name: string;
     category: string;
     replacementDays: string;
     stock: string;
+    minStock: string;
+    location: string;
+    unit: string;
+    unitCost: string;
   };
   setForm: (form: AddItemDialogProps['form']) => void;
   onSubmit: (e: React.FormEvent) => void;
@@ -59,15 +64,13 @@ export function AddItemDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Categoría</Label>
-              <Select value={form.category} onValueChange={v => setForm({...form, category: v || ''})}>
-                <SelectTrigger className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-medium">
-                  <SelectValue placeholder="Seleccionar..." />
-                </SelectTrigger>
-                <SelectContent className="bg-[#0A1628] border-white/10 text-white rounded-xl">
-                  {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Material SAP</Label>
+              <Input
+                className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-bold focus-visible:ring-[#F40009]"
+                value={form.material}
+                onChange={e => setForm({...form, material: e.target.value.toUpperCase()})}
+                placeholder="Ej: 26149605"
+              />
             </div>
           </div>
           <div className="space-y-2">
@@ -80,6 +83,17 @@ export function AddItemDialog({
             />
           </div>
           <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Categoría</Label>
+              <Select value={form.category} onValueChange={v => setForm({...form, category: v || ''})}>
+                <SelectTrigger className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-medium">
+                  <SelectValue placeholder="Seleccionar..." />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0A1628] border-white/10 text-white rounded-xl">
+                  {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Vida Útil (Días)</Label>
               <Input 
@@ -96,6 +110,47 @@ export function AddItemDialog({
                 className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-bold focus-visible:ring-[#F40009]" 
                 value={form.stock} 
                 onChange={e => setForm({...form, stock: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Stock Mínimo</Label>
+              <Input
+                type="number"
+                className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-bold focus-visible:ring-[#F40009]"
+                value={form.minStock}
+                onChange={e => setForm({...form, minStock: e.target.value})}
+                placeholder="Auto"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Ubicación</Label>
+              <Input
+                className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-bold focus-visible:ring-[#F40009]"
+                value={form.location}
+                onChange={e => setForm({...form, location: e.target.value.toUpperCase()})}
+                placeholder="Ej: A1"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Unidad</Label>
+              <Input
+                className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-bold focus-visible:ring-[#F40009]"
+                value={form.unit}
+                onChange={e => setForm({...form, unit: e.target.value.toUpperCase()})}
+                placeholder="PZA"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Precio Variable</Label>
+              <Input
+                type="number"
+                step="0.01"
+                className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-bold focus-visible:ring-[#F40009]"
+                value={form.unitCost}
+                onChange={e => setForm({...form, unitCost: e.target.value})}
+                placeholder="0.00"
               />
             </div>
           </div>

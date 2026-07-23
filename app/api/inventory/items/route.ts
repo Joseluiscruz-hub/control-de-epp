@@ -87,10 +87,15 @@ export async function POST(req: NextRequest) {
     const adminUser = await requireAdminUser(req);
     const body = await req.json();
     const sku = readText(body?.sku).toUpperCase();
+    const material = readText(body?.material).toUpperCase();
     const name = readText(body?.name);
     const category = readText(body?.category);
     const requestedDays = readNumber(body?.replacementDays);
     const stockInput = readNumber(body?.stock);
+    const location = readText(body?.location).toUpperCase();
+    const unit = readText(body?.unit).toUpperCase() || "PZA";
+    const unitCost = body?.unitCost === undefined || body?.unitCost === "" ? undefined : Math.max(0, readNumber(body?.unitCost));
+    const requestedMinStock = body?.minStock === undefined || body?.minStock === "" ? undefined : Math.max(0, readNumber(body?.minStock));
     const plantaId = resolveWritePlant(adminUser, body?.plantaId);
 
     if (!sku || !name || !category || requestedDays <= 0 || stockInput < 0) {
@@ -103,17 +108,19 @@ export async function POST(req: NextRequest) {
     const kioskRef = db.collection("kiosk_catalog").doc(itemDocId);
     const movementRef = db.collection("inventory_movements").doc();
     const auditRef = db.collection("audit_events").doc();
-    const ruleInput = { sku, name };
+    const ruleInput = { sku, material, name };
     const replacementDays = resolveEppReplacementDays(ruleInput, requestedDays);
     const rulePayload = getEppDurationRulePayload(ruleInput);
     const stockConversion = resolveStockFromPackageRule({
       name,
       sku,
+      material,
+      codes: [material],
       stockInput,
     });
     const stock = stockConversion.stock;
-    const reorderPoint = getEppReorderPoint(sku);
-    const minStock = reorderPoint ?? 2;
+    const reorderPoint = getEppReorderPoint(material, sku);
+    const minStock = reorderPoint ?? requestedMinStock ?? 2;
 
     await db.runTransaction(async (transaction) => {
       const currentSnap = await transaction.get(itemRef);
@@ -128,8 +135,11 @@ export async function POST(req: NextRequest) {
         ...rulePayload,
         plantaId,
         stock,
+        material: material || sku,
+        location,
         ...stockConversion.metadata,
-        unit: stockConversion.metadata?.stockUnit ?? "PZA",
+        unit: stockConversion.metadata?.stockUnit ?? unit,
+        ...(unitCost !== undefined ? { unitCost } : {}),
         minStock,
         ...(reorderPoint !== undefined ? { reorderPoint } : {}),
         hasSizes: false,
@@ -155,6 +165,10 @@ export async function POST(req: NextRequest) {
         metadata: {
           itemName: name,
           category,
+          material: material || sku,
+          location,
+          unit: stockConversion.metadata?.stockUnit ?? unit,
+          ...(unitCost !== undefined ? { unitCost } : {}),
           stockPackageInput: stockConversion.metadata?.stockPackageInput,
           packageRuleId: stockConversion.metadata?.packageRuleId,
           packageUnit: stockConversion.metadata?.packageUnit,
@@ -168,7 +182,16 @@ export async function POST(req: NextRequest) {
         targetCollection: "ppe_catalog",
         targetId: sku,
         before: currentSnap.exists ? { stock: previousStock, plantaId: current.plantaId ?? null } : null,
-        after: { stock, stockInput, plantaId, name, category },
+        after: {
+          stock,
+          stockInput,
+          plantaId,
+          name,
+          category,
+          material: material || sku,
+          location,
+          ...(unitCost !== undefined ? { unitCost } : {}),
+        },
       }, req));
     });
 

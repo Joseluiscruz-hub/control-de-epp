@@ -49,13 +49,16 @@ export function InventoryImportDialog({
           </div>
           <DialogHeader>
             <DialogTitle className="text-2xl font-black tracking-tight text-white uppercase">Base Maestra de EPP</DialogTitle>
-            <p className="text-white/50 font-medium mt-1">Carga controlada de materiales, tallas, ubicaciones y stock de planta.</p>
+              <p className="text-white/50 font-medium mt-1">Carga controlada de materiales unitarios o por talla, ubicaciones y stock de planta.</p>
           </DialogHeader>
         </div>
 
         <div className="p-8 space-y-6 max-h-[72vh] overflow-y-auto">
           <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-6">
             <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Archivo TSV / TXT de inventario</Label>
+            <p className="mt-2 text-xs font-medium text-white/40">
+              Para materiales sin talla, deja la columna Talla vacía u omítela del archivo.
+            </p>
             <Input
               type="file"
               accept=".txt,.tsv,text/plain,text/tab-separated-values"

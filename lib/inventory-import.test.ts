@@ -68,4 +68,48 @@ describe("parseInventoryTsv", () => {
     assert.equal(parsed.items[0]?.sizes?.M?.reorderPoint, 5);
     assert.equal(parsed.items[0]?.sizes?.M?.minStock, 5);
   });
+
+  it("permite inventario unitario sin columna Talla", () => {
+    const headersWithoutSize = [
+      "Planta",
+      "Alma",
+      "Material",
+      "Texto breve de Material",
+      "Ubicación",
+      "Umb",
+      "Precio variable",
+      "Stock",
+    ].join("\t");
+
+    const parsed = parseInventoryTsv([
+      headersWithoutSize,
+      row(["CTTOPMN001", "1000", "MAT-UNIT", "CASCO BLANCO MSA", "A1", "PZA", "125.5", "3"]),
+    ].join("\n"));
+
+    assert.equal(hasBlockingInventoryIssues(parsed), false);
+    assert.equal(parsed.summary.itemCount, 1);
+    assert.equal(parsed.summary.variantCount, 1);
+    assert.equal(parsed.items[0]?.hasSizes, false);
+    assert.equal(parsed.items[0]?.sizes, undefined);
+    assert.equal(parsed.items[0]?.stock, 3);
+    assert.equal(parsed.items[0]?.material, "MAT-UNIT");
+    assert.equal(parsed.items[0]?.location, "A1");
+    assert.equal(parsed.items[0]?.unit, "PZA");
+    assert.equal(parsed.items[0]?.unitCost, 125.5);
+  });
+
+  it("mantiene materiales sin talla como stock directo aunque haya varias filas", () => {
+    const parsed = parseInventoryTsv([
+      HEADERS,
+      row(["CTTOPMN001", "1000", "MAT-UNIT", "CASCO BLANCO MSA", "", "A1", "PZA", "125.5", "2"]),
+      row(["CTTOPMN001", "1000", "MAT-UNIT", "CASCO BLANCO MSA", "N/A", "A2", "PZA", "125.5", "3"]),
+    ].join("\n"));
+
+    assert.equal(hasBlockingInventoryIssues(parsed), false);
+    assert.equal(parsed.summary.itemCount, 1);
+    assert.equal(parsed.summary.variantCount, 2);
+    assert.equal(parsed.items[0]?.hasSizes, false);
+    assert.equal(parsed.items[0]?.sizes, undefined);
+    assert.equal(parsed.items[0]?.stock, 5);
+  });
 });

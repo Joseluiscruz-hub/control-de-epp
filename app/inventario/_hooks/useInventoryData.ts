@@ -91,6 +91,19 @@ export const CATEGORIES = [
 
 export const LOW_STOCK_THRESHOLD = 20;
 
+const EMPTY_ITEM_FORM = {
+  sku: '',
+  material: '',
+  name: '',
+  category: '',
+  replacementDays: '',
+  stock: '',
+  minStock: '',
+  location: '',
+  unit: 'PZA',
+  unitCost: '',
+};
+
 /* ── Helpers ───────────────────────────────────── */
 
 export function stockColor(stock: number) {
@@ -180,9 +193,7 @@ export function useInventoryData() {
   // Add-item dialog state
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    sku: '', name: '', category: '', replacementDays: '', stock: ''
-  });
+  const [form, setForm] = useState(EMPTY_ITEM_FORM);
 
   // Import dialog state
   const [importOpen, setImportOpen] = useState(false);
@@ -415,16 +426,23 @@ export function useInventoryData() {
     if (!form.sku || !form.name || !form.category || !form.replacementDays || !form.stock) return;
     setSaving(true);
     try {
-      const initialStock = parseInt(form.stock);
-      const ruleInput = { sku: form.sku, name: form.name };
+      const initialStock = Math.max(0, parseInt(form.stock));
+      const material = form.material.trim().toUpperCase();
+      const ruleInput = { sku: form.sku, material, name: form.name };
       const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
       const rulePayload = getEppDurationRulePayload(ruleInput);
       const stockConversion = resolveStockFromPackageRule({
         name: form.name,
         sku: form.sku,
+        material,
+        codes: [material],
         stockInput: initialStock,
       });
-      const reorderPoint = getEppReorderPoint(form.sku);
+      const reorderPoint = getEppReorderPoint(material, form.sku);
+      const minStockInput = form.minStock ? Math.max(0, parseInt(form.minStock)) : undefined;
+      const minStock = reorderPoint ?? minStockInput ?? 2;
+      const unit = (stockConversion.metadata?.stockUnit ?? form.unit.trim().toUpperCase()) || 'PZA';
+      const unitCost = form.unitCost ? Math.max(0, Number(form.unitCost)) : undefined;
       const token = await requireAdminToken();
       const response = await fetch('/api/inventory/items', {
         method: 'POST',
@@ -434,10 +452,15 @@ export function useInventoryData() {
         },
         body: JSON.stringify({
           sku: form.sku,
+          material,
           name: form.name,
           category: form.category,
           replacementDays,
           stock: initialStock,
+          minStock,
+          location: form.location.trim(),
+          unit,
+          unitCost,
           plantaId: writePlantId,
         }),
       });
@@ -454,9 +477,12 @@ export function useInventoryData() {
           ...rulePayload,
           plantaId: writePlantId,
           stock: stockConversion.stock,
+          material: material || form.sku,
+          location: form.location.trim(),
           ...stockConversion.metadata,
-          unit: stockConversion.metadata?.stockUnit ?? 'PZA',
-          minStock: reorderPoint ?? 2,
+          unit,
+          unitCost,
+          minStock,
           ...(reorderPoint !== undefined ? { reorderPoint } : {}),
           hasSizes: false,
           active: true,
@@ -465,19 +491,26 @@ export function useInventoryData() {
       }
       await loadInventory();
       toast.success(`Artículo "${form.name}" agregado al catálogo`);
-      setForm({ sku: '', name: '', category: '', replacementDays: '', stock: '' });
+      setForm(EMPTY_ITEM_FORM);
       setAddOpen(false);
     } catch {
-      const initialStock = parseInt(form.stock);
-      const ruleInput = { sku: form.sku, name: form.name };
+      const initialStock = Math.max(0, parseInt(form.stock));
+      const material = form.material.trim().toUpperCase();
+      const ruleInput = { sku: form.sku, material, name: form.name };
       const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
       const rulePayload = getEppDurationRulePayload(ruleInput);
       const stockConversion = resolveStockFromPackageRule({
         name: form.name,
         sku: form.sku,
+        material,
+        codes: [material],
         stockInput: initialStock,
       });
-      const reorderPoint = getEppReorderPoint(form.sku);
+      const reorderPoint = getEppReorderPoint(material, form.sku);
+      const minStockInput = form.minStock ? Math.max(0, parseInt(form.minStock)) : undefined;
+      const minStock = reorderPoint ?? minStockInput ?? 2;
+      const unit = (stockConversion.metadata?.stockUnit ?? form.unit.trim().toUpperCase()) || 'PZA';
+      const unitCost = form.unitCost ? Math.max(0, Number(form.unitCost)) : undefined;
       if (canUseLocalFallback()) {
         upsertLocalCatalogItem({
           id: form.sku,
@@ -488,9 +521,12 @@ export function useInventoryData() {
           ...rulePayload,
           plantaId: writePlantId,
           stock: stockConversion.stock,
+          material: material || form.sku,
+          location: form.location.trim(),
           ...stockConversion.metadata,
-          unit: stockConversion.metadata?.stockUnit ?? 'PZA',
-          minStock: reorderPoint ?? 2,
+          unit,
+          unitCost,
+          minStock,
           ...(reorderPoint !== undefined ? { reorderPoint } : {}),
           hasSizes: false,
           active: true,
@@ -498,7 +534,7 @@ export function useInventoryData() {
         });
         setItems(listLocalInventory());
         toast.success(`Artículo "${form.name}" agregado localmente`);
-        setForm({ sku: '', name: '', category: '', replacementDays: '', stock: '' });
+        setForm(EMPTY_ITEM_FORM);
         setAddOpen(false);
       } else {
         toast.error('No se pudo agregar el material en Firebase.');
