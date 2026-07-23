@@ -289,18 +289,23 @@ export function resolveCanonicalEppCatalogItem(
   );
   if (masterEntry) return buildFromMaster(masterEntry);
 
+  const durationRule = getEppDurationRule({
+    sku: requestedSku,
+    material: requestedSku,
+  });
+  const lookupCodes = [
+    requestedSku,
+    durationRule?.kofSku,
+    durationRule?.sapMaterial,
+  ];
   const candidate = candidates.find((item) =>
-    candidateMatchesCatalogCodes(item, [requestedSku])
+    candidateMatchesCatalogCodes(item, lookupCodes)
   );
   const candidateItem = candidate
     ? buildFromCandidate(candidate, requestedSku)
     : undefined;
   if (candidateItem) return candidateItem;
 
-  const durationRule = getEppDurationRule({
-    sku: requestedSku,
-    material: requestedSku,
-  });
   return durationRule
     ? buildFromDurationRule(durationRule, requestedSku)
     : undefined;
