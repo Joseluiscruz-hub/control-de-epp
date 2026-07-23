@@ -119,6 +119,7 @@ export default function InventarioPage() {
         form={data.form}
         setForm={data.setForm}
         saving={data.saving}
+        catalogLookup={data.catalogLookup}
         onSubmit={data.handleAdd}
       />
 
