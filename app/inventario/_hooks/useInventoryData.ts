@@ -17,8 +17,8 @@ import {
   upsertLocalCatalogItem,
 } from '@/lib/kiosk-local-store';
 import { PPECatalogItem } from '@/lib/kiosk-types';
-import { getEppDurationRulePayload, resolveEppReplacementDays } from '@/lib/epp-duration-rules';
-import { resolveStockFromPackageRule } from '@/lib/epp-package-rules';
+import { resolveEppReplacementDays } from '@/lib/epp-duration-rules';
+import { normalizeManualSku, validateManualSku } from '@/lib/epp-master-catalog';
 import { getEppReorderPoint } from '@/lib/epp-reorder-points';
 import { normalizePlantId, plantLabel } from '@/lib/plants';
 import { usePlantStore } from '@/store/usePlantStore';
@@ -90,6 +90,18 @@ export const CATEGORIES = [
 ];
 
 export const LOW_STOCK_THRESHOLD = 20;
+
+export interface ManualCatalogLookupState {
+  status: 'idle' | 'loading' | 'found' | 'duplicate' | 'error';
+  message: string;
+  existsInPlant: boolean;
+}
+
+const EMPTY_CATALOG_LOOKUP: ManualCatalogLookupState = {
+  status: 'idle',
+  message: 'Ingresa un SKU para consultar el catálogo maestro.',
+  existsInPlant: false,
+};
 
 const EMPTY_ITEM_FORM = {
   sku: '',
@@ -194,6 +206,7 @@ export function useInventoryData() {
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_ITEM_FORM);
+  const [catalogLookup, setCatalogLookup] = useState<ManualCatalogLookupState>(EMPTY_CATALOG_LOOKUP);
 
   // Import dialog state
   const [importOpen, setImportOpen] = useState(false);
@@ -211,6 +224,134 @@ export function useInventoryData() {
 
   const { activePlantId } = usePlantStore();
   const writePlantId = normalizePlantId(activePlantId);
+
+  useEffect(() => {
+    if (!addOpen) {
+      setCatalogLookup(EMPTY_CATALOG_LOOKUP);
+      return;
+    }
+
+    const requestedSku = normalizeManualSku(form.sku);
+    if (!requestedSku) {
+      setCatalogLookup(EMPTY_CATALOG_LOOKUP);
+      return;
+    }
+
+    const skuError = validateManualSku(requestedSku);
+    if (skuError) {
+      setCatalogLookup({
+        status: 'error',
+        message: skuError,
+        existsInPlant: false,
+      });
+      setForm((current) => ({
+        ...current,
+        material: '',
+        name: '',
+        category: '',
+        replacementDays: '',
+        minStock: '',
+        unit: 'PZA',
+      }));
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      void (async () => {
+        setCatalogLookup({
+          status: 'loading',
+          message: 'Consultando catálogo maestro...',
+          existsInPlant: false,
+        });
+
+        try {
+          const token = await requireAdminToken();
+          const response = await fetch(
+            `/api/inventory/items?lookupSku=${encodeURIComponent(requestedSku)}&plant=${encodeURIComponent(writePlantId)}`,
+            {
+              cache: 'no-store',
+              signal: controller.signal,
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: 'application/json',
+              },
+            }
+          );
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new ApiRequestError(
+              typeof result?.error === 'string' ? result.error : 'SKU no registrado en el catálogo maestro.',
+              response.status
+            );
+          }
+
+          const item = result?.catalogItem as {
+            sku?: string;
+            material?: string;
+            name?: string;
+            category?: string;
+            replacementDays?: number;
+            unit?: string;
+            minStock?: number;
+            source?: string;
+          };
+          if (!item?.sku || !item?.name || !item?.category || !item?.replacementDays) {
+            throw new Error('Respuesta incompleta del catálogo maestro.');
+          }
+
+          setForm((current) => {
+            if (normalizeManualSku(current.sku) !== requestedSku) return current;
+            return {
+              ...current,
+              sku: item.sku ?? requestedSku,
+              material: item.material ?? item.sku ?? requestedSku,
+              name: item.name ?? '',
+              category: item.category ?? '',
+              replacementDays: String(item.replacementDays ?? ''),
+              minStock: String(item.minStock ?? 2),
+              unit: item.unit ?? 'PZA',
+            };
+          });
+
+          const existsInPlant = result?.existsInPlant === true;
+          setCatalogLookup({
+            status: existsInPlant ? 'duplicate' : 'found',
+            message: existsInPlant
+              ? 'Este SKU ya existe en la planta. Usa Ajustar stock.'
+              : 'SKU validado. Nombre, categoría y vigencia fueron tomados del catálogo.',
+            existsInPlant,
+          });
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          setForm((current) => {
+            if (normalizeManualSku(current.sku) !== requestedSku) return current;
+            return {
+              ...current,
+              material: '',
+              name: '',
+              category: '',
+              replacementDays: '',
+              minStock: '',
+              unit: 'PZA',
+            };
+          });
+          setCatalogLookup({
+            status: 'error',
+            message: error instanceof Error && error.message
+              ? error.message
+              : 'No se pudo consultar el catálogo maestro.',
+            existsInPlant: false,
+          });
+        }
+      })();
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [addOpen, form.sku, writePlantId]);
 
   /* ── Local fallback loader ───────────────────── */
   const loadLocalInventory = useCallback(() => {
@@ -423,26 +564,35 @@ export function useInventoryData() {
   /* ── Add single item ─────────────────────────── */
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.sku || !form.name || !form.category || !form.replacementDays || !form.stock) return;
+    if (catalogLookup.status !== 'found') {
+      toast.error(catalogLookup.message);
+      return;
+    }
+
+    const stockInput = Number(form.stock);
+    const minStockInput = form.minStock === '' ? undefined : Number(form.minStock);
+    const unitCost = form.unitCost === '' ? undefined : Number(form.unitCost);
+    const location = form.location.trim().toUpperCase();
+
+    if (!Number.isInteger(stockInput) || stockInput < 0 || stockInput > 1_000_000) {
+      toast.error('El stock debe ser un entero entre 0 y 1,000,000.');
+      return;
+    }
+    if (!location) {
+      toast.error('La ubicación es obligatoria.');
+      return;
+    }
+    if (minStockInput !== undefined && (!Number.isInteger(minStockInput) || minStockInput < 0)) {
+      toast.error('El stock mínimo debe ser un entero no negativo.');
+      return;
+    }
+    if (unitCost !== undefined && (!Number.isFinite(unitCost) || unitCost < 0)) {
+      toast.error('El precio debe ser un número no negativo.');
+      return;
+    }
+
     setSaving(true);
     try {
-      const initialStock = Math.max(0, parseInt(form.stock));
-      const material = form.material.trim().toUpperCase();
-      const ruleInput = { sku: form.sku, material, name: form.name };
-      const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
-      const rulePayload = getEppDurationRulePayload(ruleInput);
-      const stockConversion = resolveStockFromPackageRule({
-        name: form.name,
-        sku: form.sku,
-        material,
-        codes: [material],
-        stockInput: initialStock,
-      });
-      const reorderPoint = getEppReorderPoint(material, form.sku);
-      const minStockInput = form.minStock ? Math.max(0, parseInt(form.minStock)) : undefined;
-      const minStock = reorderPoint ?? minStockInput ?? 2;
-      const unit = (stockConversion.metadata?.stockUnit ?? form.unit.trim().toUpperCase()) || 'PZA';
-      const unitCost = form.unitCost ? Math.max(0, Number(form.unitCost)) : undefined;
       const token = await requireAdminToken();
       const response = await fetch('/api/inventory/items', {
         method: 'POST',
@@ -451,94 +601,42 @@ export function useInventoryData() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          sku: form.sku,
-          material,
-          name: form.name,
-          category: form.category,
-          replacementDays,
-          stock: initialStock,
-          minStock,
-          location: form.location.trim(),
-          unit,
+          sku: normalizeManualSku(form.sku),
+          stock: stockInput,
+          minStock: minStockInput,
+          location,
           unitCost,
           plantaId: writePlantId,
         }),
       });
+      const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(await readApiError(response, 'inventory_item_save_failed'));
+        throw new ApiRequestError(
+          typeof result?.error === 'string' ? result.error : 'inventory_item_save_failed',
+          response.status
+        );
       }
-      if (canUseLocalFallback()) {
+
+      const savedItem = result?.item as PPECatalogItem | undefined;
+      if (canUseLocalFallback() && savedItem) {
         upsertLocalCatalogItem({
-          id: form.sku,
-          sku: form.sku,
-          name: form.name,
-          category: form.category,
-          replacementDays,
-          ...rulePayload,
-          plantaId: writePlantId,
-          stock: stockConversion.stock,
-          material: material || form.sku,
-          location: form.location.trim(),
-          ...stockConversion.metadata,
-          unit,
-          unitCost,
-          minStock,
-          ...(reorderPoint !== undefined ? { reorderPoint } : {}),
-          hasSizes: false,
-          active: true,
-          available: stockConversion.stock > 0,
+          id: result?.itemId ?? result?.sku,
+          ...savedItem,
         });
       }
+
       await loadInventory();
-      toast.success(`Artículo "${form.name}" agregado al catálogo`);
+      toast.success(`Artículo "${savedItem?.name ?? form.name}" agregado con datos del catálogo maestro.`);
       setForm(EMPTY_ITEM_FORM);
+      setCatalogLookup(EMPTY_CATALOG_LOOKUP);
       setAddOpen(false);
-    } catch {
-      const initialStock = Math.max(0, parseInt(form.stock));
-      const material = form.material.trim().toUpperCase();
-      const ruleInput = { sku: form.sku, material, name: form.name };
-      const replacementDays = resolveEppReplacementDays(ruleInput, parseInt(form.replacementDays));
-      const rulePayload = getEppDurationRulePayload(ruleInput);
-      const stockConversion = resolveStockFromPackageRule({
-        name: form.name,
-        sku: form.sku,
-        material,
-        codes: [material],
-        stockInput: initialStock,
-      });
-      const reorderPoint = getEppReorderPoint(material, form.sku);
-      const minStockInput = form.minStock ? Math.max(0, parseInt(form.minStock)) : undefined;
-      const minStock = reorderPoint ?? minStockInput ?? 2;
-      const unit = (stockConversion.metadata?.stockUnit ?? form.unit.trim().toUpperCase()) || 'PZA';
-      const unitCost = form.unitCost ? Math.max(0, Number(form.unitCost)) : undefined;
-      if (canUseLocalFallback()) {
-        upsertLocalCatalogItem({
-          id: form.sku,
-          sku: form.sku,
-          name: form.name,
-          category: form.category,
-          replacementDays,
-          ...rulePayload,
-          plantaId: writePlantId,
-          stock: stockConversion.stock,
-          material: material || form.sku,
-          location: form.location.trim(),
-          ...stockConversion.metadata,
-          unit,
-          unitCost,
-          minStock,
-          ...(reorderPoint !== undefined ? { reorderPoint } : {}),
-          hasSizes: false,
-          active: true,
-          available: stockConversion.stock > 0,
-        });
-        setItems(listLocalInventory());
-        toast.success(`Artículo "${form.name}" agregado localmente`);
-        setForm(EMPTY_ITEM_FORM);
-        setAddOpen(false);
-      } else {
-        toast.error('No se pudo agregar el material en Firebase.');
-      }
+    } catch (error) {
+      console.error('[Manual inventory item error]', error);
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : 'No se pudo agregar el material.'
+      );
     } finally {
       setSaving(false);
     }
@@ -632,6 +730,7 @@ export function useInventoryData() {
     saving,
     form,
     setForm,
+    catalogLookup,
     handleAdd,
 
     // Import dialog
