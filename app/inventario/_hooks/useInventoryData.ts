@@ -225,39 +225,69 @@ export function useInventoryData() {
   const { activePlantId } = usePlantStore();
   const writePlantId = normalizePlantId(activePlantId);
 
-  useEffect(() => {
-    if (!addOpen) {
+  const handleAddOpenChange = useCallback((open: boolean) => {
+    setAddOpen(open);
+    if (!open) {
+      setForm(EMPTY_ITEM_FORM);
       setCatalogLookup(EMPTY_CATALOG_LOOKUP);
-      return;
     }
+  }, []);
 
-    const requestedSku = normalizeManualSku(form.sku);
-    if (!requestedSku) {
-      setCatalogLookup(EMPTY_CATALOG_LOOKUP);
-      return;
-    }
-
-    const skuError = validateManualSku(requestedSku);
-    if (skuError) {
-      setCatalogLookup({
-        status: 'error',
-        message: skuError,
-        existsInPlant: false,
-      });
-      setForm((current) => ({
-        ...current,
+  const handleAddFormChange = (nextForm: typeof EMPTY_ITEM_FORM) => {
+    if (nextForm.sku !== form.sku) {
+      const hasSku = normalizeManualSku(nextForm.sku) !== '';
+      setCatalogLookup(hasSku
+        ? {
+            status: 'loading',
+            message: 'Validando SKU...',
+            existsInPlant: false,
+          }
+        : EMPTY_CATALOG_LOOKUP);
+      setForm({
+        ...nextForm,
         material: '',
         name: '',
         category: '',
         replacementDays: '',
         minStock: '',
         unit: 'PZA',
-      }));
+      });
       return;
     }
 
+    setForm(nextForm);
+  };
+
+  useEffect(() => {
+    if (!addOpen) return;
+
+    const requestedSku = normalizeManualSku(form.sku);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
+      if (!requestedSku) {
+        setCatalogLookup(EMPTY_CATALOG_LOOKUP);
+        return;
+      }
+
+      const skuError = validateManualSku(requestedSku);
+      if (skuError) {
+        setCatalogLookup({
+          status: 'error',
+          message: skuError,
+          existsInPlant: false,
+        });
+        setForm((current) => ({
+          ...current,
+          material: '',
+          name: '',
+          category: '',
+          replacementDays: '',
+          minStock: '',
+          unit: 'PZA',
+        }));
+        return;
+      }
+
       void (async () => {
         setCatalogLookup({
           status: 'loading',
@@ -345,7 +375,7 @@ export function useInventoryData() {
           });
         }
       })();
-    }, 450);
+    }, requestedSku ? 450 : 0);
 
     return () => {
       window.clearTimeout(timeout);
@@ -620,8 +650,8 @@ export function useInventoryData() {
       const savedItem = result?.item as PPECatalogItem | undefined;
       if (canUseLocalFallback() && savedItem) {
         upsertLocalCatalogItem({
-          id: result?.itemId ?? result?.sku,
           ...savedItem,
+          id: result?.itemId ?? result?.sku ?? savedItem.id,
         });
       }
 
@@ -726,10 +756,10 @@ export function useInventoryData() {
 
     // Add dialog
     addOpen,
-    setAddOpen,
+    setAddOpen: handleAddOpenChange,
     saving,
     form,
-    setForm,
+    setForm: handleAddFormChange,
     catalogLookup,
     handleAdd,
 
