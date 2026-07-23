@@ -225,39 +225,44 @@ export function useInventoryData() {
   const { activePlantId } = usePlantStore();
   const writePlantId = normalizePlantId(activePlantId);
 
-  useEffect(() => {
-    if (!addOpen) {
+  const handleAddOpenChange = useCallback((open: boolean) => {
+    setAddOpen(open);
+    if (!open) {
+      setForm(EMPTY_ITEM_FORM);
       setCatalogLookup(EMPTY_CATALOG_LOOKUP);
-      return;
     }
+  }, []);
+
+  useEffect(() => {
+    if (!addOpen) return;
 
     const requestedSku = normalizeManualSku(form.sku);
-    if (!requestedSku) {
-      setCatalogLookup(EMPTY_CATALOG_LOOKUP);
-      return;
-    }
-
-    const skuError = validateManualSku(requestedSku);
-    if (skuError) {
-      setCatalogLookup({
-        status: 'error',
-        message: skuError,
-        existsInPlant: false,
-      });
-      setForm((current) => ({
-        ...current,
-        material: '',
-        name: '',
-        category: '',
-        replacementDays: '',
-        minStock: '',
-        unit: 'PZA',
-      }));
-      return;
-    }
-
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
+      if (!requestedSku) {
+        setCatalogLookup(EMPTY_CATALOG_LOOKUP);
+        return;
+      }
+
+      const skuError = validateManualSku(requestedSku);
+      if (skuError) {
+        setCatalogLookup({
+          status: 'error',
+          message: skuError,
+          existsInPlant: false,
+        });
+        setForm((current) => ({
+          ...current,
+          material: '',
+          name: '',
+          category: '',
+          replacementDays: '',
+          minStock: '',
+          unit: 'PZA',
+        }));
+        return;
+      }
+
       void (async () => {
         setCatalogLookup({
           status: 'loading',
@@ -345,7 +350,7 @@ export function useInventoryData() {
           });
         }
       })();
-    }, 450);
+    }, requestedSku ? 450 : 0);
 
     return () => {
       window.clearTimeout(timeout);
@@ -726,7 +731,7 @@ export function useInventoryData() {
 
     // Add dialog
     addOpen,
-    setAddOpen,
+    setAddOpen: handleAddOpenChange,
     saving,
     form,
     setForm,
