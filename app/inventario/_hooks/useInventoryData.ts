@@ -625,8 +625,8 @@ export function useInventoryData() {
       const savedItem = result?.item as PPECatalogItem | undefined;
       if (canUseLocalFallback() && savedItem) {
         upsertLocalCatalogItem({
-          id: result?.itemId ?? result?.sku,
           ...savedItem,
+          id: result?.itemId ?? result?.sku ?? savedItem.id,
         });
       }
 
