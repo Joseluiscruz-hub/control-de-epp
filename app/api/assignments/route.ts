@@ -8,6 +8,7 @@ import { normalizePlantId } from "@/lib/plants";
 import { AuthHttpError, canAdminUsePlant, requireAdminUser } from "@/lib/server-auth";
 import { resolveEppReplacementDays } from "@/lib/epp-duration-rules";
 import { resolveEppConsumption } from "@/lib/epp-consumption-rules";
+import { resolveInventoryStockDecrease } from "@/lib/epp-package-rules";
 
 export const runtime = "nodejs";
 
@@ -90,15 +91,30 @@ export async function POST(req: NextRequest) {
         throw new AssignmentHttpError("No hay stock disponible para este material.", 409);
       }
 
-      const newStock = previousStock - 1;
       const sku = readText(variant?.sku) || readText(item.sku) || itemId;
       const material = readText(variant?.material) || readText(item.material) || sku;
       const itemName = readText(item.name) || itemId;
+      const stockUnit = variant?.stockUnit ?? item.stockUnit;
+      const packageUnit = variant?.packageUnit ?? item.packageUnit;
+      const unitsPerPackage = variant?.unitsPerPackage ?? item.unitsPerPackage;
+      const stockDecrease = resolveInventoryStockDecrease({
+        stockUnit,
+        packageUnit,
+        unitsPerPackage,
+        issuedQuantity: 1,
+      });
+      if (previousStock < stockDecrease) {
+        throw new AssignmentHttpError("No hay stock disponible para este material.", 409);
+      }
+      const newStock = Math.max(0, Number((previousStock - stockDecrease).toFixed(2)));
       const consumption = resolveEppConsumption({
         sku,
         material,
         codes: [item.durationRuleSku, item.durationRuleSapMaterial],
         issuedQuantity: 1,
+        stockUnit,
+        packageUnit,
+        unitsPerPackage,
       });
       const unitCost = Math.max(0, readNumber(variant?.unitCost ?? item.unitCost));
       const category = readText(item.category) || "Sin categoria";
@@ -116,7 +132,7 @@ export async function POST(req: NextRequest) {
         readNumber(item.replacementDays, 365)
       );
       const aggregateNewStock = hasSizes
-        ? aggregatePreviousStock - 1
+        ? Math.max(0, Number((aggregatePreviousStock - stockDecrease).toFixed(2)))
         : newStock;
       const stockUpdate = hasSizes
         ? {
@@ -162,6 +178,14 @@ export async function POST(req: NextRequest) {
               unitDecrease: consumption.rule.unitDecrease,
             }
           : {}),
+        ...(!consumption.rule && typeof unitsPerPackage === "number" && unitsPerPackage > 0
+          ? {
+              unitsPerPackage,
+              unitDecrease: stockDecrease,
+              packageUnit: typeof packageUnit === "string" ? packageUnit : undefined,
+              stockUnit: typeof stockUnit === "string" ? stockUnit : undefined,
+            }
+          : {}),
         replacementDays,
         size: hasSizes ? requestedSize : "N/A",
         assignedAt: FieldValue.serverTimestamp(),
@@ -197,6 +221,8 @@ export async function POST(req: NextRequest) {
           aggregateNewStock,
           issuedQuantity: consumption.issuedQuantity,
           issuedUnit: "PZA",
+          stockDecrease,
+          stockUnit: typeof stockUnit === "string" ? stockUnit : undefined,
           reportQuantity: consumption.quantity,
           reportQuantityUnit: consumption.quantityUnit,
           ...(consumption.rule
@@ -204,6 +230,13 @@ export async function POST(req: NextRequest) {
                 consumptionRuleId: consumption.rule.id,
                 unitsPerPackage: consumption.rule.unitsPerPackage,
                 unitDecrease: consumption.rule.unitDecrease,
+              }
+            : {}),
+          ...(!consumption.rule && typeof unitsPerPackage === "number" && unitsPerPackage > 0
+            ? {
+                unitsPerPackage,
+                unitDecrease: stockDecrease,
+                packageUnit: typeof packageUnit === "string" ? packageUnit : undefined,
               }
             : {}),
         },

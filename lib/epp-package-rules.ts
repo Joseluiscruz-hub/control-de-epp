@@ -1,5 +1,7 @@
-export type StockUnit = "PZA";
+import { findEppConsumptionRule, roundEppConsumptionQuantity } from "./epp-consumption-rules";
+
 export type PackageUnit = "CAJA" | "BOLSA";
+export type StockUnit = "PZA" | PackageUnit;
 
 export interface EppPackageRule {
   id: string;
@@ -95,15 +97,25 @@ export function convertStockPackagesToPieces(stockPackageInput: number, unitsPer
 
 export function buildPackageStockMetadata(
   rule: Pick<EppPackageRule, "id" | "packageUnit" | "unitsPerPackage">,
-  stockPackageInput: number
+  stockPackageInput: number,
+  stockUnit: StockUnit = "PZA"
 ): PackageStockMetadata {
   return {
-    stockUnit: "PZA",
+    stockUnit,
     packageUnit: rule.packageUnit,
     unitsPerPackage: rule.unitsPerPackage,
     stockPackageInput: Number.isFinite(stockPackageInput) ? stockPackageInput : 0,
     packageRuleId: rule.id,
   };
+}
+
+export function isPackageUnit(value: unknown): value is PackageUnit {
+  return value === "CAJA" || value === "BOLSA";
+}
+
+function positiveNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 export function resolveStockFromPackageRule(params: {
@@ -113,7 +125,26 @@ export function resolveStockFromPackageRule(params: {
   material?: string | null;
   codes?: readonly unknown[];
   stockInput: number;
+  packageUnit?: PackageUnit | null;
+  unitsPerPackage?: number | null;
 }) {
+  const manualPackageUnit = isPackageUnit(params.packageUnit) ? params.packageUnit : undefined;
+  const manualUnitsPerPackage = positiveNumber(params.unitsPerPackage);
+  if (manualPackageUnit && manualUnitsPerPackage) {
+    return {
+      stock: Number.isFinite(params.stockInput) ? params.stockInput : 0,
+      metadata: buildPackageStockMetadata(
+        {
+          id: `manual-${manualPackageUnit.toLowerCase()}`,
+          packageUnit: manualPackageUnit,
+          unitsPerPackage: manualUnitsPerPackage,
+        },
+        params.stockInput,
+        manualPackageUnit
+      ),
+    };
+  }
+
   const nameRule = findEppPackageRule({ name: params.name, size: params.size });
   const consumptionRule = findEppConsumptionRule({
     sku: params.sku,
@@ -139,5 +170,20 @@ export function resolveStockFromPackageRule(params: {
     metadata: buildPackageStockMetadata(rule, params.stockInput),
   };
 }
-import { findEppConsumptionRule } from "./epp-consumption-rules";
+
+export function resolveInventoryStockDecrease(params: {
+  stockUnit?: unknown;
+  packageUnit?: unknown;
+  unitsPerPackage?: unknown;
+  issuedQuantity?: unknown;
+}) {
+  const issuedQuantity = positiveNumber(params.issuedQuantity) ?? 1;
+  const unitsPerPackage = positiveNumber(params.unitsPerPackage);
+
+  if (isPackageUnit(params.stockUnit) && params.stockUnit === params.packageUnit && unitsPerPackage) {
+    return roundEppConsumptionQuantity(issuedQuantity / unitsPerPackage);
+  }
+
+  return roundEppConsumptionQuantity(issuedQuantity);
+}
 

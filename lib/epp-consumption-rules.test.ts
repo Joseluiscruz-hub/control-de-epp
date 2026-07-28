@@ -7,7 +7,7 @@ import {
   resolveAssignmentReportConsumption,
   resolveEppConsumption,
 } from "./epp-consumption-rules";
-import { resolveStockFromPackageRule } from "./epp-package-rules";
+import { resolveInventoryStockDecrease, resolveStockFromPackageRule } from "./epp-package-rules";
 
 describe("EPP consumption rules", () => {
   test("contains the 20 configured SAP materials", () => {
@@ -118,5 +118,32 @@ describe("EPP consumption rules", () => {
     });
     assert.equal(tychem.stock, 12);
     assert.equal(tychem.metadata?.unitsPerPackage, 12);
+  });
+
+  test("keeps manually boxed stock in boxes and discounts the package fraction", () => {
+    const boxed = resolveStockFromPackageRule({
+      sku: "SKU-CAJA-01",
+      name: "Articulo en caja manual",
+      stockInput: 1,
+      packageUnit: "CAJA",
+      unitsPerPackage: 5,
+    });
+
+    assert.equal(boxed.stock, 1);
+    assert.equal(boxed.metadata?.stockUnit, "CAJA");
+    assert.equal(boxed.metadata?.unitsPerPackage, 5);
+    assert.equal(resolveInventoryStockDecrease({
+      stockUnit: boxed.metadata?.stockUnit,
+      packageUnit: boxed.metadata?.packageUnit,
+      unitsPerPackage: boxed.metadata?.unitsPerPackage,
+      issuedQuantity: 1,
+    }), 0.2);
+    assert.equal(resolveEppConsumption({
+      sku: "SKU-CAJA-01",
+      issuedQuantity: 1,
+      stockUnit: "CAJA",
+      packageUnit: "CAJA",
+      unitsPerPackage: 5,
+    }).quantity, 0.2);
   });
 });

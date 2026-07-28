@@ -14,6 +14,7 @@ import {
   resolveEppReplacementDays,
 } from "@/lib/epp-duration-rules";
 import { resolveEppConsumption } from "@/lib/epp-consumption-rules";
+import { resolveInventoryStockDecrease } from "@/lib/epp-package-rules";
 import { KioskEarlyReplacementAlert, KioskRequestItem, ReplacementReason } from "@/lib/kiosk-types";
 import { normalizePlantId } from "@/lib/plants";
 import { buildInventoryMovement } from "@/app/api/inventory/_lib";
@@ -78,8 +79,10 @@ type StockUpdateResult = {
   aggregatePreviousStock: number;
   aggregateNewStock: number;
   consumedQuantity: number;
+  issuedQuantity: number;
   packageRuleId?: string;
   packageUnit?: "CAJA" | "BOLSA";
+  stockUnit?: "PZA" | "CAJA" | "BOLSA";
   unitsPerPackage?: number;
 };
 
@@ -244,6 +247,7 @@ function getSizes(data: FirebaseFirestore.DocumentData) {
       stock?: number;
       packageRuleId?: string;
       packageUnit?: "CAJA" | "BOLSA";
+      stockUnit?: "PZA" | "CAJA" | "BOLSA";
       unitsPerPackage?: number;
       unitCost?: number;
     }>
@@ -271,13 +275,23 @@ function buildStockUpdates(
     updatedAt: FieldValue.serverTimestamp(),
   };
   const requiredQuantityRaw = readNumber(item.requiredQuantity, 1);
-  const consumedQuantity = Number.isFinite(requiredQuantityRaw) && requiredQuantityRaw > 0
+  const issuedQuantity = Number.isFinite(requiredQuantityRaw) && requiredQuantityRaw > 0
     ? requiredQuantityRaw
     : 1;
 
   if (item.size && item.size !== "N/A") {
     const sizes = getSizes(catalogData);
     const currentVariant = sizes?.[item.size];
+    const packageUnit = readPackageUnit(currentVariant?.packageUnit);
+    const unitsPerPackage = typeof currentVariant?.unitsPerPackage === "number" && currentVariant.unitsPerPackage > 0
+      ? currentVariant.unitsPerPackage
+      : undefined;
+    const consumedQuantity = resolveInventoryStockDecrease({
+      stockUnit: currentVariant?.stockUnit,
+      packageUnit,
+      unitsPerPackage,
+      issuedQuantity,
+    });
     const currentStock = readNumber(currentVariant?.stock);
     const aggregatePreviousStock = typeof catalogData.stock === "number"
       ? readNumber(catalogData.stock)
@@ -287,8 +301,8 @@ function buildStockUpdates(
       throw new KioskRequestError(`Sin stock disponible para ${item.itemName} talla ${item.size}.`, 409);
     }
 
-    const nextVariantStock = currentStock - consumedQuantity;
-    const aggregateStock = aggregatePreviousStock - consumedQuantity;
+    const nextVariantStock = Number((currentStock - consumedQuantity).toFixed(2));
+    const aggregateStock = Number((aggregatePreviousStock - consumedQuantity).toFixed(2));
     if (nextVariantStock < 0 || aggregateStock < 0) {
       throw new KioskRequestError(`Stock insuficiente para ${item.itemName} talla ${item.size}.`, 409);
     }
@@ -305,21 +319,30 @@ function buildStockUpdates(
       aggregatePreviousStock,
       aggregateNewStock: aggregateStock,
       consumedQuantity,
+      issuedQuantity,
       packageRuleId: typeof currentVariant.packageRuleId === "string" ? currentVariant.packageRuleId : undefined,
-      packageUnit: readPackageUnit(currentVariant.packageUnit),
-      unitsPerPackage:
-        typeof currentVariant.unitsPerPackage === "number" && currentVariant.unitsPerPackage > 0
-          ? currentVariant.unitsPerPackage
-          : undefined,
+      packageUnit,
+      stockUnit: currentVariant.stockUnit,
+      unitsPerPackage,
     };
   }
 
+  const packageUnit = readPackageUnit(catalogData.packageUnit);
+  const unitsPerPackage = typeof catalogData.unitsPerPackage === "number" && catalogData.unitsPerPackage > 0
+    ? catalogData.unitsPerPackage
+    : undefined;
+  const consumedQuantity = resolveInventoryStockDecrease({
+    stockUnit: catalogData.stockUnit,
+    packageUnit,
+    unitsPerPackage,
+    issuedQuantity,
+  });
   const currentStock = readNumber(catalogData.stock);
   if (currentStock < consumedQuantity) {
     throw new KioskRequestError(`Sin stock disponible para ${item.itemName}.`, 409);
   }
 
-  const nextStock = currentStock - consumedQuantity;
+  const nextStock = Number((currentStock - consumedQuantity).toFixed(2));
   if (nextStock < 0) {
     throw new KioskRequestError(`Stock insuficiente para ${item.itemName}.`, 409);
   }
@@ -333,12 +356,11 @@ function buildStockUpdates(
     aggregatePreviousStock: currentStock,
     aggregateNewStock: nextStock,
     consumedQuantity,
+    issuedQuantity,
     packageRuleId: typeof catalogData.packageRuleId === "string" ? catalogData.packageRuleId : undefined,
-    packageUnit: readPackageUnit(catalogData.packageUnit),
-    unitsPerPackage:
-      typeof catalogData.unitsPerPackage === "number" && catalogData.unitsPerPackage > 0
-        ? catalogData.unitsPerPackage
-        : undefined,
+    packageUnit,
+    stockUnit: catalogData.stockUnit,
+    unitsPerPackage,
   };
 }
 
@@ -458,7 +480,10 @@ async function fulfillApprovedKioskRequest(params: {
         sku: item.sku,
         material,
         codes: [item.durationRuleSku, item.durationRuleSapMaterial],
-        issuedQuantity: stockChange.consumedQuantity,
+        issuedQuantity: stockChange.issuedQuantity,
+        stockUnit: stockChange.stockUnit,
+        packageUnit: stockChange.packageUnit,
+        unitsPerPackage: stockChange.unitsPerPackage,
       });
       const assignmentRef = db.collection("assignments").doc();
       assignmentRefs.push(assignmentRef);
@@ -483,6 +508,14 @@ async function fulfillApprovedKioskRequest(params: {
               consumptionRuleId: consumption.rule.id,
               unitsPerPackage: consumption.rule.unitsPerPackage,
               unitDecrease: consumption.rule.unitDecrease,
+            }
+          : {}),
+        ...(!consumption.rule && typeof stockChange.unitsPerPackage === "number" && stockChange.unitsPerPackage > 0
+          ? {
+              unitsPerPackage: stockChange.unitsPerPackage,
+              unitDecrease: stockChange.consumedQuantity,
+              packageUnit: stockChange.packageUnit,
+              stockUnit: stockChange.stockUnit,
             }
           : {}),
         replacementDays: item.replacementDays,
@@ -534,6 +567,8 @@ async function fulfillApprovedKioskRequest(params: {
             aggregateNewStock: stockChange.aggregateNewStock,
             issuedQuantity: consumption.issuedQuantity,
             issuedUnit: "PZA",
+            stockDecrease: stockChange.consumedQuantity,
+            stockUnit: stockChange.stockUnit,
             consumedQuantity: consumption.quantity,
             consumedUnit: consumption.quantityUnit,
             reportQuantity: consumption.quantity,
@@ -549,7 +584,7 @@ async function fulfillApprovedKioskRequest(params: {
             ...(typeof stockChange.unitsPerPackage === "number" && stockChange.unitsPerPackage > 0
               ? {
                   unitsPerPackage: stockChange.unitsPerPackage,
-                  packageEquivalentConsumed: consumption.quantity,
+                  packageEquivalentConsumed: stockChange.consumedQuantity,
                 }
               : {}),
           },

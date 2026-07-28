@@ -37,7 +37,7 @@ export interface InventoryVariant {
   unit: string;
   unitCost?: number;
   temporarySku: boolean;
-  stockUnit?: "PZA";
+  stockUnit?: "PZA" | "CAJA" | "BOLSA";
   packageUnit?: "CAJA" | "BOLSA";
   unitsPerPackage?: number;
   stockPackageInput?: number;
@@ -66,7 +66,7 @@ export interface InventoryImportItem {
   location: string;
   unit: string;
   unitCost?: number;
-  stockUnit?: "PZA";
+  stockUnit?: "PZA" | "CAJA" | "BOLSA";
   packageUnit?: "CAJA" | "BOLSA";
   unitsPerPackage?: number;
   stockPackageInput?: number;

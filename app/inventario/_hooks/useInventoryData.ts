@@ -36,7 +36,7 @@ export interface PpeSizeVariant {
   unit?: string;
   unitCost?: number;
   temporarySku?: boolean;
-  stockUnit?: 'PZA';
+  stockUnit?: 'PZA' | 'CAJA' | 'BOLSA';
   packageUnit?: 'CAJA' | 'BOLSA';
   unitsPerPackage?: number;
   stockPackageInput?: number;
@@ -58,7 +58,7 @@ export interface PpeItem {
   location?: string;
   unit?: string;
   unitCost?: number;
-  stockUnit?: 'PZA';
+  stockUnit?: 'PZA' | 'CAJA' | 'BOLSA';
   packageUnit?: 'CAJA' | 'BOLSA';
   unitsPerPackage?: number;
   stockPackageInput?: number;
@@ -114,6 +114,9 @@ const EMPTY_ITEM_FORM = {
   location: '',
   unit: 'PZA',
   unitCost: '',
+  stockUnit: 'PZA',
+  packageUnit: 'CAJA',
+  unitsPerPackage: '',
 };
 
 /* ── Helpers ───────────────────────────────────── */
@@ -603,6 +606,8 @@ export function useInventoryData() {
     const minStockInput = form.minStock === '' ? undefined : Number(form.minStock);
     const unitCost = form.unitCost === '' ? undefined : Number(form.unitCost);
     const location = form.location.trim().toUpperCase();
+    const manualPackageUnit = form.stockUnit === 'CAJA' || form.stockUnit === 'BOLSA' ? form.stockUnit : undefined;
+    const manualUnitsPerPackage = manualPackageUnit ? Math.max(0, Number(form.unitsPerPackage)) : undefined;
 
     if (!Number.isInteger(stockInput) || stockInput < 0 || stockInput > 1_000_000) {
       toast.error('El stock debe ser un entero entre 0 y 1,000,000.');
@@ -618,6 +623,10 @@ export function useInventoryData() {
     }
     if (unitCost !== undefined && (!Number.isFinite(unitCost) || unitCost < 0)) {
       toast.error('El precio debe ser un número no negativo.');
+      return;
+    }
+    if (manualPackageUnit && (!manualUnitsPerPackage || manualUnitsPerPackage <= 0)) {
+      toast.error('Indica cuántas piezas contiene cada caja/bolsa.');
       return;
     }
 
@@ -636,6 +645,9 @@ export function useInventoryData() {
           minStock: minStockInput,
           location,
           unitCost,
+          stockUnit: manualPackageUnit ?? 'PZA',
+          packageUnit: manualPackageUnit,
+          unitsPerPackage: manualUnitsPerPackage,
           plantaId: writePlantId,
         }),
       });
@@ -676,7 +688,7 @@ export function useInventoryData() {
   const handleAdjust = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adjustItem || !adjustQty) return;
-    const qty = parseInt(adjustQty);
+    const qty = Number(adjustQty);
     if (isNaN(qty) || qty < 0) return;
     setAdjustSaving(true);
     try {

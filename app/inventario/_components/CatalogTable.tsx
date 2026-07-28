@@ -40,9 +40,16 @@ export function CatalogTable({
   onAdjust,
 }: CatalogTableProps) {
   const pagination = usePagination(filtered, 20);
-  const formatPackageEquivalent = (stock: number, unitsPerPackage: number) => (
-    (stock / unitsPerPackage).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+  const formatStock = (stock: number) => (
+    stock.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
   );
+  const formatPackageEquivalent = (item: PpeItem) => {
+    if (!item.unitsPerPackage || !item.packageUnit) return null;
+    if (item.stockUnit === item.packageUnit) {
+      return `${formatStock(item.stock)} ${item.packageUnit} / ${formatStock(item.stock * item.unitsPerPackage)} PZA`;
+    }
+    return `${formatStock(item.stock)} PZA / ${formatStock(item.stock / item.unitsPerPackage)} ${item.packageUnit}`;
+  };
 
   // Reset to page 1 when filters change
   const prevSearch = useRef(search);
@@ -116,6 +123,8 @@ export function CatalogTable({
               {pagination.paginatedItems.map((item, idx) => {
                 const reorderAlerts = reorderAlertByDocId[item.docId] ?? [];
                 const imageUrl = resolveEppImageUrl(item);
+                const stockUnitLabel = item.stockUnit === item.packageUnit && item.packageUnit ? item.packageUnit : 'PZA';
+                const packageEquivalent = formatPackageEquivalent(item);
                 return (
                 <motion.tr
                   layout
@@ -187,11 +196,11 @@ export function CatalogTable({
                   <td className="px-8 py-6">
                     <div className="space-y-2">
                       <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-lg border font-bold text-[10px] tracking-widest uppercase ${stockColor(item.stock)}`}>
-                        {item.stock} <span className="opacity-60">PZA</span>
+                        {formatStock(item.stock)} <span className="opacity-60">{stockUnitLabel}</span>
                       </div>
-                      {item.unitsPerPackage && item.packageUnit && (
+                      {packageEquivalent && (
                         <p className="text-[9px] font-bold uppercase tracking-widest text-white/45">
-                          {`${item.stock} PZA / ${formatPackageEquivalent(item.stock, item.unitsPerPackage)} ${item.packageUnit}`}
+                          {packageEquivalent}
                         </p>
                       )}
                       {item.hasSizes && item.sizes && (

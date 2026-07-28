@@ -28,7 +28,7 @@ export interface PPESizeVariant {
   unit?: string;
   unitCost?: number;
   temporarySku?: boolean;
-  stockUnit?: "PZA";
+  stockUnit?: "PZA" | "CAJA" | "BOLSA";
   packageUnit?: "CAJA" | "BOLSA";
   unitsPerPackage?: number;
   stockPackageInput?: number;
@@ -59,7 +59,7 @@ export interface PPECatalogItem {
   minStock?: number;
   reorderPoint?: number;
   available?: boolean;
-  stockUnit?: "PZA";
+  stockUnit?: "PZA" | "CAJA" | "BOLSA";
   packageUnit?: "CAJA" | "BOLSA";
   unitsPerPackage?: number;
   stockPackageInput?: number;

@@ -49,6 +49,10 @@ function positiveNumber(value: unknown, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function isPackageUnit(value: unknown) {
+  return value === "CAJA" || value === "BOLSA";
+}
+
 export function roundEppConsumptionQuantity(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -75,11 +79,23 @@ export function resolveEppConsumption(input: {
   material?: unknown;
   codes?: readonly unknown[];
   issuedQuantity?: unknown;
+  stockUnit?: unknown;
+  packageUnit?: unknown;
+  unitsPerPackage?: unknown;
 }): EppConsumptionResult {
   const issuedQuantity = positiveNumber(input.issuedQuantity, 1);
   const rule = findEppConsumptionRule(input);
 
   if (!rule) {
+    const unitsPerPackage = positiveNumber(input.unitsPerPackage, 0);
+    if (isPackageUnit(input.stockUnit) && input.stockUnit === input.packageUnit && unitsPerPackage > 0) {
+      return {
+        quantity: roundEppConsumptionQuantity(issuedQuantity / unitsPerPackage),
+        issuedQuantity,
+        quantityUnit: EPP_CONSUMPTION_QUANTITY_UNIT,
+      };
+    }
+
     return {
       quantity: roundEppConsumptionQuantity(issuedQuantity),
       issuedQuantity,

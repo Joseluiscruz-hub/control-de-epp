@@ -10,7 +10,7 @@ import {
   type CanonicalEppCatalogItem,
   type EppCatalogCandidate,
 } from "@/lib/epp-master-catalog";
-import { resolveStockFromPackageRule } from "@/lib/epp-package-rules";
+import { isPackageUnit, resolveStockFromPackageRule } from "@/lib/epp-package-rules";
 import { getEppReorderPoint } from "@/lib/epp-reorder-points";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
@@ -229,6 +229,9 @@ export async function POST(req: NextRequest) {
     const location = readText(body?.location).toUpperCase();
     const requestedMinStock = parseOptionalNonNegativeNumber(body?.minStock);
     const unitCost = parseOptionalNonNegativeNumber(body?.unitCost);
+    const requestedStockUnit = readText(body?.stockUnit).toUpperCase();
+    const packageUnit = isPackageUnit(requestedStockUnit) ? requestedStockUnit : undefined;
+    const unitsPerPackage = packageUnit ? Math.max(0, readNumber(body?.unitsPerPackage)) : undefined;
     const plantaId = resolveWritePlant(adminUser, body?.plantaId);
 
     if (!Number.isInteger(stockInput) || stockInput < 0 || stockInput > 1_000_000) {
@@ -251,6 +254,9 @@ export async function POST(req: NextRequest) {
         { error: "Stock mínimo o precio fuera de rango." },
         { status: 400 }
       );
+    }
+    if (packageUnit && (!unitsPerPackage || unitsPerPackage <= 0)) {
+      return Response.json({ error: "Las piezas por caja/bolsa deben ser mayores a cero." }, { status: 400 });
     }
 
     const db = getAdminDb();
@@ -295,6 +301,8 @@ export async function POST(req: NextRequest) {
       material,
       codes: [requestedSku, ...catalogItem.aliases],
       stockInput,
+      packageUnit,
+      unitsPerPackage,
     });
     const stock = stockConversion.stock;
     const reorderPoint =

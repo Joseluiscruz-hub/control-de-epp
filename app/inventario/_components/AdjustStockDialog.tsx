@@ -39,6 +39,15 @@ export function AdjustStockDialog({
   adjustSaving,
   onSubmit,
 }: AdjustStockDialogProps) {
+  const selectedVariant = adjustItem?.hasSizes && adjustItem.sizes && adjustSize
+    ? adjustItem.sizes[adjustSize]
+    : undefined;
+  const stockUnit = selectedVariant?.stockUnit === selectedVariant?.packageUnit && selectedVariant?.packageUnit
+    ? selectedVariant.packageUnit
+    : adjustItem?.stockUnit === adjustItem?.packageUnit && adjustItem?.packageUnit
+      ? adjustItem.packageUnit
+      : 'PZA';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[450px] rounded-[2rem] border border-white/10 p-0 overflow-hidden bg-[#040813]">
@@ -59,7 +68,7 @@ export function AdjustStockDialog({
                 <SelectContent className="bg-[#0A1628] border-white/10 text-white rounded-xl">
                   {Object.entries(adjustItem.sizes).map(([size, variant]) => (
                     <SelectItem key={size} value={size}>
-                      {size} · Stock {variant.stock ?? 0} · {variant.sku}
+                      {size} · Stock {variant.stock ?? 0} {variant.stockUnit === variant.packageUnit && variant.packageUnit ? variant.packageUnit : 'PZA'} · {variant.sku}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -74,9 +83,10 @@ export function AdjustStockDialog({
           </div>
           
           <div className="space-y-2">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Cantidad a procesar</Label>
+            <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Cantidad a procesar ({stockUnit})</Label>
             <Input 
               type="number" 
+              step="0.01"
               className="h-20 text-center text-4xl font-black rounded-2xl bg-white/5 border-white/10 text-white focus-visible:ring-[#F40009]" 
               value={adjustQty} 
               onChange={e => setAdjustQty(e.target.value)}

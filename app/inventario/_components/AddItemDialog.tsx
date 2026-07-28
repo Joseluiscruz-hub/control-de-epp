@@ -27,6 +27,9 @@ export interface AddItemDialogProps {
     location: string;
     unit: string;
     unitCost: string;
+    stockUnit: string;
+    packageUnit: string;
+    unitsPerPackage: string;
   };
   setForm: (form: AddItemDialogProps['form']) => void;
   onSubmit: (e: React.FormEvent) => void;
@@ -45,6 +48,11 @@ export function AddItemDialog({
   const lookupProblem =
     catalogLookup.status === 'error' ||
     catalogLookup.status === 'duplicate';
+  const isPackagedStock = form.stockUnit === 'CAJA' || form.stockUnit === 'BOLSA';
+  const unitsPerPackage = Number(form.unitsPerPackage);
+  const decreasePerIssue = isPackagedStock && Number.isFinite(unitsPerPackage) && unitsPerPackage > 0
+    ? (1 / unitsPerPackage).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -211,6 +219,48 @@ export function AddItemDialog({
             </div>
           </div>
 
+          <div className="grid grid-cols-1 gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Entrada de Stock</Label>
+              <select
+                value={form.stockUnit}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setForm({
+                    ...form,
+                    stockUnit: value || 'PZA',
+                    packageUnit: value === 'CAJA' || value === 'BOLSA' ? value : 'CAJA',
+                    unitsPerPackage: value === 'CAJA' || value === 'BOLSA' ? (form.unitsPerPackage || '5') : '',
+                    unit: value === 'CAJA' || value === 'BOLSA' ? value : 'PZA',
+                  });
+                }}
+                className="h-12 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-white font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F40009]"
+              >
+                <option className="bg-[#0A1628]" value="PZA">Pieza</option>
+                <option className="bg-[#0A1628]" value="CAJA">Caja</option>
+                <option className="bg-[#0A1628]" value="BOLSA">Bolsa</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">Piezas por {form.stockUnit === 'BOLSA' ? 'Bolsa' : 'Caja'}</Label>
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                disabled={!isPackagedStock}
+                className="h-12 rounded-xl bg-white/5 border-white/10 text-white font-bold focus-visible:ring-[#F40009] disabled:opacity-40"
+                value={form.unitsPerPackage}
+                onChange={(event) => setForm({ ...form, unitsPerPackage: event.target.value })}
+                placeholder={isPackagedStock ? "Ej: 5" : "No aplica"}
+              />
+              {decreasePerIssue && (
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                  Cada entrega descuenta {decreasePerIssue} {form.stockUnit}
+                </p>
+              )}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase tracking-widest text-white/50">
@@ -253,7 +303,8 @@ export function AddItemDialog({
                 saving ||
                 !lookupReady ||
                 form.stock === '' ||
-                form.location.trim() === ''
+                form.location.trim() === '' ||
+                (isPackagedStock && form.unitsPerPackage === '')
               }
               className="w-full h-14 rounded-xl bg-[#F40009] hover:bg-red-700 text-white font-bold uppercase tracking-widest transition-all disabled:bg-white/10 disabled:text-white/30"
             >

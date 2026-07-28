@@ -6,6 +6,7 @@ import {
   PPECatalogItem,
 } from "./kiosk-types";
 import { resolveEppConsumption } from "./epp-consumption-rules";
+import { resolveInventoryStockDecrease } from "./epp-package-rules";
 
 const EMPLOYEES_KEY = "assetguard.local.kiosk.employees";
 const CATALOG_KEY = "assetguard.local.kiosk.catalog";
@@ -476,7 +477,7 @@ export function adjustLocalInventoryStock(input: {
     if (input.type === "add") nextStock += qty;
     else if (input.type === "subtract") nextStock -= qty;
     else nextStock = qty;
-    nextStock = Math.max(0, nextStock);
+    nextStock = Number(Math.max(0, nextStock).toFixed(2));
 
     item.sizes = {
       ...item.sizes,
@@ -486,14 +487,14 @@ export function adjustLocalInventoryStock(input: {
         available: nextStock > 0,
       },
     };
-    item.stock = Object.values(item.sizes).reduce((sum, variant) => sum + Number(variant.stock ?? 0), 0);
+    item.stock = Number(Object.values(item.sizes).reduce((sum, variant) => sum + Number(variant.stock ?? 0), 0).toFixed(2));
     item.available = item.stock > 0;
   } else {
     let nextStock = Number(item.stock ?? 0);
     if (input.type === "add") nextStock += qty;
     else if (input.type === "subtract") nextStock -= qty;
     else nextStock = qty;
-    item.stock = Math.max(0, nextStock);
+    item.stock = Number(Math.max(0, nextStock).toFixed(2));
     item.available = item.stock > 0;
   }
 
@@ -700,18 +701,30 @@ export function createLocalAssignment(input: {
     : 1;
   const variant = requestedSize && item.sizes ? item.sizes[requestedSize] : undefined;
   const material = variant?.material || item.material || input.durationRuleSapMaterial || input.sku;
+  const stockUnit = variant?.stockUnit ?? item.stockUnit;
+  const packageUnit = variant?.packageUnit ?? item.packageUnit;
+  const unitsPerPackage = variant?.unitsPerPackage ?? item.unitsPerPackage;
+  const stockDecrease = resolveInventoryStockDecrease({
+    stockUnit,
+    packageUnit,
+    unitsPerPackage,
+    issuedQuantity,
+  });
   const consumption = resolveEppConsumption({
     sku: input.sku,
     material,
     codes: [input.durationRuleSku, input.durationRuleSapMaterial],
     issuedQuantity,
+    stockUnit,
+    packageUnit,
+    unitsPerPackage,
   });
 
   if (requestedSize && item.sizes) {
     const currentStock = Number(variant?.stock ?? 0);
-    if (!variant || currentStock < issuedQuantity) throw new Error("out_of_stock");
+    if (!variant || currentStock < stockDecrease) throw new Error("out_of_stock");
 
-    const nextStock = currentStock - issuedQuantity;
+    const nextStock = Number((currentStock - stockDecrease).toFixed(2));
     item.sizes = {
       ...item.sizes,
       [requestedSize]: {
@@ -724,8 +737,8 @@ export function createLocalAssignment(input: {
     item.available = item.stock > 0;
   } else {
     const currentStock = Number(item.stock ?? 0);
-    if (!Number.isFinite(currentStock) || currentStock < issuedQuantity) throw new Error("out_of_stock");
-    item.stock = currentStock - issuedQuantity;
+    if (!Number.isFinite(currentStock) || currentStock < stockDecrease) throw new Error("out_of_stock");
+    item.stock = Number((currentStock - stockDecrease).toFixed(2));
     item.available = item.stock > 0;
   }
 
@@ -757,6 +770,14 @@ export function createLocalAssignment(input: {
           consumptionRuleId: consumption.rule.id,
           unitsPerPackage: consumption.rule.unitsPerPackage,
           unitDecrease: consumption.rule.unitDecrease,
+        }
+      : {}),
+    ...(!consumption.rule && typeof unitsPerPackage === "number" && unitsPerPackage > 0
+      ? {
+          unitsPerPackage,
+          unitDecrease: stockDecrease,
+          packageUnit,
+          stockUnit,
         }
       : {}),
     assignedAt: now,
