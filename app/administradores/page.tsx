@@ -66,6 +66,7 @@ export default function AdministradoresPage() {
   const [employeeId, setEmployeeId] = useState("");
   const [workingKey, setWorkingKey] = useState<string | null>(null);
   const [resettingEmployee, setResettingEmployee] = useState(false);
+  const [employeeActivation, setEmployeeActivation] = useState<{ employeeId: string; code: string; expiresAt: number } | null>(null);
   const [plantResetOpen, setPlantResetOpen] = useState(false);
   const [plantResetPlant, setPlantResetPlant] = useState<PlantId>(PLANTS[0].id);
   const [plantResetModules, setPlantResetModules] = useState<PlantResetModule[]>([]);
@@ -173,7 +174,11 @@ export default function AdministradoresPage() {
         throw new Error(typeof result?.error === "string" ? result.error : "employee_reset_failed");
       }
 
-      toast.success("Acceso del colaborador reseteado. Debera crear un nuevo PIN en kiosko.");
+      if (typeof result?.activationCode !== "string" || !/^\d{8}$/.test(result.activationCode)) {
+        throw new Error("El servidor no devolvio un codigo de activacion valido.");
+      }
+      setEmployeeActivation({ employeeId: cleanEmployeeId, code: result.activationCode, expiresAt: Number(result.activationExpiresAt) });
+      toast.success("Acceso reseteado. Entrega el codigo temporal al colaborador.");
       setEmployeeId("");
     } catch (error) {
       console.error("[Employee credential reset UI error]", error);
@@ -382,8 +387,20 @@ export default function AdministradoresPage() {
                   {resettingEmployee ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
                   Reset
                 </Button>
+                {employeeActivation && (
+                  <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-4 text-center">
+                    <p className="text-xs font-black uppercase tracking-widest text-amber-200">Codigo de un solo uso</p>
+                    <p className="mt-2 font-mono text-3xl font-black tracking-[0.25em] text-white">{employeeActivation.code}</p>
+                    <p className="mt-2 text-xs text-white/50">
+                      Socio {employeeActivation.employeeId}. Expira {new Date(employeeActivation.expiresAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}. No se volvera a mostrar.
+                    </p>
+                    <Button type="button" variant="outline" className="mt-3 border-white/10 bg-white/5 text-white" onClick={() => setEmployeeActivation(null)}>
+                      Ya lo entregue
+                    </Button>
+                  </div>
+                )}
                 <p className="text-xs font-semibold leading-relaxed text-white/40">
-                  El reset borra el PIN actual y obliga al colaborador a aceptar terminos y crear un PIN nuevo en el kiosko. La accion queda auditada.
+                  El reset invalida sesiones, borra el PIN y genera un codigo temporal de activacion. La accion queda auditada sin guardar el codigo en texto plano.
                 </p>
               </CardContent>
             </Card>

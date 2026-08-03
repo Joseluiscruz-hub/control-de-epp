@@ -40,10 +40,11 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const employeeId = typeof body?.employeeId === "string" ? body.employeeId.trim() : "";
+    const activationCode = typeof body?.activationCode === "string" ? body.activationCode.trim() : "";
     const pin = typeof body?.pin === "string" ? body.pin.trim() : "";
 
-    if (!employeeId || !isSixDigitPin(pin)) {
-      return Response.json({ error: "Empleado y PIN de 6 digitos requeridos." }, { status: 400 });
+    if (!employeeId || !/^\d{8}$/.test(activationCode) || !isSixDigitPin(pin)) {
+      return Response.json({ error: "No fue posible validar la activacion." }, { status: 400 });
     }
     if (isWeakPin(pin)) {
       return Response.json({ error: "Elige un PIN menos predecible." }, { status: 400 });
@@ -61,13 +62,31 @@ export async function POST(req: NextRequest) {
 
     const employeeRef = db.collection("kiosk_employees").doc(employeeId);
     const secretRef = db.collection("kiosk_employee_secrets").doc(employeeId);
+    const activationRef = db.collection("employee_activations").doc(employeeId);
+    const auditRef = db.collection("audit_events").doc();
     const pinHash = await bcrypt.hash(pin, 12);
+    const activationSnapshot = await activationRef.get();
+    const activation = activationSnapshot.data();
+    const activationValid = Boolean(
+      activationSnapshot.exists &&
+      !activation?.usedAt &&
+      Number(activation?.expiresAt ?? 0) > Date.now() &&
+      typeof activation?.codeHash === "string" &&
+      await bcrypt.compare(activationCode, activation.codeHash)
+    );
+
+    if (!activationValid) {
+      const nextRateLimit = await registerFailure(db, attemptKey, clientAttemptKey);
+      if (nextRateLimit.blocked) return kioskPinRateLimitResponse(nextRateLimit);
+      return Response.json({ error: "No fue posible validar la activacion." }, { status: 401 });
+    }
 
     try {
       await db.runTransaction(async (transaction) => {
-        const [snapshot, secretSnapshot] = await Promise.all([
+        const [snapshot, secretSnapshot, currentActivationSnapshot] = await Promise.all([
           transaction.get(employeeRef),
           transaction.get(secretRef),
+          transaction.get(activationRef),
         ]);
         if (!snapshot.exists) {
           throw new KioskPinError("Empleado no encontrado en kiosko.", 404);
@@ -75,6 +94,12 @@ export async function POST(req: NextRequest) {
 
         const employee = snapshot.data() ?? {};
         const secret = secretSnapshot.data() ?? {};
+        const currentActivation = currentActivationSnapshot.data() ?? {};
+        if (!currentActivationSnapshot.exists || currentActivation.usedAt ||
+            Number(currentActivation.expiresAt ?? 0) <= Date.now() ||
+            currentActivation.codeHash !== activation?.codeHash) {
+          throw new KioskPinError("No fue posible validar la activacion.", 401);
+        }
         if (employee.active !== true) {
           throw new KioskPinError("Empleado inactivo para kiosko.", 403);
         }
@@ -101,12 +126,22 @@ export async function POST(req: NextRequest) {
           legacyPinMigratedAt: FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp(),
         });
+        transaction.set(activationRef, {
+          usedAt: FieldValue.serverTimestamp(),
+          codeHash: FieldValue.delete(),
+        }, { merge: true });
+        transaction.set(auditRef, buildAuditEvent({
+          type: "kiosk.pin.activated",
+          targetCollection: "kiosk_employee_secrets",
+          targetId: employeeId,
+          metadata: { source: "kiosk", pinVersion: 2 },
+        }, req));
       });
     } catch (error) {
       if (error instanceof KioskPinError) {
         const nextRateLimit = await registerFailure(db, attemptKey, clientAttemptKey);
         if (nextRateLimit.blocked) return kioskPinRateLimitResponse(nextRateLimit);
-        return Response.json({ error: error.message }, { status: error.status });
+        return Response.json({ error: "No fue posible validar la activacion." }, { status: error.status });
       }
 
       throw error;
@@ -115,12 +150,6 @@ export async function POST(req: NextRequest) {
     await Promise.all([
       clearKioskPinFailures(db, attemptKey),
       clearKioskPinFailures(db, clientAttemptKey),
-      db.collection("audit_events").add(buildAuditEvent({
-        type: "kiosk.pin.setup",
-        targetCollection: "kiosk_employee_secrets",
-        targetId: employeeId,
-        metadata: { source: "kiosk", pinVersion: 2 },
-      }, req)),
     ]);
 
     return Response.json({ success: true });

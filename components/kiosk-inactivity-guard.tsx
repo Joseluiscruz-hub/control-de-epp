@@ -4,6 +4,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { usePathname, useRouter } from "next/navigation";
 import { AlertTriangle, Clock3 } from "lucide-react";
 import { clearKioskSession, isKioskSessionBusy } from "@/lib/kiosk-session";
+import { getKioskServerSession, logoutKioskServerSession } from "@/lib/kiosk-api";
 
 const TIMEOUT_MS = 2 * 60 * 1000;
 const WARNING_MS = 15 * 1000;
@@ -16,6 +17,7 @@ export function KioskInactivityGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [warningOpen, setWarningOpen] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(WARNING_MS / 1000);
+  const [sessionSecondsLeft, setSessionSecondsLeft] = useState<number | null>(null);
   const warningOpenRef = useRef(false);
   const resetTimersRef = useRef<() => void>(() => undefined);
   const timersRef = useRef<{
@@ -43,7 +45,6 @@ export function KioskInactivityGuard({ children }: { children: ReactNode }) {
     if (pathname !== "/kiosko") return true;
     return Boolean(
       sessionStorage.getItem("kiosk_employee_id") ||
-        sessionStorage.getItem("kiosk_pin_verified") === "true" ||
         sessionStorage.getItem("kiosk_request_id")
     );
   }, [pathname]);
@@ -54,7 +55,7 @@ export function KioskInactivityGuard({ children }: { children: ReactNode }) {
     setSecondsLeft(WARNING_MS / 1000);
   }, []);
 
-  const timeoutSession = useCallback(() => {
+  const timeoutSession = useCallback(async () => {
     if (isKioskSessionBusy()) {
       resetTimersRef.current();
       return;
@@ -62,6 +63,7 @@ export function KioskInactivityGuard({ children }: { children: ReactNode }) {
 
     clearTimers();
     closeWarning();
+    await logoutKioskServerSession();
     clearKioskSession();
     router.replace("/kiosko");
   }, [clearTimers, closeWarning, router]);
@@ -117,17 +119,37 @@ export function KioskInactivityGuard({ children }: { children: ReactNode }) {
     };
   }, [clearTimers, pathname, resetTimers]);
 
+  useEffect(() => {
+    let active = true;
+    let interval: number | undefined;
+    void getKioskServerSession().then((session) => {
+      if (!active || !session) { if (active) setSessionSecondsLeft(null); return; }
+      const update = () => {
+        const remaining = Math.max(0, Math.ceil((session.expiresAt - Date.now()) / 1000));
+        setSessionSecondsLeft(remaining);
+        if (remaining === 0) {
+          if (interval) window.clearInterval(interval);
+          void timeoutSession();
+        }
+      };
+      update();
+      interval = window.setInterval(update, 1000);
+    }).catch(() => { if (active) setSessionSecondsLeft(null); });
+    return () => { active = false; if (interval) window.clearInterval(interval); };
+  }, [pathname, timeoutSession]);
+
   const extendSession = () => {
     resetTimersRef.current();
   };
 
-  const logoutNow = () => {
+  const logoutNow = async () => {
     if (isKioskSessionBusy()) {
       resetTimersRef.current();
       return;
     }
     clearTimers();
     closeWarning();
+    await logoutKioskServerSession();
     clearKioskSession();
     router.replace("/kiosko");
   };
@@ -135,6 +157,11 @@ export function KioskInactivityGuard({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
+      {sessionSecondsLeft !== null && sessionSecondsLeft > 0 && pathname !== "/kiosko" && (
+        <div className="fixed right-4 top-4 z-[70] rounded-lg border border-white/10 bg-black/75 px-3 py-2 font-mono text-xs font-bold text-white/70 backdrop-blur-sm">
+          Sesion {Math.floor(sessionSecondsLeft / 60)}:{String(sessionSecondsLeft % 60).padStart(2, "0")}
+        </div>
+      )}
       {warningOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-6 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-lg border border-amber-400/35 bg-[#07090d] p-6 text-center shadow-2xl shadow-black/50">
@@ -152,7 +179,7 @@ export function KioskInactivityGuard({ children }: { children: ReactNode }) {
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={logoutNow}
+                onClick={() => void logoutNow()}
                 className="rounded-lg border border-white/10 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white/55 transition-colors hover:bg-white/10 hover:text-white"
               >
                 Cerrar ahora
