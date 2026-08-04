@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
 import {
   KioskSessionHttpError,
+  assertSameOrigin,
   clearKioskSessionCookies,
   kioskSessionErrorResponse,
   requireKioskSession,
@@ -11,6 +12,7 @@ export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   try {
+    assertSameOrigin(req);
     await requireAppCheck(req);
     const session = await requireKioskSession(req);
     return Response.json({

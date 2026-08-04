@@ -6,7 +6,9 @@ import {
   KIOSK_DEVICE_COOKIE,
   KIOSK_SESSION_COOKIE,
   KioskSessionHttpError,
+  assertSameOrigin,
   hashKioskDeviceId,
+  kioskSessionErrorResponse,
   requireKioskSession,
   signKioskSessionId,
   verifyKioskSessionToken,
@@ -17,6 +19,13 @@ process.env.KIOSK_SESSION_SECRET = "test-only-kiosk-session-secret-with-32-chara
 function request(sessionToken = "", deviceId = "device-1") {
   return {
     cookies: { get: (name: string) => ({ value: name === KIOSK_SESSION_COOKIE ? sessionToken : name === KIOSK_DEVICE_COOKIE ? deviceId : "" }) },
+  } as unknown as NextRequest;
+}
+
+function originRequest(headers: Record<string, string> = {}) {
+  return {
+    headers: new Headers(headers),
+    nextUrl: new URL("https://epp.example.com/api/kiosk/session"),
   } as unknown as NextRequest;
 }
 
@@ -92,5 +101,44 @@ describe("token de sesion de kiosko", () => {
     assert.equal(claims.employeeId, "1001");
     assert.equal(claims.plantId, "toluca");
     assert.equal(setCalls.length, 1);
+  });
+});
+
+describe("proteccion same-origin del kiosko", () => {
+  it("acepta metadata same-origin y un Origin del mismo host", () => {
+    assert.doesNotThrow(() => assertSameOrigin(originRequest({ "sec-fetch-site": "same-origin" }), "production"));
+    assert.doesNotThrow(() => assertSameOrigin(originRequest({ origin: "https://epp.example.com" }), "production"));
+  });
+
+  it("rechaza solicitudes cross-site y origenes de otro host", () => {
+    assert.throws(
+      () => assertSameOrigin(originRequest({ "sec-fetch-site": "cross-site" }), "production"),
+      (error: unknown) => error instanceof KioskSessionHttpError && error.status === 403,
+    );
+    assert.throws(
+      () => assertSameOrigin(originRequest({ origin: "https://attacker.example" }), "production"),
+      (error: unknown) => error instanceof KioskSessionHttpError && error.status === 403,
+    );
+  });
+
+  it("rechaza en produccion cuando faltan Origin y Sec-Fetch-Site", () => {
+    assert.throws(
+      () => assertSameOrigin(originRequest(), "production"),
+      (error: unknown) => error instanceof KioskSessionHttpError && error.status === 403,
+    );
+    assert.doesNotThrow(() => assertSameOrigin(originRequest(), "development"));
+  });
+
+  it("no emite Set-Cookie al rechazar el origen", () => {
+    let originError: KioskSessionHttpError | null = null;
+    try {
+      assertSameOrigin(originRequest({ "sec-fetch-site": "cross-site" }), "production");
+    } catch (error) {
+      if (!(error instanceof KioskSessionHttpError)) throw error;
+      originError = error;
+    }
+    assert.ok(originError);
+    const response = kioskSessionErrorResponse(originError);
+    assert.equal(response.headers.get("set-cookie"), null);
   });
 });

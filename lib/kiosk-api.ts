@@ -24,6 +24,7 @@ import {
 } from "./kiosk-local-store";
 import { legacyHashPin } from "./pin-utils";
 import type { ActivePlantId } from "./plants";
+import { isInsecureKioskLocalAuthEnabled } from "./kiosk-local-auth-policy";
 
 class KioskApiError extends Error {
   status: number;
@@ -114,7 +115,7 @@ export async function saveEmployeePin(employeeId: string, activationCode: string
       );
     }
   } catch (error) {
-    if (canFallbackToLocal(error) && process.env.NEXT_PUBLIC_ENABLE_INSECURE_KIOSK_LOCAL_AUTH === "true") {
+    if (canFallbackToLocal(error) && isInsecureKioskLocalAuthEnabled()) {
       console.warn("[Kiosko] Guardando PIN en modo local.", error);
       saveLocalKioskEmployeePin(employeeId, legacyHashPin(pin));
       return;
@@ -144,7 +145,7 @@ export async function validateEmployeePin(
       response.status
     );
   } catch (error) {
-    if (canFallbackToLocal(error) && process.env.NEXT_PUBLIC_ENABLE_INSECURE_KIOSK_LOCAL_AUTH === "true") {
+    if (canFallbackToLocal(error) && isInsecureKioskLocalAuthEnabled()) {
       const emp = await getEmployeeById(employeeId);
       return !!emp?.pin && emp.pin === legacyHashPin(pin);
     }

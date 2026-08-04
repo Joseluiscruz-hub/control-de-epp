@@ -1,13 +1,14 @@
 import { NextRequest } from "next/server";
 import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
 import { getAdminDb } from "@/lib/firebase-admin";
-import { KioskSessionHttpError, kioskSessionErrorResponse, requireKioskSession } from "@/lib/kiosk-session-server";
+import { KioskSessionHttpError, assertSameOrigin, kioskSessionErrorResponse, requireKioskSession } from "@/lib/kiosk-session-server";
 import { PublicRateLimitHttpError, publicRateLimitResponse, requirePublicRateLimit } from "@/lib/public-api-rate-limit";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
+    assertSameOrigin(req);
     await requireAppCheck(req);
     const db = getAdminDb();
     const session = await requireKioskSession(req, db);

@@ -150,7 +150,15 @@ export async function POST(req: NextRequest) {
       clearKioskPinFailures(db, getKioskPinRateLimitKey(req, employeeId, "setup")),
     ]);
 
-    return Response.json({ success: true, ...result, activationCode, activationExpiresAt });
+    return Response.json(
+      { success: true, ...result, activationCode, activationExpiresAt },
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+          Pragma: "no-cache",
+        },
+      },
+    );
   } catch (error) {
     if (error instanceof AuthHttpError || error instanceof EmployeeCredentialResetError) {
       return Response.json({ error: error.message }, { status: error.status });

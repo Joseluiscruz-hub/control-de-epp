@@ -25,7 +25,11 @@ export type KioskSessionClaims = {
 };
 
 export class KioskSessionHttpError extends Error {
-  constructor(public readonly status: 401 | 403, message = "La sesion de kiosko no es valida.") {
+  constructor(
+    public readonly status: 401 | 403,
+    message = "La sesion de kiosko no es valida.",
+    public readonly shouldClearCookies = true,
+  ) {
     super(message);
     this.name = "KioskSessionHttpError";
   }
@@ -185,18 +189,30 @@ export async function revokeKioskSession(req: NextRequest, db: Firestore = getAd
 }
 
 export function kioskSessionErrorResponse(error: KioskSessionHttpError) {
-  return clearKioskSessionCookies(Response.json({ error: error.message }, { status: error.status }));
+  const response = Response.json({ error: error.message }, { status: error.status });
+  return error.shouldClearCookies ? clearKioskSessionCookies(response) : response;
 }
 
-export function assertSameOrigin(req: NextRequest) {
-  if (req.headers.get("sec-fetch-site") === "cross-site") throw new KioskSessionHttpError(403, "Origen no permitido.");
+export function assertSameOrigin(req: NextRequest, environment = process.env.NODE_ENV) {
+  const fetchSite = req.headers.get("sec-fetch-site")?.trim().toLowerCase() ?? "";
   const origin = req.headers.get("origin");
+
+  if (fetchSite && fetchSite !== "same-origin") {
+    throw new KioskSessionHttpError(403, "Origen no permitido.", false);
+  }
+
   if (origin) {
     try {
-      if (new URL(origin).host !== req.nextUrl.host) throw new KioskSessionHttpError(403, "Origen no permitido.");
+      if (new URL(origin).host !== req.nextUrl.host) {
+        throw new KioskSessionHttpError(403, "Origen no permitido.", false);
+      }
     } catch (error) {
       if (error instanceof KioskSessionHttpError) throw error;
-      throw new KioskSessionHttpError(403, "Origen no permitido.");
+      throw new KioskSessionHttpError(403, "Origen no permitido.", false);
     }
+  }
+
+  if (!origin && !fetchSite && environment === "production") {
+    throw new KioskSessionHttpError(403, "Origen no permitido.", false);
   }
 }

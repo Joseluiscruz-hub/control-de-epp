@@ -7,7 +7,7 @@ import {
   publicRateLimitResponse,
   requirePublicRateLimit,
 } from "@/lib/public-api-rate-limit";
-import { KioskSessionHttpError, kioskSessionErrorResponse, requireKioskSession } from "@/lib/kiosk-session-server";
+import { KioskSessionHttpError, assertSameOrigin, kioskSessionErrorResponse, requireKioskSession } from "@/lib/kiosk-session-server";
 
 export const runtime = "nodejs";
 
@@ -35,6 +35,7 @@ function serializeDate(value: unknown) {
 
 export async function POST(req: NextRequest) {
   try {
+    assertSameOrigin(req);
     await requireAppCheck(req);
     const db = getAdminDb();
     const session = await requireKioskSession(req, db);
