@@ -10,8 +10,8 @@ import {
 import { resolveInventoryStockDecrease, resolveStockFromPackageRule } from "./epp-package-rules";
 
 describe("EPP consumption rules", () => {
-  test("contains the 20 configured SAP materials", () => {
-    assert.equal(EPP_CONSUMPTION_RULES.length, 20);
+  test("contains the 22 configured SAP materials", () => {
+    assert.equal(EPP_CONSUMPTION_RULES.length, 22);
     assert.deepEqual(
       EPP_CONSUMPTION_RULES.map((rule) => rule.sapMaterial),
       [
@@ -19,6 +19,7 @@ describe("EPP consumption rules", () => {
         "26149607", "26149608", "26016897", "26149610", "26149609",
         "26149611", "26149578", "26149580", "26149552", "26149553",
         "26149554", "26149555", "26016860", "26016859", "26016827",
+        "26008560", "26008561",
       ]
     );
   });
@@ -55,6 +56,8 @@ describe("EPP consumption rules", () => {
   test("matches known KOF aliases without using material names", () => {
     assert.equal(findEppConsumptionRule({ sku: "3ppm1" })?.sapMaterial, "26149611");
     assert.equal(findEppConsumptionRule({ sku: "2-LEM-0" })?.sapMaterial, "26149552");
+    assert.equal(findEppConsumptionRule({ sku: "62xj76" })?.sapMaterial, "26008560");
+    assert.equal(findEppConsumptionRule({ sku: "62-XJ-77" })?.sapMaterial, "26008561");
   });
 
   test("matches the KOF aliases added for Tyvek coveralls", () => {
@@ -118,6 +121,34 @@ describe("EPP consumption rules", () => {
     });
     assert.equal(tychem.stock, 12);
     assert.equal(tychem.metadata?.unitsPerPackage, 12);
+  });
+
+  test("converts each sleeve box to 25 pieces and discounts one piece per issue", () => {
+    for (const sleeve of [
+      { material: "26008560", sku: "62XJ76", name: "Manga Resistente A Cortes Negro Ch PQ50" },
+      { material: "26008561", sku: "62XJ77", name: "Manga Resistente A Cortes Negro G PQ50" },
+    ]) {
+      const imported = resolveStockFromPackageRule({
+        ...sleeve,
+        stockInput: 1,
+      });
+
+      assert.equal(imported.stock, 25);
+      assert.equal(imported.metadata?.stockUnit, "PZA");
+      assert.equal(imported.metadata?.packageUnit, "CAJA");
+      assert.equal(imported.metadata?.unitsPerPackage, 25);
+      assert.equal(resolveInventoryStockDecrease({
+        stockUnit: imported.metadata?.stockUnit,
+        packageUnit: imported.metadata?.packageUnit,
+        unitsPerPackage: imported.metadata?.unitsPerPackage,
+        issuedQuantity: 1,
+      }), 1);
+      assert.equal(imported.stock - 1, 24);
+      assert.equal(resolveEppConsumption({
+        material: sleeve.material,
+        issuedQuantity: 1,
+      }).quantity, 0.04);
+    }
   });
 
   test("keeps manually boxed stock in boxes and discounts the package fraction", () => {

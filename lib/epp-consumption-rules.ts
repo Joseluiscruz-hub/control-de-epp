@@ -36,6 +36,8 @@ export const EPP_CONSUMPTION_RULES: readonly EppConsumptionRule[] = [
   { id: "sap-26016860", sapMaterial: "26016860", unitsPerPackage: 12, unitDecrease: 0.08 },
   { id: "sap-26016859", sapMaterial: "26016859", unitsPerPackage: 12, unitDecrease: 0.08 },
   { id: "sap-26016827", sapMaterial: "26016827", unitsPerPackage: 12, unitDecrease: 0.08 },
+  { id: "sap-26008560", sapMaterial: "26008560", kofSku: "62XJ76", unitsPerPackage: 25, unitDecrease: 0.04 },
+  { id: "sap-26008561", sapMaterial: "26008561", kofSku: "62XJ77", unitsPerPackage: 25, unitDecrease: 0.04 },
 ];
 
 function normalizeCode(value: unknown) {
