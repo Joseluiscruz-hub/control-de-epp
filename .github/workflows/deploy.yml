@@ -138,7 +138,7 @@ jobs:
             --port=8080 \
             --build-env-vars-file=/tmp/build-env-vars.yaml \
             --env-vars-file=/tmp/runtime-env-vars.yaml \
-            --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" 2>&1 | tee "${deploy_log}"
+            --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest,KIOSK_SESSION_SECRET=KIOSK_SESSION_SECRET:latest" 2>&1 | tee "${deploy_log}"
 
           deploy_exit_code="${PIPESTATUS[0]}"
           echo "deploy_exit_code=${deploy_exit_code}" >> "${GITHUB_OUTPUT}"
