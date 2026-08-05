@@ -38,6 +38,7 @@ export default function KioskoSetupPage() {
   const [termsScrolled, setTermsScrolled] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [pin, setPin] = useState("");
+  const [activationCode, setActivationCode] = useState("");
   const [pinConfirm, setPinConfirm] = useState("");
   const [pinStep, setPinStep] = useState<"enter" | "confirm">("enter");
   const [error, setError] = useState("");
@@ -82,9 +83,13 @@ export default function KioskoSetupPage() {
     setLoading(true);
     setKioskSessionBusy(true);
     try {
-      await saveEmployeePin(employeeId, pin);
-      sessionStorage.setItem("kiosk_pin_verified", "true");
-      router.push("/kiosko/catalogo");
+      if (!/^\d{8}$/.test(activationCode)) {
+        setError("Ingresa el codigo de activacion de 8 digitos entregado por tu administrador.");
+        setLoading(false);
+        return;
+      }
+      await saveEmployeePin(employeeId, activationCode, pin);
+      router.replace("/kiosko/login");
     } catch (e) {
       const status =
         typeof e === "object" &&
@@ -168,6 +173,17 @@ export default function KioskoSetupPage() {
   // PIN step
   return (
     <div className="flex-1 flex flex-col items-center px-6 py-8 gap-6 max-w-sm mx-auto w-full">
+      <label className="w-full text-sm font-semibold text-gray-300">
+        Codigo de activacion
+        <input
+          value={activationCode}
+          onChange={(event) => setActivationCode(event.target.value.replace(/\D/g, "").slice(0, 8))}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          className="mt-2 h-14 w-full rounded-xl border border-gray-700 bg-gray-800 px-4 text-center font-mono text-2xl tracking-[0.35em] text-white outline-none focus:border-amber-400"
+          placeholder="00000000"
+        />
+      </label>
       <h2 className="text-2xl font-bold">
         {pinStep === "enter" ? "Crea tu PIN de 6 dígitos" : "Confirma tu PIN"}
       </h2>

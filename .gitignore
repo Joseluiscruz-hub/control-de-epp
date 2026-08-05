@@ -4,6 +4,7 @@ coverage/
 .DS_Store
 *.log
 *.tsbuildinfo
+.firebase.deploy.json
 .env*
 !.env.example
 epp-kiosko-*.zip

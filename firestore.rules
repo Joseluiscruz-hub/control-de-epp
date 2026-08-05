@@ -24,6 +24,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /employee_activations/{activationId} {
+      allow read, write: if false;
+    }
+
     // ── Catálogo EPP ───────────────────────────────────────────────────────
     match /ppe_catalog/{itemId} {
       allow read: if request.auth != null && hasPlantAccess(resource.data);
@@ -45,7 +49,7 @@ service cloud.firestore {
 
     // ── Estado público mínimo de solicitud para kiosko ─────────────────────
     match /kiosk_request_status/{requestId} {
-      allow get: if true;
+      allow get: if false;
       allow list: if false;
       allow create, update, delete: if false;
     }
@@ -88,7 +92,7 @@ service cloud.firestore {
 
     // ── Sesiones Kiosko ─────────────────────────────────────────────────────
     match /kiosk_sessions/{sessionId} {
-      allow read, write: if request.auth != null && (isAdmin() || isKioskSessionOwner(sessionId));
+      allow read, write: if false;
     }
 
     // ── Perfiles administrativos multi-planta ─────────────────────────────
@@ -234,7 +238,7 @@ service cloud.firestore {
           "createdAt", "updatedAt", "division", "personnelArea", "plantArea", "costCenter",
           "positionId", "position", "jobFunction", "hireDate", "sex", "source", "schemaVersion",
           "rfc", "imss", "curp", "plantaId", "credentialResetAt", "credentialResetByUid",
-          "credentialResetByEmail"
+          "credentialResetByEmail", "credentialVersion"
         ])
         && data.keys().hasAll(["id", "name", "area", "active", "createdAt", "updatedAt"])
         && data.id is string && data.id.size() > 0
@@ -249,6 +253,7 @@ service cloud.firestore {
         && (data.credentialResetAt == null || data.credentialResetAt is timestamp)
         && optionalString(data.credentialResetByUid)
         && optionalString(data.credentialResetByEmail)
+        && (data.credentialVersion == null || data.credentialVersion is int)
         && optionalString(data.division)
         && optionalString(data.personnelArea)
         && optionalString(data.plantArea)
@@ -270,7 +275,7 @@ service cloud.firestore {
       return data.keys().hasOnly([
           "id", "name", "area", "active", "firstLogin", "termsAccepted", "termsAcceptedAt", "createdAt",
           "updatedAt", "personnelArea", "plantArea", "costCenter", "position", "jobFunction", "source", "schemaVersion",
-          "plantaId", "credentialResetAt", "credentialResetByUid", "credentialResetByEmail"
+          "plantaId", "credentialResetAt", "credentialResetByUid", "credentialResetByEmail", "credentialVersion"
         ])
         && data.keys().hasAll(["name", "active", "updatedAt"])
         && data.name is string && data.name.size() > 0
@@ -283,6 +288,7 @@ service cloud.firestore {
         && (data.credentialResetAt == null || data.credentialResetAt is timestamp)
         && optionalString(data.credentialResetByUid)
         && optionalString(data.credentialResetByEmail)
+        && (data.credentialVersion == null || data.credentialVersion is int)
         && optionalString(data.area)
         && optionalString(data.personnelArea)
         && optionalString(data.plantArea)

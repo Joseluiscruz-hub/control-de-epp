@@ -35,7 +35,6 @@ export default function KioskoLoginPage() {
       try {
         const valid = await validateEmployeePin(employeeId, pin);
         if (valid) {
-          sessionStorage.setItem("kiosk_pin_verified", "true");
           router.push("/kiosko/catalogo");
         } else {
           const next = attempts + 1;
@@ -57,7 +56,7 @@ export default function KioskoLoginPage() {
             : 0;
 
         setPin("");
-        if (status === 429) {
+        if (status === 429 || status === 423) {
           setAttempts(MAX_ATTEMPTS);
           setError(error instanceof Error ? error.message : "Demasiados intentos fallidos. Intenta mas tarde.");
         } else {

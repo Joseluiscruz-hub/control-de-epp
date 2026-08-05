@@ -1,168 +1,96 @@
-name: Deploy to Google Cloud Run
+name: Promote to Cloud Run
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      promote_to_production:
+        description: Deploy the same main commit to production after staging succeeds
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: control-epp-cloud-run-promotion
+  cancel-in-progress: false
+
 jobs:
-  deploy:
+  deploy-staging:
+    name: Deploy and smoke test staging
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: staging
     env:
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      DEPLOYMENT_ENVIRONMENT: ${{ vars.DEPLOYMENT_ENVIRONMENT }}
+      EXPECTED_DEPLOYMENT_ENVIRONMENT: staging
       REGION: ${{ vars.GCP_REGION || 'us-central1' }}
-      SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE || 'control-de-epp' }}
+      SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE || 'control-de-epp-staging' }}
+      RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }}
+      FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+      FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
+      FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+      FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
+      FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
+      FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+      FIREBASE_MEASUREMENT_ID: ${{ vars.FIREBASE_MEASUREMENT_ID }}
+      FIREBASE_DATABASE_ID: ${{ vars.FIREBASE_DATABASE_ID }}
+      ENABLE_BOOTSTRAP_ADMIN: ${{ vars.ENABLE_BOOTSTRAP_ADMIN || 'false' }}
+      BOOTSTRAP_ADMIN_EMAIL: ${{ vars.BOOTSTRAP_ADMIN_EMAIL }}
+      NEXT_PUBLIC_ENABLE_OFFLINE_MODE: ${{ vars.NEXT_PUBLIC_ENABLE_OFFLINE_MODE || 'false' }}
+      FIREBASE_APPCHECK_SITE_KEY: ${{ vars.FIREBASE_APPCHECK_SITE_KEY }}
+      FIREBASE_APP_CHECK_REQUIRED: ${{ vars.FIREBASE_APP_CHECK_REQUIRED || 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Authenticate to Google Cloud (OIDC)
-        uses: google-github-actions/auth@v2
+      - name: Deploy staging revision
+        uses: ./.github/actions/deploy-cloud-run
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          deployer_service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+  deploy-production:
+    name: Approve, deploy and smoke test production
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.promote_to_production
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      DEPLOYMENT_ENVIRONMENT: ${{ vars.DEPLOYMENT_ENVIRONMENT }}
+      EXPECTED_DEPLOYMENT_ENVIRONMENT: production
+      REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+      SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE || 'control-de-epp' }}
+      RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }}
+      FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+      FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
+      FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+      FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
+      FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
+      FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+      FIREBASE_MEASUREMENT_ID: ${{ vars.FIREBASE_MEASUREMENT_ID }}
+      FIREBASE_DATABASE_ID: ${{ vars.FIREBASE_DATABASE_ID }}
+      ENABLE_BOOTSTRAP_ADMIN: ${{ vars.ENABLE_BOOTSTRAP_ADMIN || 'false' }}
+      BOOTSTRAP_ADMIN_EMAIL: ${{ vars.BOOTSTRAP_ADMIN_EMAIL }}
+      NEXT_PUBLIC_ENABLE_OFFLINE_MODE: ${{ vars.NEXT_PUBLIC_ENABLE_OFFLINE_MODE || 'false' }}
+      FIREBASE_APPCHECK_SITE_KEY: ${{ vars.FIREBASE_APPCHECK_SITE_KEY }}
+      FIREBASE_APP_CHECK_REQUIRED: ${{ vars.FIREBASE_APP_CHECK_REQUIRED || 'true' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
 
-      - name: Enable Cloud Run API
-        run: gcloud services enable run.googleapis.com --project="${PROJECT_ID}"
-
-      - name: Create Cloud Run env vars files
-        env:
-          FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
-          FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
-          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
-          FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
-          FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
-          FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
-          FIREBASE_MEASUREMENT_ID: ${{ vars.FIREBASE_MEASUREMENT_ID }}
-          FIREBASE_DATABASE_ID: ${{ vars.FIREBASE_DATABASE_ID }}
-          ENABLE_BOOTSTRAP_ADMIN: ${{ vars.ENABLE_BOOTSTRAP_ADMIN || 'false' }}
-          BOOTSTRAP_ADMIN_EMAIL: ${{ vars.BOOTSTRAP_ADMIN_EMAIL }}
-          NEXT_PUBLIC_ENABLE_OFFLINE_MODE: ${{ vars.NEXT_PUBLIC_ENABLE_OFFLINE_MODE || 'false' }}
-          FIREBASE_APPCHECK_SITE_KEY: ${{ vars.FIREBASE_APPCHECK_SITE_KEY }}
-          FIREBASE_APP_CHECK_REQUIRED: ${{ vars.FIREBASE_APP_CHECK_REQUIRED || 'true' }}
-        run: |
-          python3 - <<'PYEOF'
-          import os
-          import sys
-
-          required = [
-            "FIREBASE_API_KEY",
-            "FIREBASE_AUTH_DOMAIN",
-            "FIREBASE_PROJECT_ID",
-            "FIREBASE_STORAGE_BUCKET",
-            "FIREBASE_MESSAGING_SENDER_ID",
-            "FIREBASE_APP_ID",
-            "FIREBASE_DATABASE_ID",
-          ]
-          missing = [key for key in required if not os.environ.get(key)]
-          app_check_required = (os.environ.get("FIREBASE_APP_CHECK_REQUIRED", "true") or "true").lower() == "true"
-          if app_check_required and not os.environ.get("FIREBASE_APPCHECK_SITE_KEY"):
-            missing.append("FIREBASE_APPCHECK_SITE_KEY")
-          if missing:
-            sys.exit("Missing required GitHub variables: " + ", ".join(missing))
-
-          build_vars = {
-            "NEXT_PUBLIC_FIREBASE_API_KEY": os.environ["FIREBASE_API_KEY"],
-            "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN": os.environ["FIREBASE_AUTH_DOMAIN"],
-            "NEXT_PUBLIC_FIREBASE_PROJECT_ID": os.environ["FIREBASE_PROJECT_ID"],
-            "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET": os.environ["FIREBASE_STORAGE_BUCKET"],
-            "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": os.environ["FIREBASE_MESSAGING_SENDER_ID"],
-            "NEXT_PUBLIC_FIREBASE_APP_ID": os.environ["FIREBASE_APP_ID"],
-            "NEXT_PUBLIC_FIREBASE_DATABASE_ID": os.environ["FIREBASE_DATABASE_ID"],
-            "NEXT_PUBLIC_ENABLE_OFFLINE_MODE": os.environ.get("NEXT_PUBLIC_ENABLE_OFFLINE_MODE", "false") or "false",
-            "NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY": os.environ.get("FIREBASE_APPCHECK_SITE_KEY", ""),
-            "NEXT_PUBLIC_FIREBASE_APP_CHECK_REQUIRED": os.environ.get("FIREBASE_APP_CHECK_REQUIRED", "true") or "true",
-          }
-
-          measurement_id = os.environ.get("FIREBASE_MEASUREMENT_ID", "").strip()
-          if measurement_id:
-            build_vars["NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID"] = measurement_id
-
-          runtime_vars = {
-            "NODE_ENV": "production",
-            "FIREBASE_API_KEY": os.environ["FIREBASE_API_KEY"],
-            "FIREBASE_AUTH_DOMAIN": os.environ["FIREBASE_AUTH_DOMAIN"],
-            "FIREBASE_PROJECT_ID": os.environ["FIREBASE_PROJECT_ID"],
-            "FIREBASE_STORAGE_BUCKET": os.environ["FIREBASE_STORAGE_BUCKET"],
-            "FIREBASE_MESSAGING_SENDER_ID": os.environ["FIREBASE_MESSAGING_SENDER_ID"],
-            "FIREBASE_APP_ID": os.environ["FIREBASE_APP_ID"],
-            "FIREBASE_DATABASE_ID": os.environ["FIREBASE_DATABASE_ID"],
-            "ENABLE_BOOTSTRAP_ADMIN": os.environ.get("ENABLE_BOOTSTRAP_ADMIN", "false") or "false",
-            "BOOTSTRAP_ADMIN_EMAIL": os.environ.get("BOOTSTRAP_ADMIN_EMAIL", ""),
-            "FIREBASE_APPCHECK_SITE_KEY": os.environ.get("FIREBASE_APPCHECK_SITE_KEY", ""),
-            "FIREBASE_APP_CHECK_REQUIRED": os.environ.get("FIREBASE_APP_CHECK_REQUIRED", "true") or "true",
-            "NEXT_PUBLIC_FIREBASE_APP_CHECK_REQUIRED": os.environ.get("FIREBASE_APP_CHECK_REQUIRED", "true") or "true",
-          }
-
-          if measurement_id:
-            runtime_vars["FIREBASE_MEASUREMENT_ID"] = measurement_id
-
-          def write_yaml(path, values):
-            with open(path, "w", encoding="utf-8") as f:
-              for key, value in values.items():
-                escaped = str(value).replace("'", "''")
-                f.write(f"{key}: '{escaped}'\n")
-
-          write_yaml("/tmp/build-env-vars.yaml", build_vars)
-          write_yaml("/tmp/runtime-env-vars.yaml", runtime_vars)
-          print("Build env vars file created for:", ", ".join(build_vars.keys()))
-          print("Runtime env vars file created for:", ", ".join(runtime_vars.keys()))
-          PYEOF
-
-      - name: Deploy to Cloud Run
-        id: deploy
-        continue-on-error: true
-        run: |
-          set +e
-          deploy_log="$(mktemp)"
-
-          gcloud run deploy "${SERVICE_NAME}" \
-            --source . \
-            --region="${REGION}" \
-            --project="${PROJECT_ID}" \
-            --allow-unauthenticated \
-            --memory=1Gi \
-            --cpu=1 \
-            --min-instances=0 \
-            --max-instances=3 \
-            --concurrency=40 \
-            --timeout=60 \
-            --port=8080 \
-            --build-env-vars-file=/tmp/build-env-vars.yaml \
-            --env-vars-file=/tmp/runtime-env-vars.yaml \
-            --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" 2>&1 | tee "${deploy_log}"
-
-          deploy_exit_code="${PIPESTATUS[0]}"
-          echo "deploy_exit_code=${deploy_exit_code}" >> "${GITHUB_OUTPUT}"
-
-          if grep -Eiq "run\.googleapis\.com|Cloud Run Admin API|SERVICE_DISABLED|has not been used|is disabled" "${deploy_log}"; then
-            echo "missing_run_api=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "missing_run_api=false" >> "${GITHUB_OUTPUT}"
-          fi
-
-          exit 0
-
-      - name: Instrucciones para habilitar Cloud Run Admin API
-        if: steps.deploy.outputs.missing_run_api == 'true'
-        run: |
-          echo "❌ El deploy falló porque la Cloud Run Admin API no está habilitada."
-          echo "Habilítala: https://console.developers.google.com/apis/api/run.googleapis.com/overview?project=${PROJECT_ID}"
-
-      - name: Deploy Firestore Rules
-        if: steps.deploy.outputs.deploy_exit_code == '0'
-        run: |
-          npm install -g firebase-tools
-          firebase deploy --only firestore:rules --project="${PROJECT_ID}"
-
-      - name: Fallar workflow si el deploy no fue exitoso
-        if: steps.deploy.outputs.deploy_exit_code != '0'
-        run: exit 1
+      - name: Deploy production revision
+        uses: ./.github/actions/deploy-cloud-run
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          deployer_service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}

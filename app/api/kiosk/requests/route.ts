@@ -24,6 +24,7 @@ import {
   publicRateLimitResponse,
   requirePublicRateLimit,
 } from "@/lib/public-api-rate-limit";
+import { KioskSessionHttpError, assertSameOrigin, kioskSessionErrorResponse, requireKioskSession } from "@/lib/kiosk-session-server";
 
 export const runtime = "nodejs";
 
@@ -810,10 +811,18 @@ function buildEarlyReplacementAlert(
 export async function POST(req: NextRequest) {
   try {
     await requireAppCheck(req);
-
+    assertSameOrigin(req);
+    const db = getAdminDb();
+    const session = await requireKioskSession(req, db);
     const body = await req.json();
-    const employeeId = readText(body?.employeeId);
-    const employeeName = readText(body?.employeeName);
+    const suppliedEmployeeId = readText(body?.employeeId);
+    const suppliedEmployeeName = readText(body?.employeeName);
+    if ((suppliedEmployeeId && suppliedEmployeeId !== session.employeeId) ||
+        (suppliedEmployeeName && suppliedEmployeeName !== session.employeeName)) {
+      return Response.json({ error: "No tienes acceso a otro colaborador." }, { status: 403 });
+    }
+    const employeeId = session.employeeId;
+    const employeeName = session.employeeName;
     const itemsInput = Array.isArray(body?.items) ? body.items as RequestItemInput[] : [];
 
     if (!employeeId || !employeeName || itemsInput.length === 0 || itemsInput.length > 10) {
@@ -823,7 +832,6 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "Items de solicitud invalidos." }, { status: 400 });
     }
 
-    const db = getAdminDb();
     await requirePublicRateLimit(db, req, "kiosk_request_create");
 
     const employeeSnap = await db.collection("kiosk_employees").doc(employeeId).get();
@@ -835,6 +843,9 @@ export async function POST(req: NextRequest) {
     const plantaId = normalizePlantId(employee.plantaId);
     if (employee.active !== true) {
       throw new KioskRequestError("Empleado inactivo para kiosko.", 403);
+    }
+    if (plantaId !== session.plantId) {
+      throw new KioskRequestError("La planta de la sesion no coincide.", 403);
     }
 
     if (readText(employee.name) !== employeeName) {
@@ -958,6 +969,7 @@ export async function POST(req: NextRequest) {
       earlyReplacementAlertIds: alertRefs.map((ref) => ref.id),
     });
   } catch (error) {
+    if (error instanceof KioskSessionHttpError) return kioskSessionErrorResponse(error);
     if (error instanceof AppCheckHttpError) {
       return Response.json({ error: error.message }, { status: error.status });
     }

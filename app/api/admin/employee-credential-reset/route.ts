@@ -1,10 +1,13 @@
 import { FieldValue } from "firebase-admin/firestore";
+import bcrypt from "bcryptjs";
+import { randomInt } from "crypto";
 import { NextRequest } from "next/server";
 import { buildAuditEvent } from "@/lib/audit-events";
 import { normalizeEmployeeCredentialResetId } from "@/lib/employee-credential-reset";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { parsePlantId } from "@/lib/plants";
 import { AuthHttpError, canAdminUsePlant, requireAdminUser } from "@/lib/server-auth";
+import { clearKioskPinFailures, getKioskPinRateLimitKey } from "@/lib/kiosk-pin-rate-limit";
 
 export const runtime = "nodejs";
 
@@ -44,7 +47,11 @@ export async function POST(req: NextRequest) {
     const employeeRef = db.collection("kiosk_employees").doc(employeeId);
     const personnelRef = db.collection("employees").doc(employeeId);
     const secretRef = db.collection("kiosk_employee_secrets").doc(employeeId);
+    const activationRef = db.collection("employee_activations").doc(employeeId);
     const auditRef = db.collection("audit_events").doc();
+    const activationCode = randomInt(0, 100_000_000).toString().padStart(8, "0");
+    const activationCodeHash = await bcrypt.hash(activationCode, 12);
+    const activationExpiresAt = Date.now() + 30 * 60 * 1000;
 
     const result = await db.runTransaction(async (transaction) => {
       const [employeeSnap, personnelSnap, secretSnap] = await Promise.all([
@@ -85,6 +92,7 @@ export async function POST(req: NextRequest) {
         credentialResetByEmail: adminUser.email,
         updatedAt: FieldValue.serverTimestamp(),
         plantaId,
+        credentialVersion: Math.max(1, Number(employee.credentialVersion ?? 1)) + 1,
       };
 
       transaction.update(employeeRef, resetPayload);
@@ -94,6 +102,16 @@ export async function POST(req: NextRequest) {
       if (secretSnap.exists) {
         transaction.delete(secretRef);
       }
+      transaction.set(activationRef, {
+        employeeId,
+        plantaId,
+        codeHash: activationCodeHash,
+        expiresAt: activationExpiresAt,
+        usedAt: null,
+        failedAttempts: 0,
+        createdBy: adminUser.uid,
+        createdAt: FieldValue.serverTimestamp(),
+      });
 
       transaction.set(auditRef, buildAuditEvent({
         type: "kiosk.employee_credential.reset",
@@ -106,6 +124,7 @@ export async function POST(req: NextRequest) {
           termsAccepted: employee.termsAccepted === true,
           hadSecret: secretSnap.exists,
           plantaId,
+          activationExpiresAt,
         },
         after: {
           firstLogin: true,
@@ -126,7 +145,20 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    return Response.json({ success: true, ...result });
+    await Promise.all([
+      clearKioskPinFailures(db, getKioskPinRateLimitKey(req, employeeId, "verify")),
+      clearKioskPinFailures(db, getKioskPinRateLimitKey(req, employeeId, "setup")),
+    ]);
+
+    return Response.json(
+      { success: true, ...result, activationCode, activationExpiresAt },
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+          Pragma: "no-cache",
+        },
+      },
+    );
   } catch (error) {
     if (error instanceof AuthHttpError || error instanceof EmployeeCredentialResetError) {
       return Response.json({ error: error.message }, { status: error.status });

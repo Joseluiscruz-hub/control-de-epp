@@ -1,6 +1,4 @@
-import {
-  doc, getDoc, collection, query, where, getDocs, limit
-} from "firebase/firestore";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { auth, db, ensureFirebaseReady, getAppCheckTokenForRequest, isAppCheckRequiredForClient } from "./firebase";
 import { resolveEppReplacementDays, getEppDurationRulePayload } from "./epp-duration-rules";
 import {
@@ -26,6 +24,7 @@ import {
 } from "./kiosk-local-store";
 import { legacyHashPin } from "./pin-utils";
 import type { ActivePlantId } from "./plants";
+import { isInsecureKioskLocalAuthEnabled } from "./kiosk-local-auth-policy";
 
 class KioskApiError extends Error {
   status: number;
@@ -101,12 +100,12 @@ export async function getEmployeeById(employeeId: string): Promise<KioskEmployee
   }
 }
 
-export async function saveEmployeePin(employeeId: string, pin: string): Promise<void> {
+export async function saveEmployeePin(employeeId: string, activationCode: string, pin: string): Promise<void> {
   try {
     const response = await fetch("/api/kiosk/pin/setup", {
       method: "POST",
       headers: await kioskApiHeaders(),
-      body: JSON.stringify({ employeeId, pin }),
+      body: JSON.stringify({ employeeId, activationCode, pin }),
     });
 
     if (!response.ok) {
@@ -116,7 +115,7 @@ export async function saveEmployeePin(employeeId: string, pin: string): Promise<
       );
     }
   } catch (error) {
-    if (canFallbackToLocal(error)) {
+    if (canFallbackToLocal(error) && isInsecureKioskLocalAuthEnabled()) {
       console.warn("[Kiosko] Guardando PIN en modo local.", error);
       saveLocalKioskEmployeePin(employeeId, legacyHashPin(pin));
       return;
@@ -146,7 +145,7 @@ export async function validateEmployeePin(
       response.status
     );
   } catch (error) {
-    if (canFallbackToLocal(error)) {
+    if (canFallbackToLocal(error) && isInsecureKioskLocalAuthEnabled()) {
       const emp = await getEmployeeById(employeeId);
       return !!emp?.pin && emp.pin === legacyHashPin(pin);
     }
@@ -305,11 +304,13 @@ export async function getKioskRequestStatus(requestId: string): Promise<KioskReq
   }
 
   try {
-    await ensureFirebaseReady();
-    const snap = await getDoc(doc(db, "kiosk_request_status", requestId));
-    if (!snap.exists()) throw new Error("kiosk_request_not_found");
-
-    const status = snap.data().status;
+    const response = await fetch("/api/kiosk/request-status", {
+      method: "POST",
+      headers: await kioskApiHeaders(),
+      body: JSON.stringify({ requestId }),
+    });
+    if (!response.ok) throw new KioskApiError(await parseKioskApiError(response, "No se pudo consultar el folio."), response.status);
+    const status = (await response.json()).status;
     if (status === "approved" || status === "rejected" || status === "pending") {
       return status;
     }
@@ -319,6 +320,19 @@ export async function getKioskRequestStatus(requestId: string): Promise<KioskReq
     throw error;
   }
   throw new Error("kiosk_request_invalid_status");
+}
+
+export type KioskServerSession = { employeeId: string; employeeName: string; plantId: string; expiresAt: number };
+
+export async function getKioskServerSession(): Promise<KioskServerSession | null> {
+  const response = await fetch("/api/kiosk/session", { headers: await kioskApiHeaders(), cache: "no-store" });
+  if (response.status === 401 || response.status === 403) return null;
+  if (!response.ok) throw new KioskApiError(await parseKioskApiError(response, "No se pudo validar la sesion."), response.status);
+  return response.json();
+}
+
+export async function logoutKioskServerSession() {
+  await fetch("/api/kiosk/session/logout", { method: "POST", headers: await kioskApiHeaders() }).catch(() => undefined);
 }
 
 export interface AdminKioskRequest {

@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 import {
   getKioskPinClientRateLimitKey,
   getKioskPinRateLimitKey,
+  getKioskPinRateLimitStatus,
   kioskPinRateLimitResponse,
 } from "./kiosk-pin-rate-limit";
 
@@ -49,12 +50,12 @@ describe("getKioskPinRateLimitKey", () => {
     assert.equal(upper, lower);
   });
 
-  it("prefiere x-forwarded-for sobre x-real-ip", () => {
+  it("no permite evadir el limite del empleado cambiando de IP", () => {
     const forwarded = makeRequest("10.0.0.99", "203.0.113.1, 10.0.0.1");
     const direct = makeRequest("10.0.0.99");
     const forwardedKey = getKioskPinRateLimitKey(forwarded, "EMP001", "verify");
     const directKey = getKioskPinRateLimitKey(direct, "EMP001", "verify");
-    assert.notEqual(forwardedKey, directKey);
+    assert.equal(forwardedKey, directKey);
   });
 });
 
@@ -75,18 +76,18 @@ describe("getKioskPinClientRateLimitKey", () => {
 
 describe("kioskPinRateLimitResponse", () => {
   it("devuelve status 429", () => {
-    const response = kioskPinRateLimitResponse({ blocked: true, retryAfterSeconds: 60, remainingAttempts: 0 });
+    const response = kioskPinRateLimitResponse({ blocked: true, adminUnlockRequired: false, retryAfterSeconds: 60, remainingAttempts: 0 });
     assert.equal(response.status, 429);
   });
 
   it("incluye header Retry-After", () => {
-    const response = kioskPinRateLimitResponse({ blocked: true, retryAfterSeconds: 60, remainingAttempts: 0 });
+    const response = kioskPinRateLimitResponse({ blocked: true, adminUnlockRequired: false, retryAfterSeconds: 60, remainingAttempts: 0 });
     assert.equal(response.headers.get("Retry-After"), "60");
   });
 
   it("incluye campo valid:false cuando se solicita", async () => {
     const response = kioskPinRateLimitResponse(
-      { blocked: true, retryAfterSeconds: 30, remainingAttempts: 0 },
+      { blocked: true, adminUnlockRequired: false, retryAfterSeconds: 30, remainingAttempts: 0 },
       true
     );
     const body = await response.json();
@@ -94,9 +95,34 @@ describe("kioskPinRateLimitResponse", () => {
   });
 
   it("usa minimo 1 segundo aunque retryAfterSeconds sea 0", async () => {
-    const response = kioskPinRateLimitResponse({ blocked: true, retryAfterSeconds: 0, remainingAttempts: 0 });
+    const response = kioskPinRateLimitResponse({ blocked: true, adminUnlockRequired: false, retryAfterSeconds: 0, remainingAttempts: 0 });
     const body = await response.json();
     assert.equal(response.headers.get("Retry-After"), "1");
     assert.ok(body.retryAfterSeconds >= 1);
+  });
+});
+
+describe("bloqueo progresivo de PIN", () => {
+  it("bloquea cinco minutos al quinto fallo", () => {
+    const now = Date.now();
+    const status = getKioskPinRateLimitStatus({ failedAttempts: 5, windowExpiresAt: now + 1000, blockedUntil: now + 5 * 60_000 }, "employee", now);
+    assert.equal(status.blocked, true);
+    assert.equal(status.adminUnlockRequired, false);
+    assert.equal(status.retryAfterSeconds, 300);
+  });
+
+  it("bloquea treinta minutos al decimo fallo", () => {
+    const now = Date.now();
+    const status = getKioskPinRateLimitStatus({ failedAttempts: 10, windowExpiresAt: now + 1000, blockedUntil: now + 30 * 60_000 }, "employee", now);
+    assert.equal(status.retryAfterSeconds, 1800);
+  });
+
+  it("requiere desbloqueo administrativo al fallo quince", async () => {
+    const status = getKioskPinRateLimitStatus({ failedAttempts: 15, adminUnlockRequired: true }, "employee");
+    assert.equal(status.blocked, true);
+    assert.equal(status.adminUnlockRequired, true);
+    const response = kioskPinRateLimitResponse(status, true);
+    assert.equal(response.status, 423);
+    assert.equal((await response.json()).adminUnlockRequired, true);
   });
 });

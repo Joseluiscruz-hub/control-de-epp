@@ -13,6 +13,7 @@ import {
   registerKioskPinFailure,
 } from "@/lib/kiosk-pin-rate-limit";
 import { isSixDigitPin, legacyHashPin } from "@/lib/pin-utils";
+import { attachKioskSessionCookies, createKioskSession } from "@/lib/kiosk-session-server";
 
 export const runtime = "nodejs";
 
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
     const pin = typeof body?.pin === "string" ? body.pin.trim() : "";
 
     if (!employeeId || !isSixDigitPin(pin)) {
-      return Response.json({ valid: false, error: "Empleado y PIN de 6 digitos requeridos." }, { status: 400 });
+      return Response.json({ valid: false, error: "No fue posible validar las credenciales." }, { status: 400 });
     }
 
     const db = getAdminDb();
@@ -66,14 +67,14 @@ export async function POST(req: NextRequest) {
     if (!snapshot.exists || employee?.active !== true || !storedPin) {
       const nextRateLimit = await registerFailure(db, attemptKey, clientAttemptKey);
       if (nextRateLimit.blocked) return kioskPinRateLimitResponse(nextRateLimit, true);
-      return Response.json({ valid: false, error: "PIN incorrecto." }, { status: 401 });
+      return Response.json({ valid: false, error: "No fue posible validar las credenciales." }, { status: 401 });
     }
 
     const valid = await comparePin(pin, storedPin);
     if (!valid) {
       const nextRateLimit = await registerFailure(db, attemptKey, clientAttemptKey);
       if (nextRateLimit.blocked) return kioskPinRateLimitResponse(nextRateLimit, true);
-      return Response.json({ valid: false, error: "PIN incorrecto." }, { status: 401 });
+      return Response.json({ valid: false, error: "No fue posible validar las credenciales." }, { status: 401 });
     }
 
     await Promise.all([
@@ -109,7 +110,24 @@ export async function POST(req: NextRequest) {
       ]);
     }
 
-    return Response.json({ valid: true });
+    const employeeName = typeof employee.name === "string" ? employee.name.trim() : "";
+    const plantId = typeof employee.plantaId === "string" ? employee.plantaId.trim() : "";
+    if (!employeeName || !plantId) {
+      return Response.json({ valid: false, error: "No fue posible validar las credenciales." }, { status: 401 });
+    }
+    const kioskSession = await createKioskSession({
+      req,
+      db,
+      employeeId,
+      employeeName,
+      plantId,
+      credentialVersion: Number(employee.credentialVersion ?? 1),
+    });
+    return attachKioskSessionCookies(
+      Response.json({ valid: true, expiresAt: kioskSession.claims.expiresAt }),
+      kioskSession.token,
+      kioskSession.deviceId
+    );
   } catch (error) {
     if (error instanceof AppCheckHttpError) {
       return Response.json({ valid: false, error: error.message }, { status: error.status });

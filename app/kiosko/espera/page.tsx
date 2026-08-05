@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clock3, Loader2, CheckCircle2, XCircle } from "lucide-react";
-import { getKioskRequestStatus } from "@/lib/kiosk-api";
+import { getKioskRequestStatus, logoutKioskServerSession } from "@/lib/kiosk-api";
 import { clearKioskSession } from "@/lib/kiosk-session";
+import { useKioskSessionSnapshot } from "../use-kiosk-session-snapshot";
 
 type ViewStatus = "pending" | "approved" | "rejected";
 // Balancea refresco percibido por usuario y carga de lecturas en Firestore.
@@ -13,20 +14,21 @@ const AUTO_RETURN_DELAY_MS = 6_000;
 
 export default function KioskoEsperaPage() {
   const router = useRouter();
+  const { ready, pinVerified, requestId } = useKioskSessionSnapshot();
   const [status, setStatus] = useState<ViewStatus>("pending");
   const [notFound, setNotFound] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const returnToLogin = useCallback(() => {
+    void logoutKioskServerSession();
     clearKioskSession();
     router.replace("/kiosko");
   }, [router]);
 
   useEffect(() => {
-    const requestId = sessionStorage.getItem("kiosk_request_id");
-    const verified = sessionStorage.getItem("kiosk_pin_verified");
-    if (!requestId || verified !== "true") {
+    if (!ready) return;
+    if (!requestId || !pinVerified) {
       returnToLogin();
       return;
     }
@@ -41,6 +43,13 @@ export default function KioskoEsperaPage() {
         setStatus(next);
       } catch (error) {
         if (!active) return;
+        const errorStatus = typeof error === "object" && error !== null && "status" in error
+          ? Number((error as { status?: unknown }).status)
+          : 0;
+        if (errorStatus === 401 || errorStatus === 403) {
+          returnToLogin();
+          return;
+        }
         const isNotFound = error instanceof Error && error.message === "kiosk_request_not_found";
         setNotFound(isNotFound);
         setConnectionError(!isNotFound);
@@ -61,7 +70,7 @@ export default function KioskoEsperaPage() {
       active = false;
       window.clearInterval(interval);
     };
-  }, [returnToLogin]);
+  }, [pinVerified, ready, requestId, returnToLogin]);
 
   useEffect(() => {
     if (status === "pending" || connectionError) return;

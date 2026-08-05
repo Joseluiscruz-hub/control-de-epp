@@ -7,6 +7,7 @@ import {
   publicRateLimitResponse,
   requirePublicRateLimit,
 } from "@/lib/public-api-rate-limit";
+import { KioskSessionHttpError, assertSameOrigin, kioskSessionErrorResponse, requireKioskSession } from "@/lib/kiosk-session-server";
 
 export const runtime = "nodejs";
 
@@ -34,16 +35,21 @@ function serializeDate(value: unknown) {
 
 export async function POST(req: NextRequest) {
   try {
+    assertSameOrigin(req);
     await requireAppCheck(req);
-
+    const db = getAdminDb();
+    const session = await requireKioskSession(req, db);
     const body = await req.json();
-    const employeeId = readText(body?.employeeId);
+    const suppliedEmployeeId = readText(body?.employeeId);
+    if (suppliedEmployeeId && suppliedEmployeeId !== session.employeeId) {
+      return Response.json({ error: "No tienes acceso a otro colaborador." }, { status: 403 });
+    }
+    const employeeId = session.employeeId;
     const sku = readText(body?.sku);
     if (!employeeId || !/^\d+$/.test(employeeId) || !sku) {
       return Response.json({ error: "Empleado y SKU requeridos." }, { status: 400 });
     }
 
-    const db = getAdminDb();
     await requirePublicRateLimit(db, req, "kiosk_assignment_lookup");
 
     const employeeSnap = await db.collection("kiosk_employees").doc(employeeId).get();
@@ -78,6 +84,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof KioskSessionHttpError) return kioskSessionErrorResponse(error);
     if (error instanceof AppCheckHttpError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
