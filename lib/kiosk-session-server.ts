@@ -193,6 +193,10 @@ export function kioskSessionErrorResponse(error: KioskSessionHttpError) {
   return error.shouldClearCookies ? clearKioskSessionCookies(response) : response;
 }
 
+function normalizeRequestHost(value: string | null) {
+  return value?.split(",", 1)[0]?.trim().toLowerCase() ?? "";
+}
+
 export function assertSameOrigin(req: NextRequest, environment = process.env.NODE_ENV) {
   const fetchSite = req.headers.get("sec-fetch-site")?.trim().toLowerCase() ?? "";
   const origin = req.headers.get("origin");
@@ -203,7 +207,14 @@ export function assertSameOrigin(req: NextRequest, environment = process.env.NOD
 
   if (origin) {
     try {
-      if (new URL(origin).host !== req.nextUrl.host) {
+      const originHost = new URL(origin).host.toLowerCase();
+      const requestHosts = new Set([
+        normalizeRequestHost(req.headers.get("host")),
+        normalizeRequestHost(req.headers.get("x-forwarded-host")),
+        req.nextUrl.host.toLowerCase(),
+      ].filter(Boolean));
+
+      if (!requestHosts.has(originHost)) {
         throw new KioskSessionHttpError(403, "Origen no permitido.", false);
       }
     } catch (error) {

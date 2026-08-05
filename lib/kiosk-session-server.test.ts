@@ -22,10 +22,13 @@ function request(sessionToken = "", deviceId = "device-1") {
   } as unknown as NextRequest;
 }
 
-function originRequest(headers: Record<string, string> = {}) {
+function originRequest(
+  headers: Record<string, string> = {},
+  url = "https://epp.example.com/api/kiosk/session",
+) {
   return {
     headers: new Headers(headers),
-    nextUrl: new URL("https://epp.example.com/api/kiosk/session"),
+    nextUrl: new URL(url),
   } as unknown as NextRequest;
 }
 
@@ -108,6 +111,20 @@ describe("proteccion same-origin del kiosko", () => {
   it("acepta metadata same-origin y un Origin del mismo host", () => {
     assert.doesNotThrow(() => assertSameOrigin(originRequest({ "sec-fetch-site": "same-origin" }), "production"));
     assert.doesNotThrow(() => assertSameOrigin(originRequest({ origin: "https://epp.example.com" }), "production"));
+  });
+
+  it("acepta el host publico reenviado por Cloud Run", () => {
+    const request = originRequest(
+      {
+        host: "localhost:8080",
+        "x-forwarded-host": "epp.example.com",
+        origin: "https://epp.example.com",
+        "sec-fetch-site": "same-origin",
+      },
+      "http://localhost:8080/api/kiosk/session",
+    );
+
+    assert.doesNotThrow(() => assertSameOrigin(request, "production"));
   });
 
   it("rechaza solicitudes cross-site y origenes de otro host", () => {
