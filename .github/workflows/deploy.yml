@@ -46,7 +46,7 @@ jobs:
       FIREBASE_APP_CHECK_REQUIRED: ${{ vars.FIREBASE_APP_CHECK_REQUIRED || 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Deploy staging revision
         uses: ./.github/actions/deploy-cloud-run
@@ -83,7 +83,7 @@ jobs:
       FIREBASE_APP_CHECK_REQUIRED: ${{ vars.FIREBASE_APP_CHECK_REQUIRED || 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Deploy production revision
         uses: ./.github/actions/deploy-cloud-run
