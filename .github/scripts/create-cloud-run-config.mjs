@@ -24,7 +24,15 @@ function writeYaml(path, values) {
 const projectId = requiredEnv("PROJECT_ID");
 const firebaseProjectId = requiredEnv("FIREBASE_PROJECT_ID");
 const databaseId = requiredEnv("FIREBASE_DATABASE_ID");
+const deploymentEnvironment = requiredEnv("DEPLOYMENT_ENVIRONMENT");
+const expectedDeploymentEnvironment = requiredEnv("EXPECTED_DEPLOYMENT_ENVIRONMENT");
 const deploymentTempDir = optionalEnv("DEPLOYMENT_TEMP_DIR", "/tmp");
+
+if (deploymentEnvironment !== expectedDeploymentEnvironment) {
+  throw new Error(
+    `Expected GitHub environment ${expectedDeploymentEnvironment}, received ${deploymentEnvironment}.`,
+  );
+}
 
 if (projectId !== firebaseProjectId) {
   throw new Error(
@@ -94,4 +102,6 @@ writeFileSync(
   "utf8",
 );
 
-console.log(`Deployment configuration created for ${projectId}/${databaseId}.`);
+console.log(
+  `Deployment configuration created for ${deploymentEnvironment}: ${projectId}/${databaseId}.`,
+);

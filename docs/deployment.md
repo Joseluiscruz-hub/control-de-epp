@@ -19,6 +19,7 @@ these secrets independently in both environments:
 Configure these environment variables independently:
 
 - `GCP_PROJECT_ID`
+- `DEPLOYMENT_ENVIRONMENT` (`staging` or `production`)
 - `GCP_REGION`
 - `CLOUD_RUN_SERVICE`
 - `CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT`
@@ -45,6 +46,7 @@ The isolated staging environment currently uses:
 
 ```text
 GCP_PROJECT_ID=assetguard-staging-jlc
+DEPLOYMENT_ENVIRONMENT=staging
 FIREBASE_PROJECT_ID=assetguard-staging-jlc
 FIREBASE_DATABASE_ID=(default)
 CLOUD_RUN_SERVICE=control-de-epp-staging

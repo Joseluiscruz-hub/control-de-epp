@@ -28,6 +28,8 @@ jobs:
     environment: staging
     env:
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      DEPLOYMENT_ENVIRONMENT: ${{ vars.DEPLOYMENT_ENVIRONMENT }}
+      EXPECTED_DEPLOYMENT_ENVIRONMENT: staging
       REGION: ${{ vars.GCP_REGION || 'us-central1' }}
       SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE || 'control-de-epp-staging' }}
       RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }}
@@ -65,6 +67,8 @@ jobs:
     environment: production
     env:
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      DEPLOYMENT_ENVIRONMENT: ${{ vars.DEPLOYMENT_ENVIRONMENT }}
+      EXPECTED_DEPLOYMENT_ENVIRONMENT: production
       REGION: ${{ vars.GCP_REGION || 'us-central1' }}
       SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE || 'control-de-epp' }}
       RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }}
