@@ -40,6 +40,11 @@ Configure these environment variables independently:
 `GCP_PROJECT_ID` and `FIREBASE_PROJECT_ID` must match. The workflow refuses a
 cross-project deployment.
 
+Enable Cloud Run, Cloud Build, Artifact Registry, Firestore and Secret Manager
+during environment provisioning. The deployment identity deliberately does not
+need permission to enable Google Cloud APIs; the workflow only deploys to APIs
+that are already provisioned.
+
 ## Staging values
 
 The isolated staging environment currently uses:
