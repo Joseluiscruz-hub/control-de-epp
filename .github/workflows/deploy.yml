@@ -53,6 +53,7 @@ jobs:
       - name: Deploy staging revision
         uses: ./.github/actions/deploy-cloud-run
         with:
+          project_id: ${{ env.PROJECT_ID }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           deployer_service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
@@ -92,5 +93,6 @@ jobs:
       - name: Deploy production revision
         uses: ./.github/actions/deploy-cloud-run
         with:
+          project_id: ${{ env.PROJECT_ID }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           deployer_service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}

@@ -2,6 +2,9 @@ name: Deploy AssetGuard to Cloud Run
 description: Build, deploy, apply Firestore rules, and smoke test one protected environment.
 
 inputs:
+  project_id:
+    description: Google Cloud project that receives the deployment
+    required: true
   workload_identity_provider:
     description: Google Cloud Workload Identity Provider resource name
     required: true
@@ -20,6 +23,7 @@ runs:
     - name: Authenticate to Google Cloud with OIDC
       uses: google-github-actions/auth@v3
       with:
+        project_id: ${{ inputs.project_id }}
         workload_identity_provider: ${{ inputs.workload_identity_provider }}
         service_account: ${{ inputs.deployer_service_account }}
 
@@ -34,10 +38,6 @@ runs:
     - name: Validate and create deployment configuration
       shell: bash
       run: node .github/scripts/create-cloud-run-config.mjs
-
-    - name: Enable Cloud Run API
-      shell: bash
-      run: gcloud services enable run.googleapis.com --project="${PROJECT_ID}"
 
     - name: Deploy Cloud Run revision
       shell: bash
