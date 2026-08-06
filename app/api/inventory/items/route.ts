@@ -13,6 +13,7 @@ import {
 import { isPackageUnit, resolveStockFromPackageRule } from "@/lib/epp-package-rules";
 import { getEppReorderPoint } from "@/lib/epp-reorder-points";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { buildPublicKioskCatalogPayload } from "@/lib/kiosk-catalog-public";
 import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
 import {
   buildPlantScopedInventoryId,
@@ -338,6 +339,10 @@ export async function POST(req: NextRequest) {
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     };
+    const publicPayload = {
+      ...buildPublicKioskCatalogPayload(payload),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
 
     await db.runTransaction(async (transaction) => {
       const currentSnap = await transaction.get(itemRef);
@@ -349,7 +354,7 @@ export async function POST(req: NextRequest) {
       }
 
       transaction.create(itemRef, payload);
-      transaction.set(kioskRef, payload, { merge: true });
+      transaction.set(kioskRef, publicPayload);
       transaction.set(movementRef, buildInventoryMovement({
         itemId: sku,
         sku,

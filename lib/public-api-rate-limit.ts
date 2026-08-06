@@ -15,6 +15,7 @@ const POLICIES: Record<string, PublicRateLimitPolicy> = {
   portal_employee_lookup: { maxRequests: 30, windowMs: 10 * 60 * 1000, blockMs: 10 * 60 * 1000 },
   kiosk_request_create: { maxRequests: 20, windowMs: 10 * 60 * 1000, blockMs: 10 * 60 * 1000 },
   kiosk_assignment_lookup: { maxRequests: 40, windowMs: 10 * 60 * 1000, blockMs: 10 * 60 * 1000 },
+  kiosk_catalog_read: { maxRequests: 60, windowMs: 10 * 60 * 1000, blockMs: 10 * 60 * 1000 },
   kiosk_request_status: { maxRequests: 60, windowMs: 10 * 60 * 1000, blockMs: 10 * 60 * 1000 },
 };
 

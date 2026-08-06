@@ -5,6 +5,7 @@ import {
   type EppDurationRule,
 } from "./epp-duration-rules";
 import { resolveStockFromPackageRule } from "./epp-package-rules";
+import { buildPublicKioskCatalogPayload } from "./kiosk-catalog-public";
 import { getEppReorderPoint } from "./epp-reorder-points";
 import { parsePlantId, plantLabel, type PlantId } from "./plants";
 
@@ -539,5 +540,5 @@ export function buildInventoryCatalogPayload(item: InventoryImportItem) {
 }
 
 export function buildKioskCatalogPayload(item: InventoryImportItem) {
-  return buildInventoryCatalogPayload(item);
+  return buildPublicKioskCatalogPayload(buildInventoryCatalogPayload(item));
 }
