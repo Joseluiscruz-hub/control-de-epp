@@ -26,19 +26,27 @@ function cleanUndefined(input: CatalogRecord) {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 }
 
-function buildPublicSizes(source: unknown, overrides: Record<string, boolean> | undefined) {
+function publicRequestAlias(source: CatalogRecord) {
+  const name = optionalText(source.name) ?? "epp";
+  const category = optionalText(source.category) ?? "general";
+  return `public:${category}:${name}`.slice(0, 180);
+}
+
+function buildPublicSizes(
+  source: unknown,
+  overrides: Record<string, boolean> | undefined,
+  requestAlias: string
+) {
   if (!isRecord(source)) return undefined;
 
   const sizes = Object.fromEntries(
     Object.entries(source).flatMap(([size, rawVariant]) => {
       if (!isRecord(rawVariant)) return [];
-      const sku = optionalText(rawVariant.sku);
-      if (!sku) return [];
 
       return [[
         size,
         {
-          sku,
+          sku: `${requestAlias}:${size}`.slice(0, 220),
           available: overrides?.[size] ?? isAvailable(rawVariant),
         },
       ]];
@@ -51,13 +59,15 @@ function buildPublicSizes(source: unknown, overrides: Record<string, boolean> | 
 /**
  * Creates the only catalog shape that may cross the kiosk trust boundary.
  * Exact stock, costs, SAP materials, storage locations and package metadata
- * are deliberately omitted.
+ * are deliberately omitted. The public `sku` is only a non-sensitive request
+ * alias; the server resolves the canonical SKU/material from ppe_catalog.
  */
 export function buildPublicKioskCatalogPayload(
   source: CatalogRecord,
   options: PublicCatalogOptions = {}
 ) {
-  const sizes = buildPublicSizes(source.sizes, options.sizeAvailability);
+  const requestAlias = publicRequestAlias(source);
+  const sizes = buildPublicSizes(source.sizes, options.sizeAvailability, requestAlias);
   const available = options.available ?? (
     sizes
       ? Object.values(sizes).some((variant) => variant.available)
@@ -65,13 +75,10 @@ export function buildPublicKioskCatalogPayload(
   );
 
   return cleanUndefined({
-    sku: optionalText(source.sku),
+    sku: requestAlias,
     name: optionalText(source.name),
     category: optionalText(source.category),
     replacementDays: optionalPositiveNumber(source.replacementDays),
-    durationRuleId: optionalText(source.durationRuleId),
-    durationRuleSource: optionalText(source.durationRuleSource),
-    durationRuleSku: optionalText(source.durationRuleSku),
     requiredQuantity: optionalPositiveNumber(source.requiredQuantity),
     requiredUnit: optionalText(source.requiredUnit),
     hasSizes: source.hasSizes === true || Boolean(sizes),

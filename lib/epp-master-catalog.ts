@@ -91,6 +91,12 @@ const MASTER_CATALOG: readonly MasterCatalogEntry[] = [
     category: "Ropa",
     replacementDays: 365,
   },
+  {
+    sku: "26016902",
+    name: "CASCO MSA EPP M2303541AR BLANCO",
+    category: "Cascos",
+    replacementDays: 365,
+  },
 ];
 
 function readText(value: unknown) {

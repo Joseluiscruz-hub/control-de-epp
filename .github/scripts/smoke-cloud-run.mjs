@@ -66,6 +66,10 @@ await request("/api/kiosk/session", 401, {
   "Sec-Fetch-Site": "same-origin",
 });
 
+await request("/api/kiosk/catalog", 401, {
+  "Sec-Fetch-Site": "same-origin",
+});
+
 const crossSiteResponse = await request("/api/kiosk/session", 403, {
   "Sec-Fetch-Site": "cross-site",
 });
