@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { buildPublicKioskCatalogPayload } from "@/lib/kiosk-catalog-public";
 import {
   PublicRateLimitHttpError,
   publicRateLimitResponse,
@@ -13,6 +14,12 @@ export const runtime = "nodejs";
 
 function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
 }
 
 function toDate(value: unknown): Date | null {
@@ -45,8 +52,8 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "No tienes acceso a otro colaborador." }, { status: 403 });
     }
     const employeeId = session.employeeId;
-    const sku = readText(body?.sku);
-    if (!employeeId || !/^\d+$/.test(employeeId) || !sku) {
+    const publicSku = readText(body?.sku);
+    if (!employeeId || !/^\d+$/.test(employeeId) || !publicSku) {
       return Response.json({ error: "Empleado y SKU requeridos." }, { status: 400 });
     }
 
@@ -57,6 +64,51 @@ export async function POST(req: NextRequest) {
       return Response.json({ assignment: null });
     }
 
+    let canonicalSku = publicSku;
+    let resolvedItemId = "";
+
+    if (publicSku.startsWith("public:")) {
+      const catalogSnap = await db.collection("ppe_catalog")
+        .where("plantaId", "==", session.plantId)
+        .limit(500)
+        .get();
+
+      for (const catalogDoc of catalogSnap.docs) {
+        const catalogData = catalogDoc.data();
+        const publicItem = buildPublicKioskCatalogPayload(catalogData) as Record<string, unknown>;
+
+        if (readText(publicItem.sku) === publicSku) {
+          canonicalSku = readText(catalogData.sku) || readText(catalogData.material);
+          resolvedItemId = catalogDoc.id;
+          break;
+        }
+
+        const publicSizes = readRecord(publicItem.sizes);
+        const privateSizes = readRecord(catalogData.sizes);
+        if (!publicSizes || !privateSizes) continue;
+
+        for (const [size, rawPublicVariant] of Object.entries(publicSizes)) {
+          const publicVariant = readRecord(rawPublicVariant);
+          if (!publicVariant || readText(publicVariant.sku) !== publicSku) continue;
+
+          const privateVariant = readRecord(privateSizes[size]);
+          canonicalSku =
+            readText(privateVariant?.sku) ||
+            readText(privateVariant?.material) ||
+            readText(catalogData.sku) ||
+            readText(catalogData.material);
+          resolvedItemId = catalogDoc.id;
+          break;
+        }
+
+        if (resolvedItemId) break;
+      }
+
+      if (!resolvedItemId || !canonicalSku || canonicalSku === publicSku) {
+        return Response.json({ assignment: null });
+      }
+    }
+
     const assignmentsSnap = await db.collection("assignments")
       .where("employeeId", "==", employeeId)
       .limit(100)
@@ -64,7 +116,10 @@ export async function POST(req: NextRequest) {
 
     const assignment = assignmentsSnap.docs
       .map((doc) => ({ id: doc.id, data: doc.data() }))
-      .filter(({ data }) => readText(data.sku) === sku && readText(data.status) === "active")
+      .filter(({ data }) => (
+        readText(data.status) === "active" &&
+        (readText(data.sku) === canonicalSku || (resolvedItemId && readText(data.itemId) === resolvedItemId))
+      ))
       .sort((a, b) => (toDate(b.data.assignedAt)?.getTime() ?? 0) - (toDate(a.data.assignedAt)?.getTime() ?? 0))[0];
 
     if (!assignment) {
@@ -74,7 +129,7 @@ export async function POST(req: NextRequest) {
     return Response.json({
       assignment: {
         id: assignment.id,
-        sku: readText(assignment.data.sku),
+        sku: publicSku,
         itemId: readText(assignment.data.itemId),
         itemName: readText(assignment.data.itemName),
         size: readText(assignment.data.size),
