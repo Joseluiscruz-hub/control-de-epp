@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { normalizePlantId } from "@/lib/plants";
 import {
   PublicRateLimitHttpError,
   publicRateLimitResponse,
@@ -44,10 +45,16 @@ export async function POST(req: NextRequest) {
     if (suppliedEmployeeId && suppliedEmployeeId !== session.employeeId) {
       return Response.json({ error: "No tienes acceso a otro colaborador." }, { status: 403 });
     }
+
     const employeeId = session.employeeId;
-    const sku = readText(body?.sku);
-    if (!employeeId || !/^\d+$/.test(employeeId) || !sku) {
+    const clientSku = readText(body?.sku);
+    const requestedItemId = readText(body?.itemId);
+    const requestedSize = readText(body?.size) || "N/A";
+    if (!employeeId || !/^\d+$/.test(employeeId) || !clientSku) {
       return Response.json({ error: "Empleado y SKU requeridos." }, { status: 400 });
+    }
+    if (clientSku.startsWith("public:") && !requestedItemId) {
+      return Response.json({ error: "Item de catalogo requerido." }, { status: 400 });
     }
 
     await requirePublicRateLimit(db, req, "kiosk_assignment_lookup");
@@ -57,6 +64,19 @@ export async function POST(req: NextRequest) {
       return Response.json({ assignment: null });
     }
 
+    let resolvedItemId = "";
+    if (requestedItemId) {
+      const catalogDoc = await db.collection("ppe_catalog").doc(requestedItemId).get();
+      if (!catalogDoc.exists) return Response.json({ assignment: null });
+
+      const catalogData = catalogDoc.data() ?? {};
+      const catalogPlant = readText(catalogData.plantaId);
+      if (!catalogPlant || normalizePlantId(catalogPlant) !== session.plantId || catalogData.active === false) {
+        return Response.json({ assignment: null });
+      }
+      resolvedItemId = catalogDoc.id;
+    }
+
     const assignmentsSnap = await db.collection("assignments")
       .where("employeeId", "==", employeeId)
       .limit(100)
@@ -64,7 +84,13 @@ export async function POST(req: NextRequest) {
 
     const assignment = assignmentsSnap.docs
       .map((doc) => ({ id: doc.id, data: doc.data() }))
-      .filter(({ data }) => readText(data.sku) === sku && readText(data.status) === "active")
+      .filter(({ data }) => {
+        if (readText(data.status) !== "active") return false;
+        if (resolvedItemId) {
+          return readText(data.itemId) === resolvedItemId && readText(data.size || "N/A") === requestedSize;
+        }
+        return readText(data.sku) === clientSku;
+      })
       .sort((a, b) => (toDate(b.data.assignedAt)?.getTime() ?? 0) - (toDate(a.data.assignedAt)?.getTime() ?? 0))[0];
 
     if (!assignment) {
@@ -74,7 +100,7 @@ export async function POST(req: NextRequest) {
     return Response.json({
       assignment: {
         id: assignment.id,
-        sku: readText(assignment.data.sku),
+        sku: clientSku,
         itemId: readText(assignment.data.itemId),
         itemName: readText(assignment.data.itemName),
         size: readText(assignment.data.size),

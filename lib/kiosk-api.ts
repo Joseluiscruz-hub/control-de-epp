@@ -185,12 +185,22 @@ export async function getPPECatalog(plantId?: string): Promise<PPECatalogItem[]>
 
 // ── Asignaciones activas del empleado ─────────────────────────────────────────
 
-export async function getActiveAssignment(employeeId: string, sku: string): Promise<{ id: string } & Record<string, unknown> | null> {
+export async function getActiveAssignment(
+  employeeId: string,
+  sku: string,
+  itemId?: string,
+  size?: string
+): Promise<{ id: string } & Record<string, unknown> | null> {
   try {
     const response = await fetch("/api/kiosk/assignment", {
       method: "POST",
       headers: await kioskApiHeaders(),
-      body: JSON.stringify({ employeeId, sku }),
+      body: JSON.stringify({
+        employeeId,
+        sku,
+        ...(itemId ? { itemId } : {}),
+        ...(size ? { size } : {}),
+      }),
     });
 
     const payload = await response.json().catch(() => ({}));

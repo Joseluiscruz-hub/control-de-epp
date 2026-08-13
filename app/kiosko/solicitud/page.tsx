@@ -50,15 +50,20 @@ export default function KioskoSolicitudPage() {
     return () => window.clearTimeout(timeout);
   }, [item]);
 
-  // Cargar asignación activa cuando se selecciona SKU
+  // Cargar asignación activa usando itemId + talla; el SKU público no se usa como join canónico.
   useEffect(() => {
-    if (!selectedSku || !employeeId) return;
+    if (!selectedSku || !employeeId || !item) return;
     let cancelled = false;
     const loadingTimeout = window.setTimeout(() => {
       if (!cancelled) setLoadingAssignment(true);
     }, 0);
 
-    void getActiveAssignment(employeeId, selectedSku).then((assignment) => {
+    void getActiveAssignment(
+      employeeId,
+      selectedSku,
+      item.id,
+      selectedSize ?? "N/A"
+    ).then((assignment) => {
       if (cancelled) return;
       setLastAssignment(assignment);
     }).catch(() => {
@@ -71,7 +76,7 @@ export default function KioskoSolicitudPage() {
       cancelled = true;
       window.clearTimeout(loadingTimeout);
     };
-  }, [employeeId, selectedSku]);
+  }, [employeeId, item, selectedSize, selectedSku]);
 
   const evaluation = useMemo(() => {
     if (!reason || !item) return null;
