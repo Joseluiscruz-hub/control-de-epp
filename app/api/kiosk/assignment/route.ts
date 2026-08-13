@@ -3,6 +3,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { buildPublicKioskCatalogPayload } from "@/lib/kiosk-catalog-public";
+import { normalizePlantId } from "@/lib/plants";
 import {
   PublicRateLimitHttpError,
   publicRateLimitResponse,
@@ -51,8 +52,11 @@ export async function POST(req: NextRequest) {
     if (suppliedEmployeeId && suppliedEmployeeId !== session.employeeId) {
       return Response.json({ error: "No tienes acceso a otro colaborador." }, { status: 403 });
     }
+
     const employeeId = session.employeeId;
     const publicSku = readText(body?.sku);
+    const requestedItemId = readText(body?.itemId);
+    const requestedSize = readText(body?.size) || "N/A";
     if (!employeeId || !/^\d+$/.test(employeeId) || !publicSku) {
       return Response.json({ error: "Empleado y SKU requeridos." }, { status: 400 });
     }
@@ -67,7 +71,18 @@ export async function POST(req: NextRequest) {
     let canonicalSku = publicSku;
     let resolvedItemId = "";
 
-    if (publicSku.startsWith("public:")) {
+    if (requestedItemId) {
+      const catalogDoc = await db.collection("ppe_catalog").doc(requestedItemId).get();
+      if (!catalogDoc.exists) return Response.json({ assignment: null });
+
+      const catalogData = catalogDoc.data() ?? {};
+      const catalogPlant = readText(catalogData.plantaId);
+      if (!catalogPlant || normalizePlantId(catalogPlant) !== session.plantId || catalogData.active === false) {
+        return Response.json({ assignment: null });
+      }
+      resolvedItemId = catalogDoc.id;
+    } else if (publicSku.startsWith("public:")) {
+      // Backward compatibility for clients that still send only the public alias.
       const catalogSnap = await db.collection("ppe_catalog")
         .where("plantaId", "==", session.plantId)
         .limit(500)
@@ -116,10 +131,13 @@ export async function POST(req: NextRequest) {
 
     const assignment = assignmentsSnap.docs
       .map((doc) => ({ id: doc.id, data: doc.data() }))
-      .filter(({ data }) => (
-        readText(data.status) === "active" &&
-        (readText(data.sku) === canonicalSku || (resolvedItemId && readText(data.itemId) === resolvedItemId))
-      ))
+      .filter(({ data }) => {
+        if (readText(data.status) !== "active") return false;
+        if (resolvedItemId) {
+          return readText(data.itemId) === resolvedItemId && readText(data.size || "N/A") === requestedSize;
+        }
+        return readText(data.sku) === canonicalSku;
+      })
       .sort((a, b) => (toDate(b.data.assignedAt)?.getTime() ?? 0) - (toDate(a.data.assignedAt)?.getTime() ?? 0))[0];
 
     if (!assignment) {
