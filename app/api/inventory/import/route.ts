@@ -132,8 +132,7 @@ export async function POST(req: NextRequest) {
           ...kioskPayload,
           plantaId,
           updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
+        }
       );
       batch.set(
         db.collection("inventory_movements").doc(),

@@ -1,6 +1,5 @@
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { auth, db, ensureFirebaseReady, getAppCheckTokenForRequest, isAppCheckRequiredForClient } from "./firebase";
-import { resolveEppReplacementDays, getEppDurationRulePayload } from "./epp-duration-rules";
 import {
   KioskEarlyReplacementAlert,
   KioskEmployee,
@@ -53,17 +52,10 @@ function canFallbackToLocal(error: unknown) {
 }
 
 function normalizeCatalogDuration(item: PPECatalogItem): PPECatalogItem {
-  const ruleInput = {
-    sku: item.sku,
-    material: item.material,
-    name: item.name,
-    sizes: item.sizes,
-  };
-  const replacementDays = resolveEppReplacementDays(ruleInput, Number(item.replacementDays ?? 365));
+  const replacementDays = Number(item.replacementDays ?? 365);
   return {
     ...item,
-    replacementDays,
-    ...getEppDurationRulePayload(ruleInput),
+    replacementDays: Number.isFinite(replacementDays) && replacementDays > 0 ? replacementDays : 365,
   };
 }
 
@@ -162,18 +154,32 @@ export async function getPPECatalog(plantId?: string): Promise<PPECatalogItem[]>
   ));
 
   try {
-    await ensureFirebaseReady();
-    const catalogQuery = plantId
-      ? query(collection(db, "kiosk_catalog"), where("plantaId", "==", plantId))
-      : collection(db, "kiosk_catalog");
-    const snap = await getDocs(catalogQuery);
-    const items = snap.docs
-      .map(d => normalizeCatalogDuration({ id: d.id, ...d.data() } as PPECatalogItem))
+    const response = await fetch("/api/kiosk/catalog", {
+      headers: await kioskApiHeaders(),
+      cache: "no-store",
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new KioskApiError(
+        typeof payload?.error === "string" ? payload.error : "No se pudo consultar el catalogo.",
+        response.status
+      );
+    }
+
+    const rawItems: unknown[] = Array.isArray(payload?.items) ? payload.items : [];
+    const items = rawItems
+      .filter((item: unknown): item is PPECatalogItem => (
+        typeof item === "object" && item !== null && "id" in item && "name" in item
+      ))
+      .map((item) => normalizeCatalogDuration(item))
       .sort((a, b) => a.name.localeCompare(b.name, "es"));
-    return items.length > 0 ? items : localCatalog();
+    return items;
   } catch (error) {
-    console.warn("[Kiosko] Usando catalogo local por error de Firebase.", error);
-    return localCatalog();
+    if (canFallbackToLocal(error)) {
+      console.warn("[Kiosko] Usando catalogo local por error del servidor.", error);
+      return localCatalog();
+    }
+    throw error;
   }
 }
 

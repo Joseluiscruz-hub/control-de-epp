@@ -182,11 +182,10 @@ describe("Firestore deny-by-default", () => {
     await assertFails(updateDoc(doc(clientDb, "inventory_movements", "server-movement"), { delta: -2 }));
   });
 
-  it("expone solo el catalogo de kiosko y mantiene bloqueadas sus escrituras", async () => {
+  it("bloquea el acceso directo al catalogo de kiosko", async () => {
     const db = testEnv.unauthenticatedContext().firestore();
 
-    const snapshot = await assertSucceeds(getDoc(doc(db, "kiosk_catalog", "public-cua")));
-    assert.equal(snapshot.data()?.name, "Casco Demo");
+    await assertFails(getDoc(doc(db, "kiosk_catalog", "public-cua")));
     await assertFails(updateDoc(doc(db, "kiosk_catalog", "public-cua"), { available: false }));
   });
 

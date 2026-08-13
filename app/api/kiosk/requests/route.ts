@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
 import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { buildPublicKioskCatalogPayload } from "@/lib/kiosk-catalog-public";
 import { AuthHttpError, canAdminUsePlant, requireAdminUser, type AdminSession } from "@/lib/server-auth";
 import {
   buildKioskApprovalActor,
@@ -451,7 +452,6 @@ async function fulfillApprovedKioskRequest(params: {
     );
 
     const catalogSnaps = await Promise.all(catalogRefs.map((ref) => transaction.get(ref)));
-    const kioskCatalogSnaps = await Promise.all(kioskCatalogRefs.map((ref) => transaction.get(ref)));
     const previousAssignmentSnaps = await Promise.all(
       previousAssignmentQueries.map((previousQuery) => transaction.get(previousQuery))
     );
@@ -539,9 +539,15 @@ async function fulfillApprovedKioskRequest(params: {
       });
 
       transaction.update(catalogRefs[index], stockChange.updates);
-      if (kioskCatalogSnaps[index].exists) {
-        transaction.update(kioskCatalogRefs[index], stockChange.updates);
-      }
+      transaction.set(kioskCatalogRefs[index], {
+        ...buildPublicKioskCatalogPayload(catalogData, {
+          available: stockChange.aggregateNewStock > 0,
+          sizeAvailability: stockChange.size !== "N/A"
+            ? { [stockChange.size]: stockChange.newStock > 0 }
+            : undefined,
+        }),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
 
       transaction.set(
         db.collection("inventory_movements").doc(),
@@ -703,7 +709,7 @@ async function sanitizeRequestItem(
   }
   const replacementReason = requestedReason ? requestedReason as ReplacementReason : undefined;
 
-  const catalogSnap = await db.collection("kiosk_catalog").doc(itemId).get();
+  const catalogSnap = await db.collection("ppe_catalog").doc(itemId).get();
   if (!catalogSnap.exists) {
     throw new KioskRequestError("EPP no encontrado en catalogo de kiosko.", 404);
   }

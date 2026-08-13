@@ -2,6 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { NextRequest } from "next/server";
 import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { buildPublicKioskCatalogPayload } from "@/lib/kiosk-catalog-public";
 import { AuthHttpError, requireAdminUser } from "@/lib/server-auth";
 import { normalizePlantId } from "@/lib/plants";
 import {
@@ -58,10 +59,7 @@ export async function PATCH(req: NextRequest) {
     const auditRef = db.collection("audit_events").doc();
 
     const result = await db.runTransaction(async (transaction) => {
-      const [itemSnap, kioskSnap] = await Promise.all([
-        transaction.get(itemRef),
-        transaction.get(kioskRef),
-      ]);
+      const itemSnap = await transaction.get(itemRef);
 
       if (!itemSnap.exists) {
         throw new InventoryStockError("Material no encontrado.", 404);
@@ -109,7 +107,13 @@ export async function PATCH(req: NextRequest) {
       }
 
       transaction.update(itemRef, updates);
-      if (kioskSnap.exists) transaction.set(kioskRef, updates, { merge: true });
+      transaction.set(kioskRef, {
+        ...buildPublicKioskCatalogPayload(item, {
+          available: typeof updates.available === "boolean" ? updates.available : undefined,
+          sizeAvailability: sizes && size !== "N/A" ? { [size]: newStock > 0 } : undefined,
+        }),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
       transaction.set(movementRef, buildInventoryMovement({
         itemId,
         sku,

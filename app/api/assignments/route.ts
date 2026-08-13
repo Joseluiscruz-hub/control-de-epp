@@ -4,6 +4,7 @@ import { addDays } from "date-fns";
 import { buildInventoryMovement, readNumber, readStock, readText } from "@/app/api/inventory/_lib";
 import { buildAuditEvent } from "@/lib/audit-events";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { buildPublicKioskCatalogPayload } from "@/lib/kiosk-catalog-public";
 import { normalizePlantId } from "@/lib/plants";
 import { AuthHttpError, canAdminUsePlant, requireAdminUser } from "@/lib/server-auth";
 import { resolveEppReplacementDays } from "@/lib/epp-duration-rules";
@@ -49,10 +50,9 @@ export async function POST(req: NextRequest) {
     const auditRef = db.collection("audit_events").doc();
 
     const result = await db.runTransaction(async (transaction) => {
-      const [employeeSnap, itemSnap, kioskItemSnap] = await Promise.all([
+      const [employeeSnap, itemSnap] = await Promise.all([
         transaction.get(employeeRef),
         transaction.get(itemRef),
-        transaction.get(kioskItemRef),
       ]);
 
       if (!employeeSnap.exists) throw new AssignmentHttpError("Colaborador no encontrado.", 404);
@@ -197,7 +197,13 @@ export async function POST(req: NextRequest) {
       });
 
       transaction.update(itemRef, stockUpdate);
-      if (kioskItemSnap.exists) transaction.update(kioskItemRef, stockUpdate);
+      transaction.set(kioskItemRef, {
+        ...buildPublicKioskCatalogPayload(item, {
+          available: aggregateNewStock > 0,
+          sizeAvailability: hasSizes ? { [requestedSize]: newStock > 0 } : undefined,
+        }),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
 
       transaction.set(movementRef, buildInventoryMovement({
         itemId,

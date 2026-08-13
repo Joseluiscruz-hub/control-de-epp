@@ -34,10 +34,9 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // ── Catálogo público seguro para kiosko ────────────────────────────────
+    // ── Proyección de catálogo (solo servidor; el kiosko usa /api/kiosk/catalog) ──
     match /kiosk_catalog/{itemId} {
-      allow read: if true;
-      allow create, update, delete: if false;
+      allow read, write: if false;
     }
 
     // ── Solicitudes Kiosko ─────────────────────────────────────────────────
