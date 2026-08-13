@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
 import { getAdminDb } from "@/lib/firebase-admin";
-import { buildPublicKioskCatalogPayload } from "@/lib/kiosk-catalog-public";
 import { normalizePlantId } from "@/lib/plants";
 import {
   PublicRateLimitHttpError,
@@ -15,12 +14,6 @@ export const runtime = "nodejs";
 
 function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function readRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
 }
 
 function toDate(value: unknown): Date | null {
@@ -54,11 +47,14 @@ export async function POST(req: NextRequest) {
     }
 
     const employeeId = session.employeeId;
-    const publicSku = readText(body?.sku);
+    const clientSku = readText(body?.sku);
     const requestedItemId = readText(body?.itemId);
     const requestedSize = readText(body?.size) || "N/A";
-    if (!employeeId || !/^\d+$/.test(employeeId) || !publicSku) {
+    if (!employeeId || !/^\d+$/.test(employeeId) || !clientSku) {
       return Response.json({ error: "Empleado y SKU requeridos." }, { status: 400 });
+    }
+    if (clientSku.startsWith("public:") && !requestedItemId) {
+      return Response.json({ error: "Item de catalogo requerido." }, { status: 400 });
     }
 
     await requirePublicRateLimit(db, req, "kiosk_assignment_lookup");
@@ -68,9 +64,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ assignment: null });
     }
 
-    let canonicalSku = publicSku;
     let resolvedItemId = "";
-
     if (requestedItemId) {
       const catalogDoc = await db.collection("ppe_catalog").doc(requestedItemId).get();
       if (!catalogDoc.exists) return Response.json({ assignment: null });
@@ -81,47 +75,6 @@ export async function POST(req: NextRequest) {
         return Response.json({ assignment: null });
       }
       resolvedItemId = catalogDoc.id;
-    } else if (publicSku.startsWith("public:")) {
-      // Backward compatibility for clients that still send only the public alias.
-      const catalogSnap = await db.collection("ppe_catalog")
-        .where("plantaId", "==", session.plantId)
-        .limit(500)
-        .get();
-
-      for (const catalogDoc of catalogSnap.docs) {
-        const catalogData = catalogDoc.data();
-        const publicItem = buildPublicKioskCatalogPayload(catalogData) as Record<string, unknown>;
-
-        if (readText(publicItem.sku) === publicSku) {
-          canonicalSku = readText(catalogData.sku) || readText(catalogData.material);
-          resolvedItemId = catalogDoc.id;
-          break;
-        }
-
-        const publicSizes = readRecord(publicItem.sizes);
-        const privateSizes = readRecord(catalogData.sizes);
-        if (!publicSizes || !privateSizes) continue;
-
-        for (const [size, rawPublicVariant] of Object.entries(publicSizes)) {
-          const publicVariant = readRecord(rawPublicVariant);
-          if (!publicVariant || readText(publicVariant.sku) !== publicSku) continue;
-
-          const privateVariant = readRecord(privateSizes[size]);
-          canonicalSku =
-            readText(privateVariant?.sku) ||
-            readText(privateVariant?.material) ||
-            readText(catalogData.sku) ||
-            readText(catalogData.material);
-          resolvedItemId = catalogDoc.id;
-          break;
-        }
-
-        if (resolvedItemId) break;
-      }
-
-      if (!resolvedItemId || !canonicalSku || canonicalSku === publicSku) {
-        return Response.json({ assignment: null });
-      }
     }
 
     const assignmentsSnap = await db.collection("assignments")
@@ -136,7 +89,7 @@ export async function POST(req: NextRequest) {
         if (resolvedItemId) {
           return readText(data.itemId) === resolvedItemId && readText(data.size || "N/A") === requestedSize;
         }
-        return readText(data.sku) === canonicalSku;
+        return readText(data.sku) === clientSku;
       })
       .sort((a, b) => (toDate(b.data.assignedAt)?.getTime() ?? 0) - (toDate(a.data.assignedAt)?.getTime() ?? 0))[0];
 
@@ -147,7 +100,7 @@ export async function POST(req: NextRequest) {
     return Response.json({
       assignment: {
         id: assignment.id,
-        sku: publicSku,
+        sku: clientSku,
         itemId: readText(assignment.data.itemId),
         itemName: readText(assignment.data.itemName),
         size: readText(assignment.data.size),
