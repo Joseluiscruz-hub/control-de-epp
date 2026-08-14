@@ -31,8 +31,8 @@ Configure these environment variables independently:
 - `FIREBASE_APP_ID`
 - `FIREBASE_MEASUREMENT_ID` (optional)
 - `FIREBASE_DATABASE_ID`
-- `FIREBASE_APPCHECK_SITE_KEY` (required when App Check is enforced)
-- `FIREBASE_APP_CHECK_REQUIRED`
+- `FIREBASE_APPCHECK_SITE_KEY`
+- `FIREBASE_APP_CHECK_REQUIRED` (must be `true` in staging and production)
 - `ENABLE_BOOTSTRAP_ADMIN`
 - `BOOTSTRAP_ADMIN_EMAIL` (only while a controlled bootstrap is needed)
 - `NEXT_PUBLIC_ENABLE_OFFLINE_MODE` (must be `false` outside local development)
@@ -47,7 +47,7 @@ that are already provisioned.
 
 ## Staging values
 
-The isolated staging environment currently uses:
+The isolated staging environment should use:
 
 ```text
 GCP_PROJECT_ID=assetguard-staging-jlc
@@ -56,14 +56,30 @@ FIREBASE_PROJECT_ID=assetguard-staging-jlc
 FIREBASE_DATABASE_ID=(default)
 CLOUD_RUN_SERVICE=control-de-epp-staging
 GCP_REGION=us-central1
-FIREBASE_APP_CHECK_REQUIRED=false
+FIREBASE_APP_CHECK_REQUIRED=true
 ENABLE_BOOTSTRAP_ADMIN=false
 NEXT_PUBLIC_ENABLE_OFFLINE_MODE=false
 ```
 
-Keep App Check disabled only until its staging key has been registered and
-verified. Never copy staging values, service accounts, or secrets into the
-`production` environment.
+Staging and production are both protected environments. A change that depends
+on App Check must prove that integration in staging before production promotion.
+Never copy staging service accounts, secrets, or Firebase app registrations into
+`production`.
+
+## Bootstrap a new environment
+
+App Check may be disabled only while provisioning a brand-new environment that
+does not yet have a registered web app/site key:
+
+1. Deploy the first isolated revision with `FIREBASE_APP_CHECK_REQUIRED=false`.
+2. Register that environment's web app/site key in Firebase App Check.
+3. Store the environment-specific `FIREBASE_APPCHECK_SITE_KEY` in GitHub.
+4. Set `FIREBASE_APP_CHECK_REQUIRED=true`.
+5. Re-run deployment and smoke tests.
+
+After bootstrap, protected environment smoke tests intentionally fail if App
+Check is disabled or if enforcement is enabled without a site key. Any emergency
+disablement must be time-bound and documented before another promotion.
 
 ## Production protection
 
@@ -84,6 +100,9 @@ Every deployment verifies:
 - runtime Firebase project and database match the selected environment;
 - Firebase runtime configuration has `Cache-Control: no-store`;
 - the Google popup-compatible COOP header is present;
+- App Check is enabled in staging and production and has a client site key;
+- rendered HTML has a nonce-based Content-Security-Policy without `unsafe-eval`;
+- CSP denies framing with `frame-ancestors 'none'`;
 - a kiosk request without a session returns `401`;
 - a cross-site kiosk request returns `403` and emits no cookie.
 
