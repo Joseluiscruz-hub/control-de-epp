@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import Script from 'next/script';
+import { headers } from 'next/headers';
 import './globals.css';
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -40,11 +41,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({children}: {children: React.ReactNode}) {
+export default async function RootLayout({children}: {children: React.ReactNode}) {
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
+
   return (
     <html lang="es" className={cn("font-sans", inter.variable)}>
       <head>
-        <Script src="/firebase-config.js" strategy="beforeInteractive" />
+        <Script src="/firebase-config.js" strategy="beforeInteractive" nonce={nonce} />
         <meta name="theme-color" content="#040813" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -55,9 +58,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
           <AuthGuard>
             <MouseTracker />
             <NavBar />
-            <AppMain>
-              {children}
-            </AppMain>
+            <AppMain>{children}</AppMain>
             <AppExtras />
           </AuthGuard>
         </AuthProvider>
