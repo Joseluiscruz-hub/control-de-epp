@@ -1,9 +1,9 @@
 import { setTimeout as delay } from "node:timers/promises";
 
-
 const serviceUrl = process.env.SERVICE_URL?.replace(/\/$/, "");
 const expectedProject = process.env.FIREBASE_PROJECT_ID;
 const expectedDatabase = process.env.FIREBASE_DATABASE_ID;
+const deploymentEnvironment = process.env.DEPLOYMENT_ENVIRONMENT?.trim().toLowerCase();
 
 if (!serviceUrl || !expectedProject || !expectedDatabase) {
   throw new Error("SERVICE_URL, FIREBASE_PROJECT_ID, and FIREBASE_DATABASE_ID are required.");
@@ -62,6 +62,30 @@ if (configResponse.headers.get("cross-origin-opener-policy")?.toLowerCase() !== 
   throw new Error("Expected the Google popup-compatible COOP header.");
 }
 
+if (["staging", "production"].includes(deploymentEnvironment) && config.appCheckRequired !== true) {
+  throw new Error(
+    `Firebase App Check must be enforced in ${deploymentEnvironment}; received appCheckRequired=${config.appCheckRequired}.`,
+  );
+}
+if (config.appCheckRequired === true && !config.appCheckSiteKey) {
+  throw new Error("Firebase App Check is required but no site key is exposed to the web client.");
+}
+
+const htmlResponse = await request("/", 200);
+const cspHeader = htmlResponse.headers.get("content-security-policy");
+if (!cspHeader) {
+  throw new Error("Content-Security-Policy header is missing from rendered HTML.");
+}
+if (!cspHeader.includes("nonce-")) {
+  throw new Error("Content-Security-Policy does not contain a per-request nonce.");
+}
+if (cspHeader.includes("'unsafe-eval'")) {
+  throw new Error("Production Content-Security-Policy must not allow unsafe-eval.");
+}
+if (!cspHeader.includes("frame-ancestors 'none'")) {
+  throw new Error("Content-Security-Policy must deny framing with frame-ancestors 'none'.");
+}
+
 await request("/api/kiosk/session", 401, {
   "Sec-Fetch-Site": "same-origin",
 });
@@ -78,5 +102,5 @@ if (crossSiteResponse.headers.get("set-cookie")) {
 }
 
 console.log(
-  `Smoke tests passed for ${serviceUrl} (${expectedProject}/${expectedDatabase}).`,
+  `Smoke tests passed for ${serviceUrl} (${expectedProject}/${expectedDatabase}, App Check=${config.appCheckRequired}).`,
 );
