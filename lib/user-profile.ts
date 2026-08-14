@@ -1,5 +1,5 @@
 import type { AdminPermissions, AdminRole, UserProfile } from "@/lib/admin-profile";
-import { isPlantId, type PlantScope } from "@/lib/plants";
+import { DEFAULT_PLANT_ID, isPlantId, type PlantScope } from "@/lib/plants";
 
 export type ProfileUserLike = {
   uid: string;
@@ -23,32 +23,20 @@ function normalizePermissions(value: unknown): AdminPermissions | undefined {
   const input = value as Record<string, unknown>;
   const permissions: AdminPermissions = {};
 
-  if (input.canApproveKioskRequests === true) {
-    permissions.canApproveKioskRequests = true;
-  }
-  if (input.canApproveKioskAlerts === true) {
-    permissions.canApproveKioskAlerts = true;
-  }
+  if (input.canApproveKioskRequests === true) permissions.canApproveKioskRequests = true;
+  if (input.canApproveKioskAlerts === true) permissions.canApproveKioskAlerts = true;
 
   return Object.keys(permissions).length > 0 ? permissions : undefined;
 }
 
-export function normalizeUserProfile(
-  uid: string,
-  fallbackEmail: string,
-  data: Record<string, unknown>
-): UserProfile | null {
-  const role = data.role === "admin_local" || data.role === "admin_global"
-    ? data.role as AdminRole
-    : null;
+export function normalizeUserProfile(uid: string, fallbackEmail: string, data: Record<string, unknown>): UserProfile | null {
+  const role = data.role === "admin_local" || data.role === "admin_global" ? data.role as AdminRole : null;
   if (!role) return null;
 
   const rawPlant = typeof data.plantaId === "string" ? data.plantaId : "";
   const plantaId: PlantScope = role === "admin_global"
     ? (rawPlant === "nacional" || isPlantId(rawPlant) ? rawPlant : "nacional")
-    : isPlantId(rawPlant)
-      ? rawPlant
-      : "cuautitlan";
+    : isPlantId(rawPlant) ? rawPlant : DEFAULT_PLANT_ID;
 
   const employeeId = normalizeAdminEmployeeId(data.employeeId);
   const permissions = normalizePermissions(data.permissions);
@@ -70,10 +58,7 @@ export function isConfiguredBootstrapAdminEmail(email: string | null | undefined
   return config.enabled && !!email && !!configuredEmail && email.toLowerCase() === configuredEmail;
 }
 
-export function buildBootstrapAdminProfile(
-  user: ProfileUserLike,
-  config: BootstrapAdminConfig
-): UserProfile | null {
+export function buildBootstrapAdminProfile(user: ProfileUserLike, config: BootstrapAdminConfig): UserProfile | null {
   const email = user.email?.toLowerCase();
   if (!email || !isConfiguredBootstrapAdminEmail(email, config)) return null;
 
