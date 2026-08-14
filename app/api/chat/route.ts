@@ -3,6 +3,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import { NextRequest } from "next/server";
 import { buildAuditEvent } from "@/lib/audit-events";
 import { buildAriaOperationalContext, type AriaDataDocument } from "@/lib/aria-context";
+import { getOrLoadAriaData, type AriaRawData } from "@/lib/aria-data-cache";
 import { parseChatMessageInput } from "@/lib/chat-request";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { AuthHttpError, requireAdminUser, type AdminSession } from "@/lib/server-auth";
@@ -25,11 +26,9 @@ function toDocuments(snapshot: FirebaseFirestore.QuerySnapshot): AriaDataDocumen
   return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
 }
 
-async function readOperationalContext(adminUser: AdminSession, requestedScope: PlantScope) {
+async function fetchOperationalData(scope: PlantScope, now: Date): Promise<AriaRawData> {
   const db = getAdminDb();
-  const scope = resolveScope(adminUser, requestedScope);
   const plantFilter = scope === "nacional" ? null : scope;
-  const now = new Date();
   const yearStart = new Date(`${now.getFullYear()}-01-01T00:00:00-06:00`);
   const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
   const assignmentStart = yearStart < ninetyDaysAgo ? yearStart : ninetyDaysAgo;
@@ -58,14 +57,30 @@ async function readOperationalContext(adminUser: AdminSession, requestedScope: P
     return readText(data.plantaId) === plantFilter;
   });
 
-  return buildAriaOperationalContext({
-    scope,
-    now,
+  return {
     inventory: toDocuments(inventorySnap),
     employees: toDocuments(employeesSnap),
     assignments,
     budgetGoal: goalSnap.exists ? goalSnap.data() ?? null : null,
     assignmentSampleLimited: assignmentsSnap.size >= ASSIGNMENT_READ_LIMIT,
+  };
+}
+
+async function readOperationalContext(adminUser: AdminSession, requestedScope: PlantScope) {
+  const scope = resolveScope(adminUser, requestedScope);
+  const now = new Date();
+  // Include the year because the cached payload includes the current budget goal document.
+  const cacheKey = `${scope}:${now.getFullYear()}`;
+  const rawData = await getOrLoadAriaData(cacheKey, () => fetchOperationalData(scope, now));
+
+  return buildAriaOperationalContext({
+    scope,
+    now,
+    inventory: rawData.inventory,
+    employees: rawData.employees,
+    assignments: rawData.assignments,
+    budgetGoal: rawData.budgetGoal,
+    assignmentSampleLimited: rawData.assignmentSampleLimited,
   });
 }
 
