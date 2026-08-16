@@ -10,8 +10,8 @@ import {
 import { resolveInventoryStockDecrease, resolveStockFromPackageRule } from "./epp-package-rules";
 
 describe("EPP consumption rules", () => {
-  test("contains the 22 configured SAP materials", () => {
-    assert.equal(EPP_CONSUMPTION_RULES.length, 22);
+  test("contains the 24 configured SAP materials", () => {
+    assert.equal(EPP_CONSUMPTION_RULES.length, 24);
     assert.deepEqual(
       EPP_CONSUMPTION_RULES.map((rule) => rule.sapMaterial),
       [
@@ -19,7 +19,7 @@ describe("EPP consumption rules", () => {
         "26149607", "26149608", "26016897", "26149610", "26149609",
         "26149611", "26149578", "26149580", "26149552", "26149553",
         "26149554", "26149555", "26016860", "26016859", "26016827",
-        "26008560", "26008561",
+        "26008560", "26008561", "26016951", "26016950",
       ]
     );
   });
@@ -28,6 +28,8 @@ describe("EPP consumption rules", () => {
     assert.equal(resolveEppConsumption({ material: "26016866" }).quantity, 0.04);
     assert.equal(resolveEppConsumption({ material: "26149610" }).quantity, 0.08);
     assert.equal(resolveEppConsumption({ material: "26149578" }).quantity, 0.01);
+    assert.equal(resolveEppConsumption({ material: "26016951" }).quantity, 0.08);
+    assert.equal(resolveEppConsumption({ material: "26016950" }).quantity, 0.1);
   });
 
   test("applies the package factor configured for all requested coveralls", () => {
@@ -46,6 +48,18 @@ describe("EPP consumption rules", () => {
       assert.equal(rule?.unitsPerPackage, unitsPerPackage);
       assert.equal(rule?.unitDecrease, unitDecrease);
     }
+  });
+
+  test("applies the configured package factors for Condor coats", () => {
+    const medium = findEppConsumptionRule({ sku: "SEGURID068" });
+    assert.equal(medium?.sapMaterial, "26016951");
+    assert.equal(medium?.unitsPerPackage, 12);
+    assert.equal(medium?.unitDecrease, 0.08);
+
+    const large = findEppConsumptionRule({ sku: "segurid-069" });
+    assert.equal(large?.sapMaterial, "26016950");
+    assert.equal(large?.unitsPerPackage, 10);
+    assert.equal(large?.unitDecrease, 0.1);
   });
 
   test("multiplies the unit decrease by the physical quantity issued", () => {
