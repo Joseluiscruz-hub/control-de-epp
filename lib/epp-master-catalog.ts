@@ -97,6 +97,20 @@ const MASTER_CATALOG: readonly MasterCatalogEntry[] = [
     category: "Cascos",
     replacementDays: 365,
   },
+  {
+    sku: "26016951",
+    aliases: ["SEGURID068"],
+    name: "ABRIGO CONDOR 3AK92 EPP 3AK92 MED",
+    category: "Ropa",
+    replacementDays: 365,
+  },
+  {
+    sku: "26016950",
+    aliases: ["SEGURID069"],
+    name: "ABRIGO CONDOR 5AZ31 EPP 5AZ31 GRANDE",
+    category: "Ropa",
+    replacementDays: 365,
+  },
 ];
 
 function readText(value: unknown) {
@@ -176,7 +190,8 @@ function inferCategory(name: string) {
     upper.includes("PANT") ||
     upper.includes("FAJA") ||
     upper.includes("MANGA") ||
-    upper.includes("CAPUCHA")
+    upper.includes("CAPUCHA") ||
+    upper.includes("ABRIGO")
   ) return "Ropa";
   if (upper.includes("ARNES") || upper.includes("ARNÉS") || upper.includes("ANTICAIDA")) {
     return "Arneses";
