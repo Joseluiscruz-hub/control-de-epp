@@ -13,6 +13,7 @@ import {
   registerKioskPinFailure,
 } from "@/lib/kiosk-pin-rate-limit";
 import { isSixDigitPin, legacyHashPin } from "@/lib/pin-utils";
+import { normalizePlantId } from "@/lib/plants";
 import { attachKioskSessionCookies, createKioskSession } from "@/lib/kiosk-session-server";
 
 export const runtime = "nodejs";
@@ -77,6 +78,8 @@ export async function POST(req: NextRequest) {
       return Response.json({ valid: false, error: "No fue posible validar las credenciales." }, { status: 401 });
     }
 
+    // El PIN ya fue validado. A partir de aqui, cualquier problema de perfil o
+    // sesion no debe contabilizarse como intento de PIN fallido.
     await Promise.all([
       clearKioskPinFailures(db, attemptKey),
       clearKioskPinFailures(db, clientAttemptKey),
@@ -111,10 +114,17 @@ export async function POST(req: NextRequest) {
     }
 
     const employeeName = typeof employee.name === "string" ? employee.name.trim() : "";
-    const plantId = typeof employee.plantaId === "string" ? employee.plantaId.trim() : "";
-    if (!employeeName || !plantId) {
-      return Response.json({ valid: false, error: "No fue posible validar las credenciales." }, { status: 401 });
+    if (!employeeName) {
+      return Response.json(
+        { valid: false, error: "El perfil del colaborador esta incompleto. Solicita sincronizacion administrativa." },
+        { status: 409 }
+      );
     }
+
+    // Compatibilidad con empleados creados antes de que plantaId fuera obligatorio.
+    // normalizePlantId conserva plantas validas y usa la planta predeterminada para
+    // registros historicos sin este campo.
+    const plantId = normalizePlantId(employee.plantaId);
     const kioskSession = await createKioskSession({
       req,
       db,
