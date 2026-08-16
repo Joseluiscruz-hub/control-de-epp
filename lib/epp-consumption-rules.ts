@@ -38,6 +38,8 @@ export const EPP_CONSUMPTION_RULES: readonly EppConsumptionRule[] = [
   { id: "sap-26016827", sapMaterial: "26016827", unitsPerPackage: 12, unitDecrease: 0.08 },
   { id: "sap-26008560", sapMaterial: "26008560", kofSku: "62XJ76", unitsPerPackage: 25, unitDecrease: 0.04 },
   { id: "sap-26008561", sapMaterial: "26008561", kofSku: "62XJ77", unitsPerPackage: 25, unitDecrease: 0.04 },
+  { id: "sap-26016951", sapMaterial: "26016951", kofSku: "SEGURID068", unitsPerPackage: 12, unitDecrease: 0.08 },
+  { id: "sap-26016950", sapMaterial: "26016950", kofSku: "SEGURID069", unitsPerPackage: 10, unitDecrease: 0.1 },
 ];
 
 function normalizeCode(value: unknown) {
