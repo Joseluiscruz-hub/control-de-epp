@@ -1,8 +1,10 @@
-import { createHash } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { FieldValue, type DocumentData, type Firestore } from "firebase-admin/firestore";
 import type { NextRequest } from "next/server";
 
 const COLLECTION = "kiosk_pin_rate_limits";
+export const KIOSK_PIN_CLIENT_COOKIE = "assetguard_kiosk_client";
+const KIOSK_PIN_CLIENT_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
 const EMPLOYEE_POLICY = {
   maxFailedAttempts: 15,
   windowMs: 24 * 60 * 60 * 1000,
@@ -29,6 +31,34 @@ function getClientIp(req: NextRequest) {
   return forwardedFor || realIp || "unknown";
 }
 
+export function selectKioskPinPrecheckBlock(
+  employeeStatus: KioskPinRateLimitStatus,
+  _clientStatus: KioskPinRateLimitStatus,
+) {
+  // Only an employee-specific block may reject before credential verification.
+  // A shared client/device block is enforced after an invalid credential, so a
+  // legitimate employee never inherits another person's failures.
+  return employeeStatus.blocked ? employeeStatus : null;
+}
+
+function readKioskPinClientId(req: NextRequest) {
+  const value = req.cookies.get(KIOSK_PIN_CLIENT_COOKIE)?.value?.trim() ?? "";
+  return /^[A-Za-z0-9_-]{32,128}$/.test(value) ? value : "";
+}
+
+function kioskPinClientCookie(value: string) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${KIOSK_PIN_CLIENT_COOKIE}=${encodeURIComponent(value)}; Path=/api/kiosk; HttpOnly; SameSite=Strict; Max-Age=${KIOSK_PIN_CLIENT_COOKIE_MAX_AGE}${secure}`;
+}
+
+export function attachKioskPinClientCookie(req: NextRequest, response: Response) {
+  if (!readKioskPinClientId(req)) {
+    response.headers.append("Set-Cookie", kioskPinClientCookie(randomBytes(32).toString("base64url")));
+  }
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
 function getPolicy(policy: KioskPinRateLimitPolicyName) {
   return policy === "client" ? CLIENT_POLICY : EMPLOYEE_POLICY;
 }
@@ -41,7 +71,10 @@ export function getKioskPinRateLimitKey(req: NextRequest, employeeId: string, sc
 
 export function getKioskPinClientRateLimitKey(req: NextRequest, scope: KioskPinRateLimitScope) {
   const ip = getClientIp(req);
-  return `client_${createHash("sha256").update(`${scope}:${ip}`).digest("hex")}`;
+  const clientId = readKioskPinClientId(req);
+  const identity = clientId ? `device:${clientId}:ip:${ip}` : `ip:${ip}`;
+  const salt = process.env.AUDIT_IP_SALT || process.env.GOOGLE_CLOUD_PROJECT || "assetguard-kiosk-pin";
+  return `client_${createHash("sha256").update(`${salt}:${scope}:${identity}`).digest("hex")}`;
 }
 
 export function getKioskPinRateLimitStatus(
@@ -143,6 +176,13 @@ export async function registerKioskPinFailure(
 
 export async function clearKioskPinFailures(db: Firestore, key: string) {
   await db.collection(COLLECTION).doc(key).delete().catch(() => undefined);
+}
+
+export async function clearKioskPinEmployeeFailures(db: Firestore, req: NextRequest, employeeId: string) {
+  await Promise.all([
+    clearKioskPinFailures(db, getKioskPinRateLimitKey(req, employeeId, "verify")),
+    clearKioskPinFailures(db, getKioskPinRateLimitKey(req, employeeId, "setup")),
+  ]);
 }
 
 export function kioskPinRateLimitResponse(status: KioskPinRateLimitStatus, includeValid = false) {

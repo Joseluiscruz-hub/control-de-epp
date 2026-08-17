@@ -2,17 +2,25 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { NextRequest } from "next/server";
 import {
+  attachKioskPinClientCookie,
   getKioskPinClientRateLimitKey,
   getKioskPinRateLimitKey,
   getKioskPinRateLimitStatus,
+  KIOSK_PIN_CLIENT_COOKIE,
   kioskPinRateLimitResponse,
+  selectKioskPinPrecheckBlock,
 } from "./kiosk-pin-rate-limit";
 
-function makeRequest(ip: string, forwardedFor?: string): NextRequest {
+function makeRequest(ip: string, forwardedFor?: string, clientId = ""): NextRequest {
   const headers = new Headers();
   if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
   else headers.set("x-real-ip", ip);
-  return { headers } as unknown as NextRequest;
+  return {
+    headers,
+    cookies: {
+      get: (name: string) => name === KIOSK_PIN_CLIENT_COOKIE && clientId ? { value: clientId } : undefined,
+    },
+  } as unknown as NextRequest;
 }
 
 describe("getKioskPinRateLimitKey", () => {
@@ -72,6 +80,42 @@ describe("getKioskPinClientRateLimitKey", () => {
     const clientKey = getKioskPinClientRateLimitKey(req, "verify");
     assert.notEqual(employeeKey, clientKey);
   });
+
+  it("aísla dos dispositivos que comparten la misma IP", () => {
+    const first = makeRequest("10.0.0.1", undefined, "device_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+    const second = makeRequest("10.0.0.1", undefined, "device_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB");
+    assert.notEqual(
+      getKioskPinClientRateLimitKey(first, "verify"),
+      getKioskPinClientRateLimitKey(second, "verify")
+    );
+  });
+
+  it("mantiene la misma key para el mismo dispositivo e IP", () => {
+    const first = makeRequest("10.0.0.1", undefined, "device_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+    const second = makeRequest("10.0.0.1", undefined, "device_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+    assert.equal(
+      getKioskPinClientRateLimitKey(first, "verify"),
+      getKioskPinClientRateLimitKey(second, "verify")
+    );
+  });
+});
+
+describe("attachKioskPinClientCookie", () => {
+  it("emite un identificador persistente y HttpOnly cuando el dispositivo no tiene uno", () => {
+    const response = attachKioskPinClientCookie(makeRequest("10.0.0.1"), Response.json({ ok: true }));
+    const value = response.headers.get("set-cookie") ?? "";
+    assert.match(value, new RegExp(`^${KIOSK_PIN_CLIENT_COOKIE}=`));
+    assert.match(value, /HttpOnly/);
+    assert.match(value, /SameSite=Strict/);
+    assert.match(value, /Max-Age=2592000/);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+  });
+
+  it("no reemplaza el identificador existente", () => {
+    const request = makeRequest("10.0.0.1", undefined, "device_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+    const response = attachKioskPinClientCookie(request, Response.json({ ok: true }));
+    assert.equal(response.headers.get("set-cookie"), null);
+  });
 });
 
 describe("kioskPinRateLimitResponse", () => {
@@ -99,6 +143,19 @@ describe("kioskPinRateLimitResponse", () => {
     const body = await response.json();
     assert.equal(response.headers.get("Retry-After"), "1");
     assert.ok(body.retryAfterSeconds >= 1);
+  });
+});
+
+describe("selectKioskPinPrecheckBlock", () => {
+  const allowed = { blocked: false, adminUnlockRequired: false, retryAfterSeconds: 0, remainingAttempts: 15 };
+  const blocked = { blocked: true, adminUnlockRequired: false, retryAfterSeconds: 600, remainingAttempts: 0 };
+
+  it("no hereda el bloqueo compartido antes de comprobar una credencial", () => {
+    assert.equal(selectKioskPinPrecheckBlock(allowed, blocked), null);
+  });
+
+  it("mantiene el bloqueo individual del empleado", () => {
+    assert.equal(selectKioskPinPrecheckBlock(blocked, allowed), blocked);
   });
 });
 

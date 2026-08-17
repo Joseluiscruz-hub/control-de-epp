@@ -7,7 +7,7 @@ import { normalizeEmployeeCredentialResetId } from "@/lib/employee-credential-re
 import { getAdminDb } from "@/lib/firebase-admin";
 import { parsePlantId } from "@/lib/plants";
 import { AuthHttpError, canAdminUsePlant, requireAdminUser } from "@/lib/server-auth";
-import { clearKioskPinFailures, getKioskPinRateLimitKey } from "@/lib/kiosk-pin-rate-limit";
+import { clearKioskPinEmployeeFailures } from "@/lib/kiosk-pin-rate-limit";
 
 export const runtime = "nodejs";
 
@@ -145,10 +145,7 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    await Promise.all([
-      clearKioskPinFailures(db, getKioskPinRateLimitKey(req, employeeId, "verify")),
-      clearKioskPinFailures(db, getKioskPinRateLimitKey(req, employeeId, "setup")),
-    ]);
+    await clearKioskPinEmployeeFailures(db, req, employeeId);
 
     return Response.json(
       { success: true, ...result, activationCode, activationExpiresAt },

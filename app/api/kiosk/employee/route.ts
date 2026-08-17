@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { AppCheckHttpError, requireAppCheck } from "@/lib/app-check";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { attachKioskPinClientCookie } from "@/lib/kiosk-pin-rate-limit";
 import {
   PublicRateLimitHttpError,
   publicRateLimitResponse,
@@ -28,11 +29,11 @@ export async function POST(req: NextRequest) {
 
     const snapshot = await db.collection("kiosk_employees").doc(employeeId).get();
     if (!snapshot.exists) {
-      return Response.json({ employee: null });
+      return attachKioskPinClientCookie(req, Response.json({ employee: null }));
     }
 
     const employee = snapshot.data() ?? {};
-    return Response.json({
+    return attachKioskPinClientCookie(req, Response.json({
       employee: {
           id: snapshot.id,
           name: readText(employee.name),
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
           termsAccepted: employee.termsAccepted === true,
         plantaId: readText(employee.plantaId),
       },
-    });
+    }));
   } catch (error) {
     if (error instanceof AppCheckHttpError) {
       return Response.json({ error: error.message }, { status: error.status });
