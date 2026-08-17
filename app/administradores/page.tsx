@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Factory, KeyRound, Loader2, RotateCcw, ShieldCheck, Trash2, UserCog } from "lucide-react";
+import { AlertTriangle, Factory, KeyRound, Loader2, LockOpen, RotateCcw, ShieldCheck, Trash2, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,6 +66,7 @@ export default function AdministradoresPage() {
   const [employeeId, setEmployeeId] = useState("");
   const [workingKey, setWorkingKey] = useState<string | null>(null);
   const [resettingEmployee, setResettingEmployee] = useState(false);
+  const [unlockingEmployee, setUnlockingEmployee] = useState(false);
   const [employeeActivation, setEmployeeActivation] = useState<{ employeeId: string; code: string; expiresAt: number } | null>(null);
   const [plantResetOpen, setPlantResetOpen] = useState(false);
   const [plantResetPlant, setPlantResetPlant] = useState<PlantId>(PLANTS[0].id);
@@ -185,6 +186,38 @@ export default function AdministradoresPage() {
       toast.error(error instanceof Error ? error.message : "No se pudo resetear el acceso del colaborador.");
     } finally {
       setResettingEmployee(false);
+    }
+  }, [employeeId]);
+
+  const unlockEmployeePin = useCallback(async () => {
+    const cleanEmployeeId = employeeId.trim();
+    if (!cleanEmployeeId) return;
+
+    setUnlockingEmployee(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("missing_session");
+
+      const response = await fetch("/api/admin/employee-pin-unlock", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ employeeId: cleanEmployeeId }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof result?.error === "string" ? result.error : "employee_unlock_failed");
+      }
+
+      toast.success("Intentos liberados. El colaborador conserva su PIN actual.");
+      setEmployeeId("");
+    } catch (error) {
+      console.error("[Employee PIN unlock UI error]", error);
+      toast.error(error instanceof Error ? error.message : "No se pudo desbloquear al colaborador.");
+    } finally {
+      setUnlockingEmployee(false);
     }
   }, [employeeId]);
 
@@ -369,7 +402,7 @@ export default function AdministradoresPage() {
           <div className="space-y-6">
             <Card className="enterprise-panel gap-0 py-0">
               <CardHeader className="border-b border-white/10 p-5">
-                <CardTitle className="text-lg font-black text-white">Reset de colaborador</CardTitle>
+                <CardTitle className="text-lg font-black text-white">Acceso de colaborador</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 p-5">
                 <Input
@@ -379,14 +412,25 @@ export default function AdministradoresPage() {
                   placeholder="Numero de socio"
                   className="h-11 rounded-lg border-white/10 bg-white/5 font-mono text-white placeholder:text-white/30"
                 />
-                <Button
-                  className="h-11 rounded-lg bg-[#F40009] text-white hover:bg-red-700"
-                  disabled={!employeeIdValid || resettingEmployee}
-                  onClick={() => void resetEmployeeCredential()}
-                >
-                  {resettingEmployee ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-                  Reset
-                </Button>
+                <div className="grid gap-2">
+                  <Button
+                    className="h-11 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                    disabled={!employeeIdValid || unlockingEmployee || resettingEmployee}
+                    onClick={() => void unlockEmployeePin()}
+                  >
+                    {unlockingEmployee ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockOpen className="h-4 w-4" />}
+                    Desbloquear intentos
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-11 rounded-lg border-red-400/30 bg-red-500/10 text-red-100 hover:bg-red-500/20"
+                    disabled={!employeeIdValid || resettingEmployee || unlockingEmployee}
+                    onClick={() => void resetEmployeeCredential()}
+                  >
+                    {resettingEmployee ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                    Generar codigo y reemplazar PIN
+                  </Button>
+                </div>
                 {employeeActivation && (
                   <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-4 text-center">
                     <p className="text-xs font-black uppercase tracking-widest text-amber-200">Codigo de un solo uso</p>
@@ -400,7 +444,7 @@ export default function AdministradoresPage() {
                   </div>
                 )}
                 <p className="text-xs font-semibold leading-relaxed text-white/40">
-                  El reset invalida sesiones, borra el PIN y genera un codigo temporal de activacion. La accion queda auditada sin guardar el codigo en texto plano.
+                  Desbloquear conserva el PIN actual. Generar codigo invalida sesiones, borra el PIN anterior y crea un codigo temporal de activacion. Ambas acciones quedan auditadas.
                 </p>
               </CardContent>
             </Card>

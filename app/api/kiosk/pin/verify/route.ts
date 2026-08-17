@@ -11,6 +11,7 @@ import {
   getKioskPinRateLimitKey,
   kioskPinRateLimitResponse,
   registerKioskPinFailure,
+  selectKioskPinPrecheckBlock,
 } from "@/lib/kiosk-pin-rate-limit";
 import { isSixDigitPin, legacyHashPin } from "@/lib/pin-utils";
 import { normalizePlantId } from "@/lib/plants";
@@ -53,8 +54,8 @@ export async function POST(req: NextRequest) {
       assertKioskPinRateLimit(db, attemptKey, "employee"),
       assertKioskPinRateLimit(db, clientAttemptKey, "client"),
     ]);
-    if (rateLimit.blocked) return kioskPinRateLimitResponse(rateLimit, true);
-    if (clientRateLimit.blocked) return kioskPinRateLimitResponse(clientRateLimit, true);
+    const precheckBlock = selectKioskPinPrecheckBlock(rateLimit, clientRateLimit);
+    if (precheckBlock) return kioskPinRateLimitResponse(precheckBlock, true);
 
     const employeeRef = db.collection("kiosk_employees").doc(employeeId);
     const secretRef = db.collection("kiosk_employee_secrets").doc(employeeId);
