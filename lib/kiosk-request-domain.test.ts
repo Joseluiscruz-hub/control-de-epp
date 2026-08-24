@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   KioskRequestError,
   assertUniqueRequestItems,
+  decideApprovedRequestResolution,
   isValidRequestItemShape,
   normalizeFulfillableItems,
 } from "./kiosk-request-domain";
@@ -74,4 +75,40 @@ test("normalizes trusted fulfillment fields without dropping the request", () =>
   assert.equal(item.chargeAmount, 125.5);
   assert.equal(item.signatureDataUrl, "data:image/png;base64,AAAA");
   assert.equal(item.durationRuleSapMaterial, null);
+});
+
+test("reuses existing assignments on an idempotent approval retry", () => {
+  assert.deepEqual(
+    decideApprovedRequestResolution({
+      currentStatus: "approved",
+      existingAssignmentIds: ["assignment-1"],
+      approvedWithAlert: false,
+      canApproveAlert: true,
+    }),
+    { kind: "already_fulfilled", assignmentIds: ["assignment-1"] }
+  );
+});
+
+test("does not resurrect a rejected request even if it has assignment ids", () => {
+  assert.throws(
+    () => decideApprovedRequestResolution({
+      currentStatus: "rejected",
+      existingAssignmentIds: ["assignment-1"],
+      approvedWithAlert: false,
+      canApproveAlert: true,
+    }),
+    (error: unknown) => error instanceof KioskRequestError && error.status === 409
+  );
+});
+
+test("requires alert approval permission before an idempotent retry", () => {
+  assert.throws(
+    () => decideApprovedRequestResolution({
+      currentStatus: "approved",
+      existingAssignmentIds: ["assignment-1"],
+      approvedWithAlert: true,
+      canApproveAlert: false,
+    }),
+    (error: unknown) => error instanceof KioskRequestError && error.status === 403
+  );
 });
