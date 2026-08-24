@@ -773,7 +773,7 @@ async function sanitizeRequestItem(
     throw new KioskRequestError("Item de EPP requerido.", 400);
   }
 
-  if (requestedReason && !VALID_REASONS.has(requestedReason)) {
+  if (requestedReason && !VALID_REASONS.has(requestedReason as ReplacementReason)) {
     throw new KioskRequestError("Motivo de solicitud invalido.", 400);
   }
   const replacementReason = requestedReason ? requestedReason as ReplacementReason : undefined;
