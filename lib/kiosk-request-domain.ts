@@ -168,6 +168,38 @@ function parseFulfillableItem(raw: unknown, index: number): FulfillableKioskItem
   };
 }
 
+export type ApprovedRequestResolutionDecision =
+  | { kind: "fulfill" }
+  | { kind: "already_fulfilled"; assignmentIds: string[] };
+
+export function decideApprovedRequestResolution(params: {
+  currentStatus: string;
+  existingAssignmentIds: string[];
+  approvedWithAlert: boolean;
+  canApproveAlert: boolean;
+}): ApprovedRequestResolutionDecision {
+  const {
+    currentStatus,
+    existingAssignmentIds,
+    approvedWithAlert,
+    canApproveAlert,
+  } = params;
+
+  if (currentStatus !== "pending" && currentStatus !== "approved") {
+    throw new KioskRequestError(`La solicitud ya esta ${currentStatus}.`, 409);
+  }
+  if (approvedWithAlert && !canApproveAlert) {
+    throw new KioskRequestError(
+      "Este usuario no esta autorizado para aprobar solicitudes con alerta de vida util.",
+      403
+    );
+  }
+  if (existingAssignmentIds.length > 0) {
+    return { kind: "already_fulfilled", assignmentIds: existingAssignmentIds };
+  }
+  return { kind: "fulfill" };
+}
+
 export function normalizeFulfillableItems(input: unknown): FulfillableKioskItem[] {
   if (!Array.isArray(input) || input.length === 0) {
     throw new KioskRequestError(
