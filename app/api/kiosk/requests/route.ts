@@ -21,6 +21,7 @@ import {
   KioskRequestError,
   VALID_KIOSK_REPLACEMENT_REASONS as VALID_REASONS,
   assertUniqueRequestItems,
+  decideApprovedRequestResolution,
   isValidRequestItemShape,
   normalizeFulfillableItems,
   readKioskNumber as readNumber,
@@ -410,18 +411,14 @@ async function fulfillApprovedKioskRequest(params: {
       ? existingAssignmentIds
       : existingFulfillmentIds;
     const approvedWithAlert = earlyReplacementSignal || alertsSnap.size > 0;
+    const resolution = decideApprovedRequestResolution({
+      currentStatus,
+      existingAssignmentIds: alreadyFulfilledIds,
+      approvedWithAlert,
+      canApproveAlert: canApproveKioskAlert(adminUser, plantaId),
+    });
 
-    if (currentStatus !== "pending" && currentStatus !== "approved") {
-      throw new KioskRequestError(`La solicitud ya esta ${currentStatus}.`, 409);
-    }
-    if (approvedWithAlert && !canApproveKioskAlert(adminUser, plantaId)) {
-      throw new KioskRequestError(
-        "Este usuario no esta autorizado para aprobar solicitudes con alerta de vida util.",
-        403
-      );
-    }
-
-    if (alreadyFulfilledIds.length > 0) {
+    if (resolution.kind === "already_fulfilled") {
       transaction.update(requestRef, {
         status: "approved",
         assignmentIds: alreadyFulfilledIds,
