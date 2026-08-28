@@ -98,7 +98,7 @@ export function AddEmployeeDialog({
               disabled={saving || !form.id || !form.name || !form.area || !form.costCenter}
               className="w-full h-14 rounded-xl bg-[#F40009] hover:bg-red-700 text-white font-bold uppercase tracking-widest transition-all"
             >
-              {saving ? <Loader2 className="h-6 w-6 animate-spin" /> : "Vincular a la Red FEMSA"}
+              {saving ? <Loader2 className="h-6 w-6 animate-spin" /> : "Vincular a la Red ORSTED CORP"}
             </Button>
           </DialogFooter>
         </form>
