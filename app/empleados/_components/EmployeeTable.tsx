@@ -96,7 +96,7 @@ export function EmployeeTable({
                     <td className="px-8 py-6">
                        <p className="font-bold text-white text-lg tracking-tight">{emp.name}</p>
                        <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">
-                         {emp.position || emp.jobFunction || 'Colaborador FEMSA'}
+                         {emp.position || emp.jobFunction || 'Colaborador ORSTED CORP'}
                        </p>
                     </td>
                     <td className="px-8 py-6">
