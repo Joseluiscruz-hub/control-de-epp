@@ -56,7 +56,7 @@ export function DashboardHero({ authDisplayName, stats, insights }: DashboardHer
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <span className="badge-femsa">Centro de mando EPP</span>
+            <span className="badge-brand">Centro de mando EPP</span>
           </motion.div>
 
           <motion.div
