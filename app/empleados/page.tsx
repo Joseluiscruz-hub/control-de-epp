@@ -30,7 +30,7 @@ export default function EmpleadosPage() {
           </div>
           <div>
             <h1 className="text-3xl font-black tracking-tight uppercase text-white">Nómina Activa</h1>
-            <p className="section-eyebrow mt-1">Control y gestión del personal operativo FEMSA</p>
+            <p className="section-eyebrow mt-1">Control y gestión del personal operativo ORSTED CORP</p>
           </div>
         </div>
 
