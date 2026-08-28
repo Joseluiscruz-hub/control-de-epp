@@ -191,7 +191,7 @@ export function AiChatPanel() {
 
   return (
     <>
-      {/* Floating Button - FEMSA themed */}
+      {/* Floating Button - ORSTED CORP themed */}
       <AnimatePresence>
         {!open && (
           <motion.button
@@ -233,7 +233,7 @@ export function AiChatPanel() {
                 : 'bottom-3 left-3 right-3 h-[calc(100dvh-1.5rem)] sm:bottom-6 sm:left-auto sm:right-6 sm:h-[640px] sm:max-h-[85vh] sm:w-[420px]'
             }`}
           >
-            {/* Header - FEMSA branded */}
+            {/* Header - ORSTED CORP branded */}
             <div className="flex items-center justify-between px-5 py-3.5 bg-[#0d1117] flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="relative">
