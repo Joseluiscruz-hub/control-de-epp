@@ -19,11 +19,11 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://assetguard.local'),
-  title: 'AssetGuard EPP — Control de Seguridad Industrial | Coca-Cola FEMSA',
+  title: 'AssetGuard EPP — Control de Seguridad Industrial | ORSTED CORP',
   description: 'Plataforma corporativa de gestión de Equipo de Protección Personal con inteligencia artificial predictiva y monitoreo en tiempo real.',
   manifest: '/manifest.webmanifest',
-  keywords: ['EPP', 'Seguridad Industrial', 'Coca-Cola FEMSA', 'AssetGuard', 'Control de Equipos', 'Protección Personal'],
-  authors: [{ name: 'Coca-Cola FEMSA — Seguridad Industrial' }],
+  keywords: ['EPP', 'Seguridad Industrial', 'ORSTED CORP', 'AssetGuard', 'Control de Equipos', 'Protección Personal'],
+  authors: [{ name: 'José Luis Cruz / ORSTED CORP demo' }],
   icons: {
     icon: '/favicon.ico',
     apple: '/icons/icon-192.png',
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     title: 'AssetGuard EPP',
   },
   openGraph: {
-    title: 'AssetGuard EPP — Coca-Cola FEMSA',
+    title: 'AssetGuard EPP — ORSTED CORP',
     description: 'Plataforma corporativa de gestión de Equipo de Protección Personal',
     type: 'website',
   },
