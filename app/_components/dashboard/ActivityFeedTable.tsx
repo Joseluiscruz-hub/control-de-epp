@@ -32,7 +32,7 @@ export function ActivityFeedTable({ loading, recentAssignments }: ActivityFeedTa
           </div>
           <div>
             <h2 className="text-base font-bold text-white">Bitácora de Seguridad</h2>
-            <p className="section-eyebrow">Coca-Cola FEMSA · Tiempo Real</p>
+            <p className="section-eyebrow">ORSTED CORP · Tiempo Real</p>
           </div>
         </div>
         <div className="command-strip flex items-center gap-2 px-3 py-1.5 text-[10px] font-bold" style={{color:'rgba(244,0,9,0.9)'}}>

@@ -318,13 +318,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
               </div>
             </motion.div>
             <h1 className="text-4xl font-black text-white tracking-tighter uppercase">AssetGuard</h1>
-            <p className="text-red-500/80 font-black tracking-[0.3em] uppercase text-[10px] mt-2">Coca-Cola FEMSA • Seguridad Industrial</p>
+            <p className="text-red-500/80 font-black tracking-[0.3em] uppercase text-[10px] mt-2">ORSTED CORP • Seguridad Industrial</p>
           </div>
 
           {/* Login Card */}
           <div className="enterprise-panel">
-            {/* FEMSA gradient stripe */}
-            <div className="h-1.5 bg-gradient-to-r from-femsa-red via-coca-cola-red to-femsa-gold" />
+            {/* ORSTED CORP gradient stripe */}
+            <div className="h-1.5 bg-gradient-to-r from-brand-red via-brand-red to-brand-gold" />
             
             <div className="p-10 text-center space-y-8">
               <div className="space-y-3">
@@ -394,9 +394,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em]">Sistemas Operativos</span>
           </div>
-          {/* Badge FEMSA */}
-          <div className="badge-femsa inline-block">
-            Coca-Cola FEMSA · Plataforma Corporativa Oficial
+          {/* Badge ORSTED CORP */}
+          <div className="badge-brand inline-block">
+            ORSTED CORP · Plataforma Corporativa Oficial
           </div>
           <p className="text-[9px] text-white/25 uppercase tracking-[0.4em]">AssetGuard v4.0 · Seguridad Industrial</p>
         </motion.div>

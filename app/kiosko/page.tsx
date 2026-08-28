@@ -98,7 +98,7 @@ export default function KioskoHomePage() {
         </div>
         <h1 className="text-4xl font-black text-white tracking-tight uppercase">Kiosko EPP</h1>
         <div className="flex items-center gap-2 text-amber-500 font-bold text-[10px] tracking-widest uppercase">
-          <ShieldCheck className="h-4 w-4" /> Coca-Cola FEMSA
+          <ShieldCheck className="h-4 w-4" /> ORSTED CORP
         </div>
         <p className="text-white/50 max-w-sm text-sm font-medium mt-2">
           Ingresa tu número de nómina corporativa para acceder a tu dotación.

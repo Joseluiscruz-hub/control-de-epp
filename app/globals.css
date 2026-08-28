@@ -7,14 +7,14 @@
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
-    /* Coca-Cola FEMSA Brand Colors */
-    --color-femsa-red: #F40009;
-    --color-femsa-red-dark: #B01E13;
-    --color-coca-cola-red: #F40009;
-    --color-femsa-black: #000000;
-    --color-femsa-white: #FFFFFF;
-    --color-femsa-gold: #D4A017;
-    --color-femsa-gold-light: #F5C842;
+    /* Brand palette */
+    --color-brand-red: #F40009;
+    --color-brand-red-dark: #B01E13;
+    --color-brand-red: #F40009;
+    --color-brand-black: #000000;
+    --color-brand-white: #FFFFFF;
+    --color-brand-gold: #D4A017;
+    --color-brand-gold-light: #F5C842;
     /* Corporate Dark Theme */
     --color-corporate-dark: #040813;
     --color-corporate-slate: #0A1628;
@@ -97,14 +97,14 @@
     --sidebar-accent-foreground: #F40009;
     --sidebar-border: rgba(255,255,255,0.06);
     --sidebar-ring: rgba(244,0,9,0.4);
-    /* FEMSA Brand System */
-    --femsa-red: #F40009;
-    --femsa-red-dark: #B01E13;
-    --femsa-gold: #D4A017;
-    --femsa-gold-light: #F5C842;
-    --femsa-black: #07090d;
-    --brand-primary: var(--femsa-red);
-    --brand-accent: var(--femsa-gold);
+    /* Brand palette */
+    --brand-red: #F40009;
+    --brand-red-dark: #B01E13;
+    --brand-gold: #D4A017;
+    --brand-gold-light: #F5C842;
+    --brand-black: #07090d;
+    --brand-primary: var(--brand-red);
+    --brand-accent: var(--brand-gold);
     /* Glass System */
     --glass-bg: rgba(255, 255, 255, 0.055);
     --glass-bg-hover: rgba(255, 255, 255, 0.085);
@@ -422,7 +422,7 @@
     box-shadow: 0 0 30px rgba(212,160,23,0.2), 0 0 80px rgba(212,160,23,0.06);
   }
 
-  .kpi-femsa-glow {
+  .kpi-brand-glow {
     text-shadow: 0 0 30px rgba(244,0,9,0.5);
     color: #F40009;
   }
@@ -529,10 +529,10 @@
   }
 }
 
-/* ── FEMSA Premium Components ─────────────── */
+/* ── Brand premium components ─────────────── */
 
-/* Badge Coca-Cola FEMSA */
-.badge-femsa {
+/* Brand badge */
+.badge-brand {
   background: rgba(244,0,9,0.12);
   border: 1px solid rgba(244,0,9,0.28);
   color: white;
@@ -545,7 +545,7 @@
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
-.badge-femsa-gold {
+.badge-brand-gold {
   background: rgba(212,160,23,0.14);
   border: 1px solid rgba(212,160,23,0.28);
   color: #F5C842;
@@ -558,8 +558,8 @@
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
-/* Línea decorativa FEMSA */
-.femsa-divider {
+/* Decorative brand rule */
+.brand-divider {
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(244,0,9,0.4), rgba(212,160,23,0.2), transparent);
   border: none;
