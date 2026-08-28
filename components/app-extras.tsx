@@ -28,13 +28,13 @@ export function AppExtras() {
   return (
     <>
       <footer className="relative z-10 no-print mt-auto">
-        <div className="femsa-divider mx-8" />
+        <div className="brand-divider mx-8" />
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-2">
           <span className="text-[rgba(248,250,252,0.3)] text-[10px] uppercase tracking-[0.2em] font-bold">
             AssetGuard Corporate v4.0
           </span>
           <span className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: "rgba(244,0,9,0.4)" }}>
-            Coca-Cola FEMSA · Impulsado por Gemini IA
+            ORSTED CORP · Impulsado por Gemini IA
           </span>
         </div>
       </footer>
