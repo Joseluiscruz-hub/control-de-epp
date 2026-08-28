@@ -74,7 +74,7 @@ export function NavBar() {
               <div className="hidden sm:block leading-none">
                 <span className="font-black text-white text-base leading-none block tracking-tight">AssetGuard</span>
                 <span className="text-[9px] font-bold tracking-[0.17em] uppercase leading-none mt-1 flex items-center gap-1" style={{color: 'rgba(244,0,9,0.75)'}}>
-                  Coca-Cola FEMSA
+                  ORSTED CORP
                   <span className="text-[8px] font-bold" style={{color:'rgba(255,255,255,0.25)'}}>· EPP</span>
                 </span>
                 <span className="hidden xl:block text-[8px] font-semibold uppercase tracking-[0.17em] text-white/35 mt-1">Plataforma corporativa</span>
