@@ -17,6 +17,18 @@ import {
 import { resolveEppConsumption } from "@/lib/epp-consumption-rules";
 import { resolveInventoryStockDecrease } from "@/lib/epp-package-rules";
 import { KioskEarlyReplacementAlert, KioskRequestItem, ReplacementReason } from "@/lib/kiosk-types";
+import {
+  KioskRequestError,
+  VALID_KIOSK_REPLACEMENT_REASONS as VALID_REASONS,
+  assertUniqueRequestItems,
+  decideApprovedRequestResolution,
+  isValidRequestItemShape,
+  normalizeFulfillableItems,
+  readKioskNumber as readNumber,
+  readKioskText as readText,
+  type FulfillableKioskItem,
+  type RequestItemInput,
+} from "@/lib/kiosk-request-domain";
 import { normalizePlantId } from "@/lib/plants";
 import { buildInventoryMovement } from "@/app/api/inventory/_lib";
 import { evaluateReplacement } from "@/lib/replacement-logic";
@@ -30,42 +42,8 @@ import { KioskSessionHttpError, assertSameOrigin, kioskSessionErrorResponse, req
 export const runtime = "nodejs";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const VALID_REASONS = new Set(["vida_util", "desgaste", "extravio"]);
 const ALERT_COLLECTION = "kiosk_alerts";
 const MAX_SIGNATURE_DATA_URL_LENGTH = 120_000;
-const REQUEST_ITEM_KEYS = new Set([
-  "itemId",
-  "itemName",
-  "sku",
-  "size",
-  "replacementDays",
-  "replacementReason",
-  "durationRuleId",
-  "durationRuleSource",
-  "durationRuleSku",
-  "durationRuleSapMaterial",
-  "requiredQuantity",
-  "requiredUnit",
-  "chargeAmount",
-  "signatureDataUrl",
-  "earlyReplacementAlert",
-]);
-
-class KioskRequestError extends Error {
-  status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "KioskRequestError";
-    this.status = status;
-  }
-}
-
-type RequestItemInput = Partial<KioskRequestItem>;
-type FulfillableKioskItem = KioskRequestItem & {
-  chargeAmount?: number;
-  signatureDataUrl?: string | null;
-};
 
 type SanitizedKioskItem = KioskRequestItem & {
   unitCost: number;
@@ -88,20 +66,12 @@ type StockUpdateResult = {
   unitsPerPackage?: number;
 };
 
-function readText(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 function optionalAuditText(value: string | null | undefined) {
   return value && value.length > 0 ? value : null;
 }
 
 function readPackageUnit(value: unknown): "CAJA" | "BOLSA" | undefined {
   return value === "CAJA" || value === "BOLSA" ? value : undefined;
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function toDate(value: unknown): Date | null {
@@ -121,11 +91,6 @@ function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
-}
-
-function readNumber(value: unknown, fallback = 0) {
-  const parsed = Number(value ?? fallback);
-  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function hasEarlyReplacementSignal(data: Record<string, unknown>) {
@@ -177,67 +142,6 @@ function sanitizeSignatureDataUrl(value: unknown) {
     throw new KioskRequestError("Formato de firma invalido.", 400);
   }
   return signature;
-}
-
-function isValidRequestItemShape(value: unknown): value is RequestItemInput {
-  if (!isObject(value)) return false;
-  const keys = Object.keys(value);
-  if (keys.some((key) => !REQUEST_ITEM_KEYS.has(key))) return false;
-
-  const itemId = readText(value.itemId);
-  if (!itemId) return false;
-
-  const replacementReason = readText(value.replacementReason);
-  if (replacementReason && !VALID_REASONS.has(replacementReason)) return false;
-
-  if (
-    value.replacementDays != null &&
-    (!Number.isFinite(Number(value.replacementDays)) || Number(value.replacementDays) <= 0)
-  ) {
-    return false;
-  }
-
-  if (value.chargeAmount != null && (!Number.isFinite(Number(value.chargeAmount)) || Number(value.chargeAmount) < 0)) {
-    return false;
-  }
-
-  if (value.signatureDataUrl != null && typeof value.signatureDataUrl !== "string") {
-    return false;
-  }
-
-  return true;
-}
-
-function normalizeFulfillableItems(input: unknown): FulfillableKioskItem[] {
-  if (!Array.isArray(input)) return [];
-  return input
-    .map((raw): FulfillableKioskItem | null => {
-      if (!raw || typeof raw !== "object") return null;
-      const item = raw as Record<string, unknown>;
-      const itemId = readText(item.itemId);
-      const itemName = readText(item.itemName);
-      const sku = readText(item.sku);
-      const size = readText(item.size) || "N/A";
-      const replacementDays = readNumber(item.replacementDays);
-      const replacementReason = readText(item.replacementReason);
-      if (!itemId || !itemName || !sku || replacementDays <= 0) return null;
-
-      return {
-        itemId,
-        itemName,
-        sku,
-        size,
-        replacementDays,
-        requiredQuantity: readNumber(item.requiredQuantity, 1),
-        requiredUnit: readText(item.requiredUnit),
-        unitCost: Math.max(0, readNumber(item.unitCost)),
-        category: readText(item.category) || "Sin categoria",
-        ...(VALID_REASONS.has(replacementReason) ? { replacementReason: replacementReason as ReplacementReason } : {}),
-        ...(readNumber(item.chargeAmount) > 0 ? { chargeAmount: readNumber(item.chargeAmount) } : {}),
-        ...(typeof item.signatureDataUrl === "string" ? { signatureDataUrl: item.signatureDataUrl } : {}),
-      };
-    })
-    .filter((item): item is FulfillableKioskItem => item !== null);
 }
 
 function getSizes(data: FirebaseFirestore.DocumentData) {
@@ -366,12 +270,104 @@ function buildStockUpdates(
   };
 }
 
+type KioskResolutionStatus = "approved" | "rejected";
+
+function resolveKioskAlerts(params: {
+  transaction: FirebaseFirestore.Transaction;
+  alerts: FirebaseFirestore.QuerySnapshot;
+  status: KioskResolutionStatus;
+  actor: KioskApprovalActor;
+}) {
+  const { transaction, alerts, status, actor } = params;
+  const patch = {
+    status: status === "approved" ? "acknowledged" : "dismissed",
+    requestStatus: status,
+    resolvedByUserId: actor.uid,
+    resolvedByEmail: actor.email,
+    resolvedByEmployeeId: optionalAuditText(actor.employeeId),
+    resolvedByName: actor.name,
+    resolvedByRole: actor.role,
+    resolvedByPlantId: actor.plantaId,
+    ...(status === "approved"
+      ? {
+          approvedByUserId: actor.uid,
+          approvedByEmail: actor.email,
+          approvedByEmployeeId: optionalAuditText(actor.employeeId),
+          approvedByName: actor.name,
+          approvedAlertPermissionSource: actor.permissionSource,
+        }
+      : {}),
+    resolvedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+
+  alerts.docs.forEach((alertDoc) => transaction.update(alertDoc.ref, patch));
+}
+
+function writeKioskResolutionAudit(params: {
+  transaction: FirebaseFirestore.Transaction;
+  db: FirebaseFirestore.Firestore;
+  req: NextRequest;
+  requestId: string;
+  status: KioskResolutionStatus;
+  assignmentIds: string[];
+  plantaId: string;
+  fulfilled: boolean;
+  approvedWithAlert: boolean;
+  actor: KioskApprovalActor;
+  alertCount: number;
+}) {
+  const {
+    transaction,
+    db,
+    req,
+    requestId,
+    status,
+    assignmentIds,
+    plantaId,
+    fulfilled,
+    approvedWithAlert,
+    actor,
+    alertCount,
+  } = params;
+
+  transaction.set(db.collection("audit_events").doc(), buildAuditEvent({
+    type: approvedWithAlert
+      ? "kiosk.request.approve_with_alert"
+      : status === "approved"
+        ? "kiosk.request.approve"
+        : "kiosk.request.reject",
+    actorUid: actor.uid,
+    actorEmail: actor.email,
+    targetCollection: "kiosk_requests",
+    targetId: requestId,
+    after: {
+      status,
+      assignmentIds,
+      approvedWithAlert,
+      approvedByEmployeeId: optionalAuditText(actor.employeeId),
+      approvedByName: actor.name,
+    },
+    metadata: {
+      plantaId,
+      fulfilled,
+      alertCount,
+      actorEmployeeId: optionalAuditText(actor.employeeId),
+      actorName: actor.name,
+      actorRole: actor.role,
+      actorPlantId: actor.plantaId,
+      alertApprovalPermissionSource: actor.permissionSource,
+    },
+  }, req));
+}
+
 async function fulfillApprovedKioskRequest(params: {
   db: FirebaseFirestore.Firestore;
+  req: NextRequest;
   requestId: string;
   adminUser: AdminSession;
 }) {
-  const { db, requestId, adminUser } = params;
+  const { db, req, requestId, adminUser } = params;
   const requestRef = db.collection("kiosk_requests").doc(requestId);
   const statusRef = db.collection("kiosk_request_status").doc(requestId);
 
@@ -389,26 +385,40 @@ async function fulfillApprovedKioskRequest(params: {
     const employeeArea = readText(requestData.employeeArea);
     const plantaId = normalizePlantId(requestData.plantaId);
     const items = normalizeFulfillableItems(requestData.items);
-    const approvedWithAlert = hasEarlyReplacementSignal(requestData);
+    const earlyReplacementSignal = hasEarlyReplacementSignal(requestData);
     const approvalActor = buildKioskApprovalActor(adminUser, plantaId);
     const existingAssignmentIds = Array.isArray(requestData.assignmentIds)
       ? requestData.assignmentIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
       : [];
 
-    if (!employeeId || !employeeName || items.length === 0) {
+    if (!employeeId || !employeeName) {
       throw new KioskRequestError("Solicitud de kiosko incompleta para sincronizar consumo.", 409);
     }
     if (!canAdminUsePlant(adminUser, plantaId)) {
       throw new KioskRequestError("No tienes permisos para operar esta planta.", 403);
     }
 
-    const existingFulfillmentSnap = await transaction.get(
-      db.collection("assignments").where("kioskRequestId", "==", requestId).limit(20)
-    );
+    const [existingFulfillmentSnap, alertsSnap] = await Promise.all([
+      transaction.get(
+        db.collection("assignments").where("kioskRequestId", "==", requestId).limit(20)
+      ),
+      transaction.get(
+        db.collection(ALERT_COLLECTION).where("requestId", "==", requestId).limit(50)
+      ),
+    ]);
     const existingFulfillmentIds = existingFulfillmentSnap.docs.map((docSnap) => docSnap.id);
-    const alreadyFulfilledIds = existingAssignmentIds.length > 0 ? existingAssignmentIds : existingFulfillmentIds;
+    const alreadyFulfilledIds = existingAssignmentIds.length > 0
+      ? existingAssignmentIds
+      : existingFulfillmentIds;
+    const approvedWithAlert = earlyReplacementSignal || alertsSnap.size > 0;
+    const resolution = decideApprovedRequestResolution({
+      currentStatus,
+      existingAssignmentIds: alreadyFulfilledIds,
+      approvedWithAlert,
+      canApproveAlert: canApproveKioskAlert(adminUser, plantaId),
+    });
 
-    if (alreadyFulfilledIds.length > 0) {
+    if (resolution.kind === "already_fulfilled") {
       transaction.update(requestRef, {
         status: "approved",
         assignmentIds: alreadyFulfilledIds,
@@ -427,17 +437,32 @@ async function fulfillApprovedKioskRequest(params: {
         },
         { merge: true }
       );
-      return { assignmentIds: alreadyFulfilledIds, fulfilled: false, plantaId, approvedWithAlert: false, approvalActor };
-    }
-
-    if (currentStatus !== "pending" && currentStatus !== "approved") {
-      throw new KioskRequestError(`La solicitud ya esta ${currentStatus}.`, 409);
-    }
-    if (approvedWithAlert && !canApproveKioskAlert(adminUser, plantaId)) {
-      throw new KioskRequestError(
-        "Este usuario no esta autorizado para aprobar solicitudes con alerta de vida util.",
-        403
-      );
+      resolveKioskAlerts({
+        transaction,
+        alerts: alertsSnap,
+        status: "approved",
+        actor: approvalActor,
+      });
+      writeKioskResolutionAudit({
+        transaction,
+        db,
+        req,
+        requestId,
+        status: "approved",
+        assignmentIds: alreadyFulfilledIds,
+        plantaId,
+        fulfilled: false,
+        approvedWithAlert,
+        actor: approvalActor,
+        alertCount: alertsSnap.size,
+      });
+      return {
+        assignmentIds: alreadyFulfilledIds,
+        fulfilled: false,
+        plantaId,
+        approvedWithAlert,
+        approvalActor,
+      };
     }
 
     const catalogRefs = items.map((item) => db.collection("ppe_catalog").doc(item.itemId));
@@ -630,6 +655,25 @@ async function fulfillApprovedKioskRequest(params: {
       },
       { merge: true }
     );
+    resolveKioskAlerts({
+      transaction,
+      alerts: alertsSnap,
+      status: "approved",
+      actor: approvalActor,
+    });
+    writeKioskResolutionAudit({
+      transaction,
+      db,
+      req,
+      requestId,
+      status: "approved",
+      assignmentIds,
+      plantaId,
+      fulfilled: true,
+      approvedWithAlert,
+      actor: approvalActor,
+      alertCount: alertsSnap.size,
+    });
 
     return { assignmentIds, fulfilled: true, plantaId, approvedWithAlert, approvalActor };
   });
@@ -637,10 +681,11 @@ async function fulfillApprovedKioskRequest(params: {
 
 async function rejectKioskRequest(params: {
   db: FirebaseFirestore.Firestore;
+  req: NextRequest;
   requestId: string;
   adminUser: AdminSession;
 }) {
-  const { db, requestId, adminUser } = params;
+  const { db, req, requestId, adminUser } = params;
   const requestRef = db.collection("kiosk_requests").doc(requestId);
   const statusRef = db.collection("kiosk_request_status").doc(requestId);
 
@@ -661,6 +706,11 @@ async function rejectKioskRequest(params: {
       throw new KioskRequestError(`La solicitud ya esta ${currentStatus}.`, 409);
     }
 
+    const alertsSnap = await transaction.get(
+      db.collection(ALERT_COLLECTION).where("requestId", "==", requestId).limit(50)
+    );
+    const resolutionActor = buildKioskApprovalActor(adminUser, plantaId);
+
     transaction.update(requestRef, {
       status: "rejected",
       plantaId,
@@ -680,13 +730,32 @@ async function rejectKioskRequest(params: {
       },
       { merge: true }
     );
+    resolveKioskAlerts({
+      transaction,
+      alerts: alertsSnap,
+      status: "rejected",
+      actor: resolutionActor,
+    });
+    writeKioskResolutionAudit({
+      transaction,
+      db,
+      req,
+      requestId,
+      status: "rejected",
+      assignmentIds: [],
+      plantaId,
+      fulfilled: false,
+      approvedWithAlert: false,
+      actor: resolutionActor,
+      alertCount: alertsSnap.size,
+    });
 
     return {
       assignmentIds: [],
       fulfilled: false,
       plantaId,
       approvedWithAlert: false,
-      approvalActor: buildKioskApprovalActor(adminUser, plantaId),
+      approvalActor: resolutionActor,
     };
   });
 }
@@ -704,7 +773,7 @@ async function sanitizeRequestItem(
     throw new KioskRequestError("Item de EPP requerido.", 400);
   }
 
-  if (requestedReason && !VALID_REASONS.has(requestedReason)) {
+  if (requestedReason && !VALID_REASONS.has(requestedReason as ReplacementReason)) {
     throw new KioskRequestError("Motivo de solicitud invalido.", 400);
   }
   const replacementReason = requestedReason ? requestedReason as ReplacementReason : undefined;
@@ -837,6 +906,7 @@ export async function POST(req: NextRequest) {
     if (!itemsInput.every(isValidRequestItemShape)) {
       return Response.json({ error: "Items de solicitud invalidos." }, { status: 400 });
     }
+    assertUniqueRequestItems(itemsInput);
 
     await requirePublicRateLimit(db, req, "kiosk_request_create");
 
@@ -1006,79 +1076,16 @@ export async function PATCH(req: NextRequest) {
     const result = status === "approved"
       ? await fulfillApprovedKioskRequest({
           db,
+          req,
           requestId,
           adminUser,
         })
       : await rejectKioskRequest({
           db,
+          req,
           requestId,
           adminUser,
         });
-
-    const alertsSnap = await db
-      .collection(ALERT_COLLECTION)
-      .where("requestId", "==", requestId)
-      .limit(50)
-      .get();
-
-    const batch = db.batch();
-    const resolutionActor = status === "approved"
-      ? result.approvalActor
-      : buildKioskApprovalActor(adminUser, result.plantaId);
-    const approvedWithAlert = status === "approved" && alertsSnap.size > 0;
-    alertsSnap.docs.forEach((alertDoc) => {
-      batch.update(alertDoc.ref, {
-        status: status === "approved" ? "acknowledged" : "dismissed",
-        requestStatus: status,
-        resolvedByUserId: resolutionActor.uid,
-        resolvedByEmail: resolutionActor.email,
-        resolvedByEmployeeId: optionalAuditText(resolutionActor.employeeId),
-        resolvedByName: resolutionActor.name,
-        resolvedByRole: resolutionActor.role,
-        resolvedByPlantId: resolutionActor.plantaId,
-        ...(status === "approved"
-          ? {
-              approvedByUserId: resolutionActor.uid,
-              approvedByEmail: resolutionActor.email,
-              approvedByEmployeeId: optionalAuditText(resolutionActor.employeeId),
-              approvedByName: resolutionActor.name,
-              approvedAlertPermissionSource: resolutionActor.permissionSource,
-            }
-          : {}),
-        resolvedAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    });
-    batch.set(db.collection("audit_events").doc(), buildAuditEvent({
-      type: approvedWithAlert
-        ? "kiosk.request.approve_with_alert"
-        : status === "approved"
-          ? "kiosk.request.approve"
-          : "kiosk.request.reject",
-      actorUid: adminUser.uid,
-      actorEmail: adminUser.email,
-      targetCollection: "kiosk_requests",
-      targetId: requestId,
-      after: {
-        status,
-        assignmentIds: result.assignmentIds,
-        approvedWithAlert,
-        approvedByEmployeeId: optionalAuditText(resolutionActor.employeeId),
-        approvedByName: resolutionActor.name,
-      },
-      metadata: {
-        plantaId: result.plantaId,
-        fulfilled: result.fulfilled,
-        alertCount: alertsSnap.size,
-        actorEmployeeId: optionalAuditText(resolutionActor.employeeId),
-        actorName: resolutionActor.name,
-        actorRole: resolutionActor.role,
-        actorPlantId: resolutionActor.plantaId,
-        alertApprovalPermissionSource: resolutionActor.permissionSource,
-      },
-    }, req));
-
-    await batch.commit();
 
     return Response.json({ success: true, requestId, status, ...result });
   } catch (error) {
