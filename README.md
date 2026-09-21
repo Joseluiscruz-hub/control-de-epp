@@ -63,6 +63,7 @@ flowchart LR
 - ✅ ARIA con Gemini desde servidor.
 - ✅ Tests, typecheck, lint y build automatizados.
 - ✅ Staging automático y promoción controlada a producción en Cloud Run.
+- ✅ **Piloto de 2 meses** en planta de producción de una embotelladora líder en México: **543 usuarios registrados**; operación estable sin incidentes críticos.
 
 ## Arquitectura
 
