@@ -191,46 +191,45 @@ export function AiChatPanel() {
 
   return (
     <>
-      {/* Floating Button - ORSTED CORP themed */}
+      {/* Docked edge tab — non-blocking (replaces floating FAB) */}
       <AnimatePresence>
         {!open && (
           <motion.button
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            initial={{ x: 40, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 40, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 24 }}
             onClick={() => setOpen(true)}
-            className="fixed bottom-3 right-3 z-50 group flex items-center gap-2.5 bg-[#10151d] text-white px-4 py-3 sm:bottom-6 sm:right-6 sm:px-5 sm:py-4 rounded-xl shadow-2xl shadow-black/30 hover:shadow-red-950/20 transition-all duration-500 hover:scale-105 active:scale-95 border border-white/10"
+            className="fixed right-0 top-1/2 z-40 -translate-y-1/2 group flex flex-col items-center gap-2 bg-[#10151d] text-white px-2.5 py-4 rounded-l-xl shadow-2xl shadow-black/40 hover:bg-[#141b24] transition-colors border border-r-0 border-white/12"
             title="Abrir ARIA - Asistente IA"
             aria-label="Abrir ARIA - Asistente IA"
           >
             <div className="relative">
-              <div className="h-9 w-9 rounded-lg bg-[#F40009] flex items-center justify-center shadow-lg shadow-red-950/20 group-hover:shadow-red-950/40 transition-shadow">
-                <Bot className="h-5 w-5 text-white" />
+              <div className="h-8 w-8 rounded-lg bg-[#F40009] flex items-center justify-center shadow-lg shadow-red-950/30">
+                <Bot className="h-4 w-4 text-white" />
               </div>
-              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-green-400 rounded-full border-2 border-slate-950 animate-pulse" />
+              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-green-400 rounded-full border-2 border-slate-950 animate-pulse" />
             </div>
-            <div className="hidden sm:block">
-              <span className="font-black text-sm tracking-tight block">ARIA</span>
-              <span className="text-[9px] text-red-500 font-bold uppercase tracking-widest">IA Activa</span>
-            </div>
-            <Sparkles className="h-4 w-4 text-red-400 group-hover:rotate-12 transition-transform" />
+            <span className="text-[9px] font-black tracking-[0.18em] uppercase writing-mode-vertical" style={{ writingMode: 'vertical-rl' }}>
+              ARIA
+            </span>
+            <Sparkles className="h-3.5 w-3.5 text-red-400 opacity-80 group-hover:opacity-100" />
           </motion.button>
         )}
       </AnimatePresence>
 
-      {/* Chat Panel */}
+      {/* Right-docked chat panel */}
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className={`fixed z-50 bg-[#f8fafc] rounded-xl shadow-2xl shadow-black/25 border border-white/20 flex flex-col overflow-hidden ${
+            initial={{ opacity: 0, x: 48 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 48 }}
+            transition={{ type: "spring", damping: 28, stiffness: 320 }}
+            className={`fixed z-50 bg-[#f8fafc] shadow-2xl shadow-black/35 border border-white/20 flex flex-col overflow-hidden ${
               minimized
-                ? 'bottom-3 left-3 right-3 h-16 sm:bottom-6 sm:left-auto sm:right-6 sm:w-72'
-                : 'bottom-3 left-3 right-3 h-[calc(100dvh-1.5rem)] sm:bottom-6 sm:left-auto sm:right-6 sm:h-[640px] sm:max-h-[85vh] sm:w-[420px]'
+                ? 'right-0 top-1/2 -translate-y-1/2 h-14 w-72 rounded-l-xl border-r-0'
+                : 'inset-y-0 right-0 h-full w-full sm:w-[400px] sm:max-w-[min(400px,100vw)] rounded-none sm:rounded-l-xl sm:border-r-0'
             }`}
           >
             {/* Header - ORSTED CORP branded */}
