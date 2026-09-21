@@ -143,7 +143,7 @@ export function KpiCardGrid({ loading, stats }: KpiCardGridProps) {
             </div>
           </div>
 
-          {/* Sub — real status copy only (no fake sparklines) */}
+          {/* Sub — real status only (no fake sparklines) */}
           <div className="flex items-center gap-2 mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: card.accentColor }} />
             <p className="text-[10px] font-semibold text-secondary uppercase tracking-wider">{card.sub}</p>

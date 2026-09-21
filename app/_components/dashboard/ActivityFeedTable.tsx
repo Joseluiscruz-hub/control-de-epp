@@ -7,10 +7,14 @@ import { es } from 'date-fns/locale';
 import Link from 'next/link';
 import type { Assignment } from '@/app/_hooks/useDashboardData';
 
+// ── Props ─────────────────────────────────────────────────────
+
 export interface ActivityFeedTableProps {
   loading: boolean;
   recentAssignments: Assignment[];
 }
+
+// ── Component ─────────────────────────────────────────────────
 
 export function ActivityFeedTable({ loading, recentAssignments }: ActivityFeedTableProps) {
   return (
@@ -20,6 +24,7 @@ export function ActivityFeedTable({ loading, recentAssignments }: ActivityFeedTa
       transition={{ delay: 0.7 }}
       className="xl:col-span-2 enterprise-panel"
     >
+      {/* Header */}
       <div className="flex items-center justify-between px-5 py-4" style={{borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{background:'rgba(244,0,9,0.12)', border:'1px solid rgba(244,0,9,0.2)'}}>
@@ -36,6 +41,7 @@ export function ActivityFeedTable({ loading, recentAssignments }: ActivityFeedTa
         </div>
       </div>
 
+      {/* Table */}
       {loading ? (
         <div className="space-y-2 p-5">
           {[1,2,3,4,5].map(i => (
