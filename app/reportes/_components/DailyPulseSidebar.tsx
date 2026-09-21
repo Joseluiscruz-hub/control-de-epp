@@ -34,8 +34,9 @@ export function DailyPulseSidebar({
             </div>
           ))}
           {!loading && summaryRows.length === 0 && (
-            <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4 text-sm font-semibold text-white/45">
-              Sin lineas para mostrar.
+            <div className="empty-state py-8">
+              <p className="empty-state-title">Sin líneas del día</p>
+              <p className="empty-state-body">El pulso diario se llena con consumos reales del corte seleccionado.</p>
             </div>
           )}
         </div>
