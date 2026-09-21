@@ -138,7 +138,7 @@ export function KpiCardGrid({ loading, stats }: KpiCardGridProps) {
             <div className="text-3xl sm:text-4xl font-black text-white tracking-tighter kpi-white-glow tabular-nums">
               {card.value}
             </div>
-            <div className="text-[11px] font-semibold text-secondary uppercase tracking-widest mt-1">
+            <div className="text-[11px] font-semibold text-white/55 uppercase tracking-widest mt-1">
               {card.title}
             </div>
           </div>
@@ -146,7 +146,7 @@ export function KpiCardGrid({ loading, stats }: KpiCardGridProps) {
           {/* Sub — real status only (no fake sparklines) */}
           <div className="flex items-center gap-2 mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: card.accentColor }} />
-            <p className="text-[10px] font-semibold text-secondary uppercase tracking-wider">{card.sub}</p>
+            <p className="text-[10px] font-semibold text-white/55 uppercase tracking-wider">{card.sub}</p>
           </div>
         </motion.div>
       ))}

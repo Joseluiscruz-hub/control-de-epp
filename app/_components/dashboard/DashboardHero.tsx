@@ -70,7 +70,7 @@ export function DashboardHero({ authDisplayName, stats, insights }: DashboardHer
                 Operación en vivo
               </span>
             </h1>
-            <p className="text-secondary text-sm font-medium mt-3 leading-relaxed max-w-xl">
+            <p className="text-white/70 text-sm font-medium mt-3 leading-relaxed max-w-xl">
               Hola {authDisplayName?.split(' ')[0] || 'Admin'}. Estado operativo de{' '}
               <span className="text-white/85 font-semibold">{stats.activeEmployees} colaboradores</span>
               {' · '}inventario, kiosko y alertas en un solo tablero.
