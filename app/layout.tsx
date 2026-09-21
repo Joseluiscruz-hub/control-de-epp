@@ -1,6 +1,7 @@
 import type {Metadata} from 'next';
 import Script from 'next/script';
 import './globals.css';
+import './command-center-polish.css';
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 
