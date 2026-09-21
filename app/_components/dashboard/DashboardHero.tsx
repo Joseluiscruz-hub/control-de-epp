@@ -64,16 +64,16 @@ export function DashboardHero({ authDisplayName, stats, insights }: DashboardHer
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <h1 className="text-4xl lg:text-6xl font-black tracking-tight text-white leading-[0.95]">
-              Seguridad operativa,
-              <span className="block text-gradient-red">
-                inteligente y corporativa
+            <h1 className="text-3xl lg:text-4xl font-black tracking-tight text-white leading-tight">
+              Centro de control EPP
+              <span className="block text-gradient-red text-2xl lg:text-3xl mt-1">
+                Operación en vivo
               </span>
             </h1>
-            <p className="text-white/60 text-base font-medium mt-4 leading-relaxed max-w-2xl">
-              Hola {authDisplayName?.split(' ')[0] || 'Admin'}. Monitoreo activo de{' '}
-              <span className="text-white/80 font-semibold">{stats.activeEmployees} colaboradores</span>
-              {' '}con inventario, solicitudes de kiosko y análisis ARIA en un centro de control unificado.
+            <p className="text-secondary text-sm font-medium mt-3 leading-relaxed max-w-xl">
+              Hola {authDisplayName?.split(' ')[0] || 'Admin'}. Estado operativo de{' '}
+              <span className="text-white/85 font-semibold">{stats.activeEmployees} colaboradores</span>
+              {' · '}inventario, kiosko y alertas en un solo tablero.
             </p>
           </motion.div>
 
