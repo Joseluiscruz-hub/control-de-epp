@@ -67,9 +67,12 @@ export function MonthlySpendingChart({ spending, goal, loading }: MonthlySpendin
       </div>
 
       {spending && spending.unpricedAssignmentCount > 0 && (
-        <div className="mt-5 flex items-start gap-2 border-t border-white/8 pt-4 text-xs text-amber-300/80">
+        <div className="ops-alert mt-5" role="status">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{spending.unpricedAssignmentCount} entregas no tienen costo en la asignacion ni en el catalogo y no se incluyen en el total.</span>
+          <div>
+            <p className="ops-alert-title">Valorización incompleta</p>
+            <p className="ops-alert-body">{spending.unpricedAssignmentCount} entregas sin costo (asignación o catálogo) quedan fuera del total de este gráfico.</p>
+          </div>
         </div>
       )}
     </section>
