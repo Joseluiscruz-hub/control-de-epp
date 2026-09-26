@@ -157,6 +157,8 @@ npm run build
 - Alertas operativas por correo o Teams.
 - Fortalecimiento del modo offline para kioskos físicos.
 
+> Orsted Corp es tenant de laboratorio (Microsoft 365 E5). No es el cliente ni el empleador.
+
 ## Autor
 
 **José Luis Cruz Prieto** · [@Joseluiscruz-hub](https://github.com/Joseluiscruz-hub)
